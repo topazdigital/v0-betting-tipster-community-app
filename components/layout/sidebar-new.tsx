@@ -184,11 +184,14 @@ export function SidebarNew({ selectedSportId, onSelectSport }: SidebarNewProps) 
               {topLeagues.map((league) => (
                 <Link
                   key={league.id}
-                  href={`/matches?league=${league.slug}`}
-                  className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-sidebar-foreground transition-colors hover:bg-sidebar-accent/50"
+                  href={`/leagues/${league.slug}`}
+                  className="flex items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-sm text-sidebar-foreground transition-colors hover:bg-sidebar-accent/50"
                 >
-                  <span className="text-sm">{getCountryFlag(league.countryCode)}</span>
-                  <span className="truncate">{league.name}</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm">{getCountryFlag(league.countryCode)}</span>
+                    <span className="truncate">{league.name}</span>
+                  </div>
+                  <ChevronRight className="h-3 w-3 text-sidebar-foreground/40" />
                 </Link>
               ))}
             </nav>
