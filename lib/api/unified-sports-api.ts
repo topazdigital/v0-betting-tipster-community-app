@@ -157,8 +157,8 @@ const ODDS_API_IO_SPORTS: Record<string, { sportId: number; leagueId: number }> 
 // ============================================
 
 const CACHE_DURATION = {
-  live: 30 * 1000, // 30 seconds for live data
-  upcoming: 5 * 60 * 1000, // 5 minutes for upcoming
+  live: 15 * 1000, // 15 seconds for live data (more real-time)
+  upcoming: 2 * 60 * 1000, // 2 minutes for upcoming
   standings: 15 * 60 * 1000, // 15 minutes for standings
   outrights: 30 * 60 * 1000, // 30 minutes for outrights
 };
@@ -184,6 +184,7 @@ function setCache(key: string, data: unknown): void {
 
 // Track API status for debugging
 const apiStatus = {
+  espn: { working: true, lastError: '', lastCheck: 0 }, // ESPN - Free, no API key
   theOddsApi: { working: false, lastError: '', lastCheck: 0 },
   sportsDataIo: { working: true, lastError: '', lastCheck: 0 },
   oddsApiIo: { working: false, lastError: '', lastCheck: 0 },
@@ -396,6 +397,758 @@ export async function getTheOddsAPIMatches(
       },
       odds: bestOdds,
       markets,
+      tipsCount: 0,
+    };
+  });
+
+  setCache(cacheKey, matches);
+  return matches;
+}
+
+// ============================================
+// ESPN API Client (FREE - No API Key Required)
+// ============================================
+
+const ESPN_BASE_URL = 'https://site.api.espn.com/apis/site/v2/sports';
+
+interface ESPNEvent {
+  id: string;
+  name: string;
+  shortName: string;
+  date: string;
+  status: {
+    type: {
+      id: string;
+      name: string;
+      state: string;
+      completed: boolean;
+      description: string;
+    };
+    period?: number;
+    displayClock?: string;
+  };
+  competitions: Array<{
+    id: string;
+    competitors: Array<{
+      id: string;
+      team: {
+        id: string;
+        name: string;
+        abbreviation: string;
+        displayName: string;
+        logo?: string;
+      };
+      homeAway: 'home' | 'away';
+      score?: string;
+    }>;
+  }>;
+}
+
+interface ESPNScoreboardResponse {
+  events: ESPNEvent[];
+  leagues?: Array<{
+    id: string;
+    name: string;
+    abbreviation: string;
+  }>;
+}
+
+async function fetchESPN(sport: string, league: string, endpoint: string = 'scoreboard'): Promise<ESPNScoreboardResponse | null> {
+  const url = `${ESPN_BASE_URL}/${sport}/${league}/${endpoint}`;
+  
+  try {
+    const response = await fetch(url, {
+      headers: { 'Accept': 'application/json' },
+      next: { revalidate: 15 }, // Revalidate every 15 seconds for live data
+    });
+
+    if (!response.ok) {
+      console.warn(`[ESPN] Error fetching ${sport}/${league}: ${response.status}`);
+      apiStatus.espn.lastError = `HTTP ${response.status}`;
+      return null;
+    }
+
+    apiStatus.espn.working = true;
+    apiStatus.espn.lastCheck = Date.now();
+    
+    return await response.json();
+  } catch (error) {
+    console.error('[ESPN] Fetch error:', error);
+    apiStatus.espn.lastError = String(error);
+    return null;
+  }
+}
+
+function mapESPNStatus(status: ESPNEvent['status']): UnifiedMatch['status'] {
+  const state = status.type.state?.toLowerCase() || '';
+  const name = status.type.name?.toLowerCase() || '';
+  
+  if (state === 'in' || name === 'in progress' || name === 'in_progress') return 'live';
+  if (name === 'halftime' || name === 'half') return 'halftime';
+  if (state === 'post' || status.type.completed) return 'finished';
+  if (name === 'postponed') return 'postponed';
+  if (name === 'canceled' || name === 'cancelled') return 'cancelled';
+  return 'scheduled';
+}
+
+// Get NBA scores from ESPN
+export async function getESPNNBAScores(): Promise<UnifiedMatch[]> {
+  const cacheKey = 'espn-nba-scores';
+  const cached = getCached<UnifiedMatch[]>(cacheKey, CACHE_DURATION.live);
+  if (cached) return cached;
+
+  const data = await fetchESPN('basketball', 'nba');
+  if (!data?.events) return [];
+
+  const matches: UnifiedMatch[] = data.events.map((event) => {
+    const competition = event.competitions[0];
+    const homeTeam = competition?.competitors.find(c => c.homeAway === 'home');
+    const awayTeam = competition?.competitors.find(c => c.homeAway === 'away');
+
+    return {
+      id: `espn_nba_${event.id}`,
+      externalId: event.id,
+      source: 'sportsdata-io' as const, // Using this to match existing type
+      sportId: 2,
+      sportKey: 'basketball_nba',
+      leagueId: 101,
+      leagueKey: 'nba',
+      homeTeam: {
+        id: homeTeam?.team.id || '',
+        name: homeTeam?.team.displayName || homeTeam?.team.name || 'TBD',
+        shortName: homeTeam?.team.abbreviation || 'TBD',
+        logo: homeTeam?.team.logo,
+      },
+      awayTeam: {
+        id: awayTeam?.team.id || '',
+        name: awayTeam?.team.displayName || awayTeam?.team.name || 'TBD',
+        shortName: awayTeam?.team.abbreviation || 'TBD',
+        logo: awayTeam?.team.logo,
+      },
+      kickoffTime: new Date(event.date),
+      status: mapESPNStatus(event.status),
+      homeScore: homeTeam?.score ? parseInt(homeTeam.score, 10) : null,
+      awayScore: awayTeam?.score ? parseInt(awayTeam.score, 10) : null,
+      minute: event.status.period,
+      period: event.status.displayClock,
+      league: {
+        id: 101,
+        name: 'NBA',
+        slug: 'nba',
+        country: 'USA',
+        countryCode: 'US',
+        tier: 1,
+      },
+      sport: {
+        id: 2,
+        name: 'Basketball',
+        slug: 'basketball',
+        icon: 'basketball',
+      },
+      tipsCount: 0,
+    };
+  });
+
+  setCache(cacheKey, matches);
+  return matches;
+}
+
+// Get NFL scores from ESPN
+export async function getESPNNFLScores(): Promise<UnifiedMatch[]> {
+  const cacheKey = 'espn-nfl-scores';
+  const cached = getCached<UnifiedMatch[]>(cacheKey, CACHE_DURATION.live);
+  if (cached) return cached;
+
+  const data = await fetchESPN('football', 'nfl');
+  if (!data?.events) return [];
+
+  const matches: UnifiedMatch[] = data.events.map((event) => {
+    const competition = event.competitions[0];
+    const homeTeam = competition?.competitors.find(c => c.homeAway === 'home');
+    const awayTeam = competition?.competitors.find(c => c.homeAway === 'away');
+
+    return {
+      id: `espn_nfl_${event.id}`,
+      externalId: event.id,
+      source: 'sportsdata-io' as const,
+      sportId: 5,
+      sportKey: 'americanfootball_nfl',
+      leagueId: 401,
+      leagueKey: 'nfl',
+      homeTeam: {
+        id: homeTeam?.team.id || '',
+        name: homeTeam?.team.displayName || homeTeam?.team.name || 'TBD',
+        shortName: homeTeam?.team.abbreviation || 'TBD',
+        logo: homeTeam?.team.logo,
+      },
+      awayTeam: {
+        id: awayTeam?.team.id || '',
+        name: awayTeam?.team.displayName || awayTeam?.team.name || 'TBD',
+        shortName: awayTeam?.team.abbreviation || 'TBD',
+        logo: awayTeam?.team.logo,
+      },
+      kickoffTime: new Date(event.date),
+      status: mapESPNStatus(event.status),
+      homeScore: homeTeam?.score ? parseInt(homeTeam.score, 10) : null,
+      awayScore: awayTeam?.score ? parseInt(awayTeam.score, 10) : null,
+      minute: event.status.period,
+      period: event.status.displayClock,
+      league: {
+        id: 401,
+        name: 'NFL',
+        slug: 'nfl',
+        country: 'USA',
+        countryCode: 'US',
+        tier: 1,
+      },
+      sport: {
+        id: 5,
+        name: 'American Football',
+        slug: 'american-football',
+        icon: 'football',
+      },
+      tipsCount: 0,
+    };
+  });
+
+  setCache(cacheKey, matches);
+  return matches;
+}
+
+// Get Premier League scores from ESPN
+export async function getESPNPremierLeagueScores(): Promise<UnifiedMatch[]> {
+  const cacheKey = 'espn-epl-scores';
+  const cached = getCached<UnifiedMatch[]>(cacheKey, CACHE_DURATION.live);
+  if (cached) return cached;
+
+  const data = await fetchESPN('soccer', 'eng.1');
+  if (!data?.events) return [];
+
+  const matches: UnifiedMatch[] = data.events.map((event) => {
+    const competition = event.competitions[0];
+    const homeTeam = competition?.competitors.find(c => c.homeAway === 'home');
+    const awayTeam = competition?.competitors.find(c => c.homeAway === 'away');
+
+    return {
+      id: `espn_epl_${event.id}`,
+      externalId: event.id,
+      source: 'sportsdata-io' as const,
+      sportId: 1,
+      sportKey: 'soccer_epl',
+      leagueId: 1,
+      leagueKey: 'epl',
+      homeTeam: {
+        id: homeTeam?.team.id || '',
+        name: homeTeam?.team.displayName || homeTeam?.team.name || 'TBD',
+        shortName: homeTeam?.team.abbreviation || 'TBD',
+        logo: homeTeam?.team.logo,
+      },
+      awayTeam: {
+        id: awayTeam?.team.id || '',
+        name: awayTeam?.team.displayName || awayTeam?.team.name || 'TBD',
+        shortName: awayTeam?.team.abbreviation || 'TBD',
+        logo: awayTeam?.team.logo,
+      },
+      kickoffTime: new Date(event.date),
+      status: mapESPNStatus(event.status),
+      homeScore: homeTeam?.score ? parseInt(homeTeam.score, 10) : null,
+      awayScore: awayTeam?.score ? parseInt(awayTeam.score, 10) : null,
+      league: {
+        id: 1,
+        name: 'Premier League',
+        slug: 'premier-league',
+        country: 'England',
+        countryCode: 'GB',
+        tier: 1,
+      },
+      sport: {
+        id: 1,
+        name: 'Football',
+        slug: 'football',
+        icon: 'soccer',
+      },
+      tipsCount: 0,
+    };
+  });
+
+  setCache(cacheKey, matches);
+  return matches;
+}
+
+// Get La Liga scores from ESPN
+export async function getESPNLaLigaScores(): Promise<UnifiedMatch[]> {
+  const cacheKey = 'espn-laliga-scores';
+  const cached = getCached<UnifiedMatch[]>(cacheKey, CACHE_DURATION.live);
+  if (cached) return cached;
+
+  const data = await fetchESPN('soccer', 'esp.1');
+  if (!data?.events) return [];
+
+  const matches: UnifiedMatch[] = data.events.map((event) => {
+    const competition = event.competitions[0];
+    const homeTeam = competition?.competitors.find(c => c.homeAway === 'home');
+    const awayTeam = competition?.competitors.find(c => c.homeAway === 'away');
+
+    return {
+      id: `espn_laliga_${event.id}`,
+      externalId: event.id,
+      source: 'sportsdata-io' as const,
+      sportId: 1,
+      sportKey: 'soccer_spain_la_liga',
+      leagueId: 2,
+      leagueKey: 'la-liga',
+      homeTeam: {
+        id: homeTeam?.team.id || '',
+        name: homeTeam?.team.displayName || homeTeam?.team.name || 'TBD',
+        shortName: homeTeam?.team.abbreviation || 'TBD',
+        logo: homeTeam?.team.logo,
+      },
+      awayTeam: {
+        id: awayTeam?.team.id || '',
+        name: awayTeam?.team.displayName || awayTeam?.team.name || 'TBD',
+        shortName: awayTeam?.team.abbreviation || 'TBD',
+        logo: awayTeam?.team.logo,
+      },
+      kickoffTime: new Date(event.date),
+      status: mapESPNStatus(event.status),
+      homeScore: homeTeam?.score ? parseInt(homeTeam.score, 10) : null,
+      awayScore: awayTeam?.score ? parseInt(awayTeam.score, 10) : null,
+      league: {
+        id: 2,
+        name: 'La Liga',
+        slug: 'la-liga',
+        country: 'Spain',
+        countryCode: 'ES',
+        tier: 1,
+      },
+      sport: {
+        id: 1,
+        name: 'Football',
+        slug: 'football',
+        icon: 'soccer',
+      },
+      tipsCount: 0,
+    };
+  });
+
+  setCache(cacheKey, matches);
+  return matches;
+}
+
+// Get Bundesliga scores from ESPN
+export async function getESPNBundesligaScores(): Promise<UnifiedMatch[]> {
+  const cacheKey = 'espn-bundesliga-scores';
+  const cached = getCached<UnifiedMatch[]>(cacheKey, CACHE_DURATION.live);
+  if (cached) return cached;
+
+  const data = await fetchESPN('soccer', 'ger.1');
+  if (!data?.events) return [];
+
+  const matches: UnifiedMatch[] = data.events.map((event) => {
+    const competition = event.competitions[0];
+    const homeTeam = competition?.competitors.find(c => c.homeAway === 'home');
+    const awayTeam = competition?.competitors.find(c => c.homeAway === 'away');
+
+    return {
+      id: `espn_bundesliga_${event.id}`,
+      externalId: event.id,
+      source: 'sportsdata-io' as const,
+      sportId: 1,
+      sportKey: 'soccer_germany_bundesliga',
+      leagueId: 3,
+      leagueKey: 'bundesliga',
+      homeTeam: {
+        id: homeTeam?.team.id || '',
+        name: homeTeam?.team.displayName || homeTeam?.team.name || 'TBD',
+        shortName: homeTeam?.team.abbreviation || 'TBD',
+        logo: homeTeam?.team.logo,
+      },
+      awayTeam: {
+        id: awayTeam?.team.id || '',
+        name: awayTeam?.team.displayName || awayTeam?.team.name || 'TBD',
+        shortName: awayTeam?.team.abbreviation || 'TBD',
+        logo: awayTeam?.team.logo,
+      },
+      kickoffTime: new Date(event.date),
+      status: mapESPNStatus(event.status),
+      homeScore: homeTeam?.score ? parseInt(homeTeam.score, 10) : null,
+      awayScore: awayTeam?.score ? parseInt(awayTeam.score, 10) : null,
+      league: {
+        id: 3,
+        name: 'Bundesliga',
+        slug: 'bundesliga',
+        country: 'Germany',
+        countryCode: 'DE',
+        tier: 1,
+      },
+      sport: {
+        id: 1,
+        name: 'Football',
+        slug: 'football',
+        icon: 'soccer',
+      },
+      tipsCount: 0,
+    };
+  });
+
+  setCache(cacheKey, matches);
+  return matches;
+}
+
+// Get Serie A scores from ESPN
+export async function getESPNSerieAScores(): Promise<UnifiedMatch[]> {
+  const cacheKey = 'espn-seriea-scores';
+  const cached = getCached<UnifiedMatch[]>(cacheKey, CACHE_DURATION.live);
+  if (cached) return cached;
+
+  const data = await fetchESPN('soccer', 'ita.1');
+  if (!data?.events) return [];
+
+  const matches: UnifiedMatch[] = data.events.map((event) => {
+    const competition = event.competitions[0];
+    const homeTeam = competition?.competitors.find(c => c.homeAway === 'home');
+    const awayTeam = competition?.competitors.find(c => c.homeAway === 'away');
+
+    return {
+      id: `espn_seriea_${event.id}`,
+      externalId: event.id,
+      source: 'sportsdata-io' as const,
+      sportId: 1,
+      sportKey: 'soccer_italy_serie_a',
+      leagueId: 4,
+      leagueKey: 'serie-a',
+      homeTeam: {
+        id: homeTeam?.team.id || '',
+        name: homeTeam?.team.displayName || homeTeam?.team.name || 'TBD',
+        shortName: homeTeam?.team.abbreviation || 'TBD',
+        logo: homeTeam?.team.logo,
+      },
+      awayTeam: {
+        id: awayTeam?.team.id || '',
+        name: awayTeam?.team.displayName || awayTeam?.team.name || 'TBD',
+        shortName: awayTeam?.team.abbreviation || 'TBD',
+        logo: awayTeam?.team.logo,
+      },
+      kickoffTime: new Date(event.date),
+      status: mapESPNStatus(event.status),
+      homeScore: homeTeam?.score ? parseInt(homeTeam.score, 10) : null,
+      awayScore: awayTeam?.score ? parseInt(awayTeam.score, 10) : null,
+      league: {
+        id: 4,
+        name: 'Serie A',
+        slug: 'serie-a',
+        country: 'Italy',
+        countryCode: 'IT',
+        tier: 1,
+      },
+      sport: {
+        id: 1,
+        name: 'Football',
+        slug: 'football',
+        icon: 'soccer',
+      },
+      tipsCount: 0,
+    };
+  });
+
+  setCache(cacheKey, matches);
+  return matches;
+}
+
+// Get MLS scores from ESPN
+export async function getESPNMLSScores(): Promise<UnifiedMatch[]> {
+  const cacheKey = 'espn-mls-scores';
+  const cached = getCached<UnifiedMatch[]>(cacheKey, CACHE_DURATION.live);
+  if (cached) return cached;
+
+  const data = await fetchESPN('soccer', 'usa.1');
+  if (!data?.events) return [];
+
+  const matches: UnifiedMatch[] = data.events.map((event) => {
+    const competition = event.competitions[0];
+    const homeTeam = competition?.competitors.find(c => c.homeAway === 'home');
+    const awayTeam = competition?.competitors.find(c => c.homeAway === 'away');
+
+    return {
+      id: `espn_mls_${event.id}`,
+      externalId: event.id,
+      source: 'sportsdata-io' as const,
+      sportId: 1,
+      sportKey: 'soccer_usa_mls',
+      leagueId: 11,
+      leagueKey: 'mls',
+      homeTeam: {
+        id: homeTeam?.team.id || '',
+        name: homeTeam?.team.displayName || homeTeam?.team.name || 'TBD',
+        shortName: homeTeam?.team.abbreviation || 'TBD',
+        logo: homeTeam?.team.logo,
+      },
+      awayTeam: {
+        id: awayTeam?.team.id || '',
+        name: awayTeam?.team.displayName || awayTeam?.team.name || 'TBD',
+        shortName: awayTeam?.team.abbreviation || 'TBD',
+        logo: awayTeam?.team.logo,
+      },
+      kickoffTime: new Date(event.date),
+      status: mapESPNStatus(event.status),
+      homeScore: homeTeam?.score ? parseInt(homeTeam.score, 10) : null,
+      awayScore: awayTeam?.score ? parseInt(awayTeam.score, 10) : null,
+      league: {
+        id: 11,
+        name: 'MLS',
+        slug: 'mls',
+        country: 'USA',
+        countryCode: 'US',
+        tier: 1,
+      },
+      sport: {
+        id: 1,
+        name: 'Football',
+        slug: 'football',
+        icon: 'soccer',
+      },
+      tipsCount: 0,
+    };
+  });
+
+  setCache(cacheKey, matches);
+  return matches;
+}
+
+// Get Champions League scores from ESPN
+export async function getESPNChampionsLeagueScores(): Promise<UnifiedMatch[]> {
+  const cacheKey = 'espn-ucl-scores';
+  const cached = getCached<UnifiedMatch[]>(cacheKey, CACHE_DURATION.live);
+  if (cached) return cached;
+
+  const data = await fetchESPN('soccer', 'uefa.champions');
+  if (!data?.events) return [];
+
+  const matches: UnifiedMatch[] = data.events.map((event) => {
+    const competition = event.competitions[0];
+    const homeTeam = competition?.competitors.find(c => c.homeAway === 'home');
+    const awayTeam = competition?.competitors.find(c => c.homeAway === 'away');
+
+    return {
+      id: `espn_ucl_${event.id}`,
+      externalId: event.id,
+      source: 'sportsdata-io' as const,
+      sportId: 1,
+      sportKey: 'soccer_uefa_champs_league',
+      leagueId: 9,
+      leagueKey: 'champions-league',
+      homeTeam: {
+        id: homeTeam?.team.id || '',
+        name: homeTeam?.team.displayName || homeTeam?.team.name || 'TBD',
+        shortName: homeTeam?.team.abbreviation || 'TBD',
+        logo: homeTeam?.team.logo,
+      },
+      awayTeam: {
+        id: awayTeam?.team.id || '',
+        name: awayTeam?.team.displayName || awayTeam?.team.name || 'TBD',
+        shortName: awayTeam?.team.abbreviation || 'TBD',
+        logo: awayTeam?.team.logo,
+      },
+      kickoffTime: new Date(event.date),
+      status: mapESPNStatus(event.status),
+      homeScore: homeTeam?.score ? parseInt(homeTeam.score, 10) : null,
+      awayScore: awayTeam?.score ? parseInt(awayTeam.score, 10) : null,
+      league: {
+        id: 9,
+        name: 'Champions League',
+        slug: 'champions-league',
+        country: 'Europe',
+        countryCode: 'EU',
+        tier: 1,
+      },
+      sport: {
+        id: 1,
+        name: 'Football',
+        slug: 'football',
+        icon: 'soccer',
+      },
+      tipsCount: 0,
+    };
+  });
+
+  setCache(cacheKey, matches);
+  return matches;
+}
+
+// Get MLB scores from ESPN
+export async function getESPNMLBScores(): Promise<UnifiedMatch[]> {
+  const cacheKey = 'espn-mlb-scores';
+  const cached = getCached<UnifiedMatch[]>(cacheKey, CACHE_DURATION.live);
+  if (cached) return cached;
+
+  const data = await fetchESPN('baseball', 'mlb');
+  if (!data?.events) return [];
+
+  const matches: UnifiedMatch[] = data.events.map((event) => {
+    const competition = event.competitions[0];
+    const homeTeam = competition?.competitors.find(c => c.homeAway === 'home');
+    const awayTeam = competition?.competitors.find(c => c.homeAway === 'away');
+
+    return {
+      id: `espn_mlb_${event.id}`,
+      externalId: event.id,
+      source: 'sportsdata-io' as const,
+      sportId: 6,
+      sportKey: 'baseball_mlb',
+      leagueId: 501,
+      leagueKey: 'mlb',
+      homeTeam: {
+        id: homeTeam?.team.id || '',
+        name: homeTeam?.team.displayName || homeTeam?.team.name || 'TBD',
+        shortName: homeTeam?.team.abbreviation || 'TBD',
+        logo: homeTeam?.team.logo,
+      },
+      awayTeam: {
+        id: awayTeam?.team.id || '',
+        name: awayTeam?.team.displayName || awayTeam?.team.name || 'TBD',
+        shortName: awayTeam?.team.abbreviation || 'TBD',
+        logo: awayTeam?.team.logo,
+      },
+      kickoffTime: new Date(event.date),
+      status: mapESPNStatus(event.status),
+      homeScore: homeTeam?.score ? parseInt(homeTeam.score, 10) : null,
+      awayScore: awayTeam?.score ? parseInt(awayTeam.score, 10) : null,
+      minute: event.status.period,
+      period: event.status.displayClock,
+      league: {
+        id: 501,
+        name: 'MLB',
+        slug: 'mlb',
+        country: 'USA',
+        countryCode: 'US',
+        tier: 1,
+      },
+      sport: {
+        id: 6,
+        name: 'Baseball',
+        slug: 'baseball',
+        icon: 'baseball',
+      },
+      tipsCount: 0,
+    };
+  });
+
+  setCache(cacheKey, matches);
+  return matches;
+}
+
+// Get NHL scores from ESPN
+export async function getESPNNHLScores(): Promise<UnifiedMatch[]> {
+  const cacheKey = 'espn-nhl-scores';
+  const cached = getCached<UnifiedMatch[]>(cacheKey, CACHE_DURATION.live);
+  if (cached) return cached;
+
+  const data = await fetchESPN('hockey', 'nhl');
+  if (!data?.events) return [];
+
+  const matches: UnifiedMatch[] = data.events.map((event) => {
+    const competition = event.competitions[0];
+    const homeTeam = competition?.competitors.find(c => c.homeAway === 'home');
+    const awayTeam = competition?.competitors.find(c => c.homeAway === 'away');
+
+    return {
+      id: `espn_nhl_${event.id}`,
+      externalId: event.id,
+      source: 'sportsdata-io' as const,
+      sportId: 7,
+      sportKey: 'icehockey_nhl',
+      leagueId: 601,
+      leagueKey: 'nhl',
+      homeTeam: {
+        id: homeTeam?.team.id || '',
+        name: homeTeam?.team.displayName || homeTeam?.team.name || 'TBD',
+        shortName: homeTeam?.team.abbreviation || 'TBD',
+        logo: homeTeam?.team.logo,
+      },
+      awayTeam: {
+        id: awayTeam?.team.id || '',
+        name: awayTeam?.team.displayName || awayTeam?.team.name || 'TBD',
+        shortName: awayTeam?.team.abbreviation || 'TBD',
+        logo: awayTeam?.team.logo,
+      },
+      kickoffTime: new Date(event.date),
+      status: mapESPNStatus(event.status),
+      homeScore: homeTeam?.score ? parseInt(homeTeam.score, 10) : null,
+      awayScore: awayTeam?.score ? parseInt(awayTeam.score, 10) : null,
+      minute: event.status.period,
+      period: event.status.displayClock,
+      league: {
+        id: 601,
+        name: 'NHL',
+        slug: 'nhl',
+        country: 'USA',
+        countryCode: 'US',
+        tier: 1,
+      },
+      sport: {
+        id: 7,
+        name: 'Ice Hockey',
+        slug: 'ice-hockey',
+        icon: 'hockey',
+      },
+      tipsCount: 0,
+    };
+  });
+
+  setCache(cacheKey, matches);
+  return matches;
+}
+
+// Get UFC/MMA scores from ESPN
+export async function getESPNMMAScores(): Promise<UnifiedMatch[]> {
+  const cacheKey = 'espn-mma-scores';
+  const cached = getCached<UnifiedMatch[]>(cacheKey, CACHE_DURATION.live);
+  if (cached) return cached;
+
+  const data = await fetchESPN('mma', 'ufc');
+  if (!data?.events) return [];
+
+  const matches: UnifiedMatch[] = data.events.map((event) => {
+    const competition = event.competitions[0];
+    const homeTeam = competition?.competitors.find(c => c.homeAway === 'home');
+    const awayTeam = competition?.competitors.find(c => c.homeAway === 'away');
+
+    return {
+      id: `espn_mma_${event.id}`,
+      externalId: event.id,
+      source: 'sportsdata-io' as const,
+      sportId: 27,
+      sportKey: 'mma_mixed_martial_arts',
+      leagueId: 2701,
+      leagueKey: 'ufc',
+      homeTeam: {
+        id: homeTeam?.team?.id || homeTeam?.id || '',
+        name: homeTeam?.team?.displayName || homeTeam?.team?.name || 'TBD',
+        shortName: homeTeam?.team?.abbreviation || 'TBD',
+      },
+      awayTeam: {
+        id: awayTeam?.team?.id || awayTeam?.id || '',
+        name: awayTeam?.team?.displayName || awayTeam?.team?.name || 'TBD',
+        shortName: awayTeam?.team?.abbreviation || 'TBD',
+      },
+      kickoffTime: new Date(event.date),
+      status: mapESPNStatus(event.status),
+      homeScore: homeTeam?.score ? parseInt(homeTeam.score, 10) : null,
+      awayScore: awayTeam?.score ? parseInt(awayTeam.score, 10) : null,
+      league: {
+        id: 2701,
+        name: 'UFC',
+        slug: 'ufc',
+        country: 'USA',
+        countryCode: 'US',
+        tier: 1,
+      },
+      sport: {
+        id: 27,
+        name: 'MMA',
+        slug: 'mma',
+        icon: 'mma',
+      },
       tipsCount: 0,
     };
   });
@@ -876,7 +1629,8 @@ export async function getSportsDataIOMMAEvents(): Promise<UnifiedMatch[]> {
 // ============================================
 
 export async function fetchOddsAPIIO(
-  endpoint: string
+  endpoint: string,
+  params: Record<string, string> = {}
 ): Promise<unknown> {
   const apiKey = process.env.ODDS_API_IO_KEY;
   if (!apiKey || apiKey === 'your_api_key_here') {
@@ -884,15 +1638,19 @@ export async function fetchOddsAPIIO(
     return null;
   }
 
-  const url = `https://api.odds-api.io/v1/${endpoint}`;
+  // Use v3 API as per documentation
+  const url = new URL(`https://api.odds-api.io/v3/${endpoint}`);
+  url.searchParams.set('apiKey', apiKey);
+  Object.entries(params).forEach(([key, value]) => {
+    url.searchParams.set(key, value);
+  });
 
   try {
-    const response = await fetch(url, {
+    const response = await fetch(url.toString(), {
       headers: {
-        'Authorization': `Bearer ${apiKey}`,
         'Accept': 'application/json',
       },
-      next: { revalidate: 60 },
+      next: { revalidate: 30 },
     });
 
     if (!response.ok) {
@@ -913,70 +1671,133 @@ export async function fetchOddsAPIIO(
   }
 }
 
-// Get matches from Odds-API.io
-export async function getOddsAPIIOMatches(sport: string = 'soccer'): Promise<UnifiedMatch[]> {
+// Get live events from Odds-API.io
+export async function getOddsAPIIOLiveEvents(sport?: string): Promise<UnifiedMatch[]> {
+  const cacheKey = `odds-api-io-live-${sport || 'all'}`;
+  const cached = getCached<UnifiedMatch[]>(cacheKey, CACHE_DURATION.live);
+  if (cached) return cached;
+
+  const params: Record<string, string> = {};
+  if (sport) params.sport = sport;
+
+  const data = await fetchOddsAPIIO('events/live', params);
+  if (!data || !Array.isArray(data)) return [];
+
+  const matches: UnifiedMatch[] = data.map((event: {
+    id: number;
+    home: string;
+    homeId: number;
+    away: string;
+    awayId: number;
+    date: string;
+    status: string;
+    sport: { name: string; slug: string };
+    league: { name: string; slug: string };
+    scores?: { home: number; away: number };
+  }) => {
+    const sportMapping = ODDS_API_IO_SPORTS[event.sport?.slug || 'soccer'];
+
+    return {
+      id: `oaio_${event.id}`,
+      externalId: String(event.id),
+      source: 'odds-api-io' as const,
+      sportId: sportMapping?.sportId || 1,
+      sportKey: event.sport?.slug || 'soccer',
+      leagueId: sportMapping?.leagueId || 1,
+      leagueKey: event.league?.slug || 'unknown',
+      homeTeam: {
+        id: String(event.homeId),
+        name: event.home,
+        shortName: getShortName(event.home),
+      },
+      awayTeam: {
+        id: String(event.awayId),
+        name: event.away,
+        shortName: getShortName(event.away),
+      },
+      kickoffTime: new Date(event.date),
+      status: event.status === 'live' ? 'live' : 'scheduled' as const,
+      homeScore: event.scores?.home ?? null,
+      awayScore: event.scores?.away ?? null,
+      league: {
+        id: sportMapping?.leagueId || 1,
+        name: event.league?.name || 'Unknown League',
+        slug: event.league?.slug || 'unknown',
+        country: 'Unknown',
+        countryCode: 'UN',
+        tier: 2,
+      },
+      sport: {
+        id: sportMapping?.sportId || 1,
+        name: event.sport?.name || 'Football',
+        slug: event.sport?.slug || 'football',
+        icon: event.sport?.slug || 'soccer',
+      },
+      tipsCount: 0,
+    };
+  });
+
+  setCache(cacheKey, matches);
+  return matches;
+}
+
+// Get upcoming events from Odds-API.io
+export async function getOddsAPIIOMatches(sport: string = 'football'): Promise<UnifiedMatch[]> {
   const cacheKey = `odds-api-io-${sport}`;
   const cached = getCached<UnifiedMatch[]>(cacheKey, CACHE_DURATION.upcoming);
   if (cached) return cached;
 
-  const data = await fetchOddsAPIIO(`odds/${sport}/upcoming`);
-  if (!data || typeof data !== 'object') return [];
-
-  const events = (data as { events?: unknown[] }).events;
-  if (!Array.isArray(events)) return [];
+  const data = await fetchOddsAPIIO('events', { sport });
+  if (!data || !Array.isArray(data)) return [];
 
   const sportMapping = ODDS_API_IO_SPORTS[sport];
 
-  const matches: UnifiedMatch[] = events.map((event: {
-    id: string;
-    home_team: string;
-    away_team: string;
-    commence_time: string;
-    league?: string;
-    odds?: {
-      h2h?: number[];
-    };
+  const matches: UnifiedMatch[] = data.map((event: {
+    id: number;
+    home: string;
+    homeId: number;
+    away: string;
+    awayId: number;
+    date: string;
+    status: string;
+    sport?: { name: string; slug: string };
+    league?: { name: string; slug: string };
   }) => ({
     id: `oaio_${event.id}`,
-    externalId: event.id,
+    externalId: String(event.id),
     source: 'odds-api-io' as const,
     sportId: sportMapping?.sportId || 1,
     sportKey: sport,
     leagueId: sportMapping?.leagueId || 1,
-    leagueKey: event.league || sport,
+    leagueKey: event.league?.slug || sport,
     homeTeam: {
-      id: generateTeamId(event.home_team),
-      name: event.home_team,
-      shortName: getShortName(event.home_team),
+      id: String(event.homeId),
+      name: event.home,
+      shortName: getShortName(event.home),
     },
     awayTeam: {
-      id: generateTeamId(event.away_team),
-      name: event.away_team,
-      shortName: getShortName(event.away_team),
+      id: String(event.awayId),
+      name: event.away,
+      shortName: getShortName(event.away),
     },
-    kickoffTime: new Date(event.commence_time),
-    status: getMatchStatus(new Date(event.commence_time)),
+    kickoffTime: new Date(event.date),
+    status: getMatchStatus(new Date(event.date)),
     homeScore: null,
     awayScore: null,
     league: {
       id: sportMapping?.leagueId || 1,
-      name: event.league || 'League',
-      slug: (event.league || sport).toLowerCase().replace(/\s+/g, '-'),
+      name: event.league?.name || 'League',
+      slug: event.league?.slug || sport,
       country: 'World',
       countryCode: 'WO',
       tier: 1,
     },
     sport: {
       id: sportMapping?.sportId || 1,
-      name: sport.charAt(0).toUpperCase() + sport.slice(1),
-      slug: sport,
-      icon: sport,
+      name: event.sport?.name || sport.charAt(0).toUpperCase() + sport.slice(1),
+      slug: event.sport?.slug || sport,
+      icon: event.sport?.slug || sport,
     },
-    odds: event.odds?.h2h ? {
-      home: event.odds.h2h[0],
-      draw: event.odds.h2h[2],
-      away: event.odds.h2h[1],
-    } : undefined,
     tipsCount: 0,
   }));
 
@@ -1010,33 +1831,36 @@ export async function getAllMatches(): Promise<UnifiedMatch[]> {
   };
 
   // Fetch from all sources in parallel
-  // SportsData.io is our primary working API
-  // The Odds API and Odds-API.io are secondary (require valid API keys)
+  // ESPN is PRIMARY (FREE, no API key, real-time data)
+  // SportsData.io is secondary (requires API key)
+  // The Odds API and Odds-API.io are tertiary (require valid API keys)
   const results = await Promise.allSettled([
-    // SportsData.io - Primary source (WORKING)
-    getSportsDataIOSoccerGames('EPL'),
-    getSportsDataIOSoccerGames('BUNDESLIGA'),
-    getSportsDataIOSoccerGames('LA_LIGA'),
-    getSportsDataIOSoccerGames('SERIE_A'),
-    getSportsDataIOSoccerGames('LIGUE_1'),
-    getSportsDataIOSoccerGames('MLS'),
-    getSportsDataIOSoccerGames('UEFA_CHAMPIONS_LEAGUE'),
+    // ESPN - PRIMARY SOURCE (FREE, real-time, no API key)
+    getESPNNBAScores(),
+    getESPNNFLScores(),
+    getESPNMLBScores(),
+    getESPNNHLScores(),
+    getESPNMMAScores(),
+    getESPNPremierLeagueScores(),
+    getESPNLaLigaScores(),
+    getESPNBundesligaScores(),
+    getESPNSerieAScores(),
+    getESPNMLSScores(),
+    getESPNChampionsLeagueScores(),
+    // Odds-API.io - Live events (has free tier, 100 requests/hour)
+    getOddsAPIIOLiveEvents(),
+    getOddsAPIIOMatches('football'),
+    getOddsAPIIOMatches('basketball'),
+    // SportsData.io - Secondary (for additional data if available)
     getSportsDataIONFLGames(),
     getSportsDataIONBAGames(),
     getSportsDataIOMLBGames(),
     getSportsDataIONHLGames(),
     getSportsDataIOMMAEvents(),
-    // The Odds API - Secondary source (requires valid API key)
-    getTheOddsAPIMatches('soccer_epl'),
-    getTheOddsAPIMatches('soccer_spain_la_liga'),
-    getTheOddsAPIMatches('soccer_germany_bundesliga'),
-    getTheOddsAPIMatches('basketball_nba'),
-    getTheOddsAPIMatches('americanfootball_nfl'),
-    getTheOddsAPIMatches('icehockey_nhl'),
-    getTheOddsAPIMatches('baseball_mlb'),
-    getTheOddsAPIMatches('mma_mixed_martial_arts'),
-    // Odds-API.io - Tertiary source
-    getOddsAPIIOMatches('soccer'),
+    // The Odds API - Only if quota available (you're at 549/500)
+    // Disabled until quota resets on 1st of month
+    // getTheOddsAPIMatches('soccer_epl'),
+    // getTheOddsAPIMatches('basketball_nba'),
   ]);
 
   // Process all results
