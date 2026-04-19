@@ -1,12 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import {
-  getLiveMatches,
-  getTodayMatches,
-  getUpcomingMatches,
-  getFinishedMatches,
+  getAllMatches,
+  getMatchesBySport,
   getMatchesByLeague,
+  getLiveMatches as getApiLiveMatches,
+  getUpcomingMatches as getApiUpcomingMatches,
+  getMatchById,
   type UnifiedMatch,
-} from '@/lib/api/api-football';
+} from '@/lib/api/unified-sports-api';
+import { generateAllMatches, filterMatches } from '@/lib/api/sports-api';
 import { ALL_SPORTS, ALL_LEAGUES, TEAMS_DATABASE, getSportIcon } from '@/lib/sports-data';
 
 export const dynamic = 'force-dynamic';
@@ -127,7 +129,7 @@ function convertToMatchData(match: UnifiedMatch): MatchData {
       logo: match.awayTeam.logo,
     },
     kickoffTime: new Date(match.kickoffTime).toISOString(),
-    status: match.status,
+    status: match.status as MatchData['status'],
     homeScore: match.homeScore,
     awayScore: match.awayScore,
     minute: match.minute,
@@ -137,7 +139,6 @@ function convertToMatchData(match: UnifiedMatch): MatchData {
     markets: match.markets,
     tipsCount: match.tipsCount,
     source: match.source,
-    venue: match.venue,
   };
 }
 
@@ -236,26 +237,6 @@ function generateFallbackMatches(userCountryCode?: string): MatchData[] {
             { name: 'Under 2.5', price: Math.round((1.9 + Math.random() * 0.5) * 100) / 100 },
           ]
         },
-        {
-          key: 'double_chance',
-          name: 'Double Chance',
-          outcomes: [
-            { name: 'Home/Draw', price: Math.round((1.3 + Math.random() * 0.3) * 100) / 100 },
-            { name: 'Away/Draw', price: Math.round((1.4 + Math.random() * 0.3) * 100) / 100 },
-            { name: 'Home/Away', price: Math.round((1.2 + Math.random() * 0.2) * 100) / 100 },
-          ]
-        },
-        {
-          key: 'correct_score',
-          name: 'Correct Score',
-          outcomes: [
-            { name: '1-0', price: Math.round((6 + Math.random() * 3) * 100) / 100 },
-            { name: '2-1', price: Math.round((8 + Math.random() * 4) * 100) / 100 },
-            { name: '2-0', price: Math.round((7 + Math.random() * 3) * 100) / 100 },
-            { name: '0-0', price: Math.round((9 + Math.random() * 4) * 100) / 100 },
-            { name: '1-1', price: Math.round((6 + Math.random() * 2) * 100) / 100 },
-          ]
-        },
       ];
       
       matches.push({
@@ -296,26 +277,38 @@ function generateFallbackMatches(userCountryCode?: string): MatchData[] {
     }
   });
   
-  const leaguePriorityFinal = userCountryCode 
+  return sortMatches(matches, userCountryCode);
+}
+
+// Sort matches by priority
+function sortMatches(matches: MatchData[], userCountryCode?: string): MatchData[] {
+  const leaguePriority = userCountryCode 
     ? COUNTRY_LEAGUES[userCountryCode.toUpperCase()] || EUROPEAN_TOP_5_LEAGUES
     : EUROPEAN_TOP_5_LEAGUES;
     
   return matches.sort((a, b) => {
+    // 1. Sport priority
     const sportPriorityA = SPORT_PRIORITY[a.sportId] ?? 99;
     const sportPriorityB = SPORT_PRIORITY[b.sportId] ?? 99;
     if (sportPriorityA !== sportPriorityB) return sportPriorityA - sportPriorityB;
     
-    const leaguePriorityA = leaguePriorityFinal.indexOf(a.leagueId);
-    const leaguePriorityB = leaguePriorityFinal.indexOf(b.leagueId);
+    // 2. League priority
+    const leaguePriorityA = leaguePriority.indexOf(a.leagueId);
+    const leaguePriorityB = leaguePriority.indexOf(b.leagueId);
     const leagueOrderA = leaguePriorityA === -1 ? 999 : leaguePriorityA;
     const leagueOrderB = leaguePriorityB === -1 ? 999 : leaguePriorityB;
     if (leagueOrderA !== leagueOrderB) return leagueOrderA - leagueOrderB;
     
-    const statusOrder: Record<string, number> = { live: 0, halftime: 1, extra_time: 1.5, penalties: 1.6, scheduled: 2, finished: 3, postponed: 4, cancelled: 5 };
+    // 3. Status order (live first)
+    const statusOrder: Record<string, number> = { 
+      live: 0, halftime: 1, extra_time: 1.5, penalties: 1.6, 
+      scheduled: 2, finished: 3, postponed: 4, cancelled: 5 
+    };
     const statusOrderA = statusOrder[a.status] ?? 5;
     const statusOrderB = statusOrder[b.status] ?? 5;
     if (statusOrderA !== statusOrderB) return statusOrderA - statusOrderB;
     
+    // 4. Kickoff time
     return new Date(a.kickoffTime).getTime() - new Date(b.kickoffTime).getTime();
   });
 }
@@ -330,107 +323,85 @@ export async function GET(request: NextRequest) {
   
   try {
     let matches: MatchData[] = [];
-    let apiWorking = false;
+    let apiSource = 'fallback';
     
-    // Try to fetch from API-Football
+    // Check which APIs are configured
+    const hasTheOddsApi = !!process.env.THE_ODDS_API_KEY;
+    const hasSportsDataIo = !!process.env.SPORTSDATA_IO_KEY;
+    const hasOddsApiIo = !!process.env.ODDS_API_IO_KEY;
+    
+    console.log('[Matches API] Available APIs:', { hasTheOddsApi, hasSportsDataIo, hasOddsApiIo });
+    
+    // Try to fetch from unified sports API (combines all your existing APIs)
     try {
       let apiMatches: UnifiedMatch[] = [];
       
-      if (status === 'live') {
-        apiMatches = await getLiveMatches();
-      } else if (status === 'finished' || status === 'results') {
-        apiMatches = await getFinishedMatches(3);
-      } else if (status === 'upcoming') {
-        apiMatches = await getUpcomingMatches(7);
+      if (matchId) {
+        // Get single match
+        const match = await getMatchById(matchId);
+        if (match) {
+          return NextResponse.json({ 
+            match: convertToMatchData(match),
+            source: match.source,
+          });
+        }
+      } else if (sportId) {
+        apiMatches = await getMatchesBySport(parseInt(sportId));
       } else if (leagueId) {
         apiMatches = await getMatchesByLeague(parseInt(leagueId));
+      } else if (status === 'live') {
+        apiMatches = await getApiLiveMatches();
+      } else if (status === 'upcoming') {
+        apiMatches = await getApiUpcomingMatches();
       } else {
-        // Get combined data: live + today + upcoming
-        const [live, today, upcoming] = await Promise.all([
-          getLiveMatches(),
-          getTodayMatches(),
-          getUpcomingMatches(3),
-        ]);
-        
-        // Combine and dedupe
-        const seen = new Set<string>();
-        apiMatches = [...live, ...today, ...upcoming].filter(m => {
-          if (seen.has(m.id)) return false;
-          seen.add(m.id);
-          return true;
-        });
+        // Get all matches from all APIs
+        apiMatches = await getAllMatches();
       }
       
       if (apiMatches.length > 0) {
         matches = apiMatches.map(convertToMatchData);
-        apiWorking = true;
+        // Determine primary source
+        const sources = new Set(apiMatches.map(m => m.source));
+        apiSource = Array.from(sources).join('+') || 'unified';
+        console.log(`[Matches API] Got ${matches.length} matches from: ${apiSource}`);
       }
     } catch (apiError) {
-      console.error('[API] API-Football error, falling back:', apiError);
+      console.error('[Matches API] Error fetching from APIs:', apiError);
     }
     
-    // If no API matches, use fallback
+    // If no API matches, use fallback with real team names
     if (matches.length === 0) {
+      console.log('[Matches API] No API data, using fallback with real teams');
       matches = generateFallbackMatches(countryCode);
-      
-      // Apply filters to fallback data
-      if (sportId) {
-        matches = matches.filter(m => m.sportId === parseInt(sportId));
-      }
-      
-      if (leagueId) {
-        matches = matches.filter(m => m.leagueId === parseInt(leagueId));
-      }
-      
-      if (status && status !== 'all') {
-        if (status === 'live') {
-          matches = matches.filter(m => m.status === 'live' || m.status === 'halftime' || m.status === 'extra_time' || m.status === 'penalties');
-        } else if (status === 'upcoming') {
-          matches = matches.filter(m => m.status === 'scheduled');
-        } else if (status === 'finished' || status === 'results') {
-          matches = matches.filter(m => m.status === 'finished');
-        } else {
-          matches = matches.filter(m => m.status === status);
-        }
-      }
+      apiSource = 'fallback';
     }
     
-    // Apply sport filter (for API data)
-    if (apiWorking && sportId) {
-      matches = matches.filter(m => m.sportId === parseInt(sportId));
-    }
-    
-    // Filter by specific match ID
-    if (matchId) {
-      const match = matches.find(m => m.id === matchId);
-      return NextResponse.json({ match });
+    // Apply status filter
+    if (status && status !== 'all') {
+      if (status === 'live') {
+        matches = matches.filter(m => 
+          m.status === 'live' || m.status === 'halftime' || 
+          m.status === 'extra_time' || m.status === 'penalties'
+        );
+      } else if (status === 'upcoming') {
+        matches = matches.filter(m => m.status === 'scheduled');
+      } else if (status === 'finished' || status === 'results') {
+        matches = matches.filter(m => m.status === 'finished');
+      } else {
+        matches = matches.filter(m => m.status === status);
+      }
     }
     
     // Sort matches
-    matches.sort((a, b) => {
-      // Live matches first
-      const statusOrder: Record<string, number> = { 
-        live: 0, 
-        halftime: 1, 
-        extra_time: 1.5, 
-        penalties: 1.6, 
-        scheduled: 2, 
-        finished: 3, 
-        postponed: 4, 
-        cancelled: 5 
-      };
-      const statusOrderA = statusOrder[a.status] ?? 5;
-      const statusOrderB = statusOrder[b.status] ?? 5;
-      if (statusOrderA !== statusOrderB) return statusOrderA - statusOrderB;
-      
-      // Then by kickoff time
-      return new Date(a.kickoffTime).getTime() - new Date(b.kickoffTime).getTime();
-    });
+    matches = sortMatches(matches, countryCode);
     
     // Calculate stats
     const stats = {
       total: matches.length,
-      live: matches.filter(m => m.status === 'live' || m.status === 'halftime' || m.status === 'extra_time' || m.status === 'penalties').length,
+      live: matches.filter(m => 
+        m.status === 'live' || m.status === 'halftime' || 
+        m.status === 'extra_time' || m.status === 'penalties'
+      ).length,
       today: matches.filter(m => {
         const matchDate = new Date(m.kickoffTime).toDateString();
         return matchDate === new Date().toDateString();
@@ -442,11 +413,16 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ 
       matches,
       stats,
-      source: apiWorking ? 'api-football' : 'fallback',
+      source: apiSource,
+      apis: {
+        theOddsApi: hasTheOddsApi,
+        sportsDataIo: hasSportsDataIo,
+        oddsApiIo: hasOddsApiIo,
+      },
       timestamp: new Date().toISOString(),
     });
   } catch (error) {
-    console.error('Error in matches API:', error);
+    console.error('[Matches API] Error:', error);
     return NextResponse.json(
       { error: 'Failed to fetch matches' },
       { status: 500 }
