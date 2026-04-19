@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
 
 // ✅ FIX: import correct export and alias it
-import { ALL_SPORTS as SPORTS_LIST } from "@/lib/sports-data"
+import { ALL_SPORTS as SPORTS_LIST, getSportIcon } from "@/lib/sports-data"
 
 const mainNavItems = [
   { href: "/", label: "Home", icon: Home },
@@ -106,11 +106,11 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
               {SPORTS_LIST?.slice(0, 15).map((sport) => (
                 <Link
                   key={sport.id}
-                  href={`/matches?sport=${sport.id}`}
+                  href={`/matches?sport=${sport.slug}`}
                   onClick={() => setSidebarOpen(false)}
                   className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted-foreground hover:bg-muted hover:text-foreground"
                 >
-                  <span>{sport.icon}</span>
+                  <span>{getSportIcon(sport.slug)}</span>
                   {sport.name}
                 </Link>
               ))}

@@ -332,8 +332,8 @@ export function getCountryFlag(countryCode: string): string {
   return String.fromCodePoint(...codePoints);
 }
 
-// Get sport icon
-export function getSportIcon(sportSlug: string): string {
+// Get sport icon by slug or id
+export function getSportIcon(sportSlugOrId: string | number): string {
   const iconMap: Record<string, string> = {
     'football': '⚽',
     'basketball': '🏀',
@@ -358,6 +358,35 @@ export function getSportIcon(sportSlug: string): string {
     'darts': '🎯',
     'snooker': '🎱',
     'chess': '♟️',
+    'futsal': '⚽',
+    'water-polo': '🤽',
+    'field-hockey': '🏑',
+    'beach-volleyball': '🏐',
+    'lacrosse': '🥍',
+    'aussie-rules': '🏉',
+    'squash': '🎾',
+    'athletics': '🏃',
+    'wrestling': '🤼',
+    'nascar': '🏎️',
+    'motogp': '🏍️',
+    'ski-jumping': '⛷️',
   };
-  return iconMap[sportSlug] || '🏆';
+  
+  // If it's a number, find the sport by ID
+  if (typeof sportSlugOrId === 'number') {
+    const sport = ALL_SPORTS.find(s => s.id === sportSlugOrId);
+    return sport ? iconMap[sport.slug] || '🏆' : '🏆';
+  }
+  
+  return iconMap[sportSlugOrId] || '🏆';
+}
+
+// Get sport by ID
+export function getSportById(id: number): SportConfig | undefined {
+  return ALL_SPORTS.find(s => s.id === id);
+}
+
+// Get league by ID
+export function getLeagueById(id: number): LeagueConfig | undefined {
+  return ALL_LEAGUES.find(l => l.id === id);
 }
