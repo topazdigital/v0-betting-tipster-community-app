@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import Link from 'next/link';
 import { 
   Trophy, 
@@ -12,21 +12,34 @@ import {
   Gift,
   ChevronRight,
   Timer,
-  Target
+  Target,
+  TrendingUp
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { SidebarNew } from '@/components/layout/sidebar-new';
 import { cn } from '@/lib/utils';
+import { ALL_LEAGUES, TEAMS_DATABASE, getSportIcon, BOOKMAKERS } from '@/lib/sports-data';
 
-// Mock competitions data
-const competitions = [
+// Sport priority for sorting
+const SPORT_PRIORITY: Record<number, number> = {
+  1: 0,   // Football first
+  2: 1,   // Basketball
+  3: 2,   // Tennis
+  4: 3,   // Cricket
+  5: 4,   // American Football
+  7: 5,   // Ice Hockey
+};
+
+// Mock tipster competitions data
+const tipsterCompetitions = [
   {
     id: 1,
     name: 'Weekly Tipster Challenge',
-    description: 'Compete with other tipsters for the highest win rate this week! Top 10 win prizes.',
+    description: 'Compete with other tipsters for the highest win rate this week!',
     type: 'weekly',
     status: 'active',
     startDate: new Date(),
@@ -46,7 +59,7 @@ const competitions = [
   {
     id: 2,
     name: 'Monthly Masters League',
-    description: 'The ultimate monthly competition for serious tipsters. Bigger stakes, bigger rewards!',
+    description: 'The ultimate monthly competition for serious tipsters.',
     type: 'monthly',
     status: 'active',
     startDate: new Date(),
@@ -63,74 +76,78 @@ const competitions = [
       { place: '4-10th', amount: 5714 },
     ],
   },
-  {
-    id: 3,
-    name: 'Football Weekend Blitz',
-    description: 'Football-only competition! Predict weekend matches and win big.',
-    type: 'weekend',
-    status: 'upcoming',
-    startDate: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000),
-    endDate: new Date(Date.now() + 4 * 24 * 60 * 60 * 1000),
-    prizePool: 30000,
-    entryFee: 50,
-    maxParticipants: 1000,
-    currentParticipants: 0,
-    yourRank: null,
-    prizes: [
-      { place: '1st', amount: 12000 },
-      { place: '2nd', amount: 8000 },
-      { place: '3rd', amount: 5000 },
-      { place: '4-10th', amount: 714 },
-    ],
-  },
-  {
-    id: 4,
-    name: 'NBA Playoffs Special',
-    description: 'Basketball fans! Predict NBA playoff games for a chance to win.',
-    type: 'special',
-    status: 'active',
-    startDate: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000),
-    endDate: new Date(Date.now() + 20 * 24 * 60 * 60 * 1000),
-    prizePool: 75000,
-    entryFee: 200,
-    maxParticipants: 300,
-    currentParticipants: 245,
-    yourRank: 8,
-    prizes: [
-      { place: '1st', amount: 30000 },
-      { place: '2nd', amount: 20000 },
-      { place: '3rd', amount: 12000 },
-      { place: '4-10th', amount: 1857 },
-    ],
-  },
 ];
 
-const pastCompetitions = [
-  {
-    id: 101,
-    name: 'March Madness Challenge',
-    type: 'special',
-    prizePool: 100000,
-    winner: 'KingOfTips',
-    yourRank: 5,
-    endDate: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
-  },
-  {
-    id: 102,
-    name: 'Weekly Challenge #12',
-    type: 'weekly',
-    prizePool: 50000,
-    winner: 'AcePredicts',
-    yourRank: 12,
-    endDate: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
-  },
-];
+// Generate outright markets for major leagues
+function generateOutrightMarkets() {
+  // Football leagues first, then other sports
+  const footballLeagues = ALL_LEAGUES.filter(l => l.sportId === 1 && l.tier === 1).slice(0, 8);
+  const otherLeagues = ALL_LEAGUES.filter(l => l.sportId !== 1 && l.tier === 1).slice(0, 6);
+  
+  const leagues = [...footballLeagues, ...otherLeagues].sort((a, b) => {
+    const priorityA = SPORT_PRIORITY[a.sportId] ?? 99;
+    const priorityB = SPORT_PRIORITY[b.sportId] ?? 99;
+    return priorityA - priorityB;
+  });
+  
+  return leagues.map(league => {
+    const teams = TEAMS_DATABASE.filter(t => t.leagueId === league.id);
+    const topTeams = teams.length >= 3 ? teams.slice(0, 5) : Array.from({ length: 5 }, (_, i) => ({
+      id: 8000 + i + league.id * 100,
+      name: `Team ${i + 1}`,
+      shortName: `T${i + 1}`,
+      sportId: league.sportId,
+      leagueId: league.id,
+      country: league.country
+    }));
+    
+    return {
+      league,
+      sportIcon: getSportIcon(league.sportId === 1 ? 'football' : 
+        league.sportId === 2 ? 'basketball' : 
+        league.sportId === 3 ? 'tennis' : 
+        league.sportId === 5 ? 'american-football' : 'football'),
+      favourite: {
+        team: topTeams[0],
+        odds: +(1.5 + Math.random() * 2).toFixed(2)
+      },
+      contenders: topTeams.slice(0, 5).map((team, idx) => ({
+        team,
+        odds: +(1.5 + (idx * 3) + Math.random() * 3).toFixed(2)
+      }))
+    };
+  });
+}
+
+// Country flag helper
+function getCountryFlag(countryCode: string): string {
+  const codeMap: Record<string, string> = {
+    'GB-ENG': '\u{1F3F4}\u{E0067}\u{E0062}\u{E0065}\u{E006E}\u{E0067}\u{E007F}',
+    'GB-SCT': '\u{1F3F4}\u{E0067}\u{E0062}\u{E0073}\u{E0063}\u{E0074}\u{E007F}',
+    'EU': '\u{1F1EA}\u{1F1FA}',
+    'WO': '\u{1F30D}',
+    'AF': '\u{1F30D}',
+  };
+  
+  const mapped = codeMap[countryCode];
+  if (mapped) return mapped;
+  
+  try {
+    const codePoints = countryCode.substring(0, 2)
+      .toUpperCase()
+      .split('')
+      .map(char => 127397 + char.charCodeAt(0));
+    return String.fromCodePoint(...codePoints);
+  } catch {
+    return '\u{1F3C6}';
+  }
+}
 
 export default function CompetitionsPage() {
-  const [activeTab, setActiveTab] = useState('active');
-
-  const activeComps = competitions.filter(c => c.status === 'active');
-  const upcomingComps = competitions.filter(c => c.status === 'upcoming');
+  const [activeTab, setActiveTab] = useState('outrights');
+  
+  const outrightMarkets = useMemo(() => generateOutrightMarkets(), []);
+  const activeComps = tipsterCompetitions.filter(c => c.status === 'active');
 
   const formatTimeLeft = (endDate: Date) => {
     const diff = endDate.getTime() - Date.now();
@@ -140,16 +157,6 @@ export default function CompetitionsPage() {
     if (days > 0) return `${days}d ${hours}h left`;
     if (hours > 0) return `${hours}h left`;
     return 'Ending soon';
-  };
-
-  const formatStartsIn = (startDate: Date) => {
-    const diff = startDate.getTime() - Date.now();
-    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-    const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-    
-    if (days > 0) return `Starts in ${days}d ${hours}h`;
-    if (hours > 0) return `Starts in ${hours}h`;
-    return 'Starting soon';
   };
 
   return (
@@ -165,13 +172,13 @@ export default function CompetitionsPage() {
                 Competitions
               </h1>
               <p className="text-sm text-muted-foreground">
-                Compete with other tipsters and win prizes
+                Outright winners, tipster challenges, and more
               </p>
             </div>
             <Button asChild>
               <Link href="/leaderboard">
                 <Star className="mr-2 h-4 w-4" />
-                View Leaderboard
+                Leaderboard
               </Link>
             </Button>
           </div>
@@ -179,134 +186,142 @@ export default function CompetitionsPage() {
           {/* Stats */}
           <div className="mb-8 grid grid-cols-2 gap-4 sm:grid-cols-4">
             <div className="rounded-xl border border-border bg-gradient-to-br from-warning/10 to-transparent p-4 text-center">
-              <Gift className="mx-auto h-6 w-6 text-warning" />
+              <Target className="mx-auto h-6 w-6 text-warning" />
               <div className="mt-2 text-2xl font-bold text-warning">
-                KES {competitions.reduce((sum, c) => sum + c.prizePool, 0).toLocaleString()}
+                {outrightMarkets.length}
               </div>
-              <div className="text-xs text-muted-foreground">Total Prize Pool</div>
+              <div className="text-xs text-muted-foreground">Outright Markets</div>
             </div>
             <div className="rounded-xl border border-border bg-card p-4 text-center">
               <Zap className="mx-auto h-6 w-6 text-primary" />
               <div className="mt-2 text-2xl font-bold">{activeComps.length}</div>
-              <div className="text-xs text-muted-foreground">Active Now</div>
+              <div className="text-xs text-muted-foreground">Active Contests</div>
             </div>
             <div className="rounded-xl border border-border bg-card p-4 text-center">
               <Users className="mx-auto h-6 w-6 text-success" />
               <div className="mt-2 text-2xl font-bold">
-                {competitions.reduce((sum, c) => sum + c.currentParticipants, 0)}
+                {tipsterCompetitions.reduce((sum, c) => sum + c.currentParticipants, 0)}
               </div>
               <div className="text-xs text-muted-foreground">Participants</div>
             </div>
             <div className="rounded-xl border border-border bg-card p-4 text-center">
-              <Target className="mx-auto h-6 w-6 text-live" />
+              <Gift className="mx-auto h-6 w-6 text-live" />
               <div className="mt-2 text-2xl font-bold">
-                {competitions.filter(c => c.yourRank).length}
+                KES {tipsterCompetitions.reduce((sum, c) => sum + c.prizePool, 0).toLocaleString()}
               </div>
-              <div className="text-xs text-muted-foreground">Your Entries</div>
+              <div className="text-xs text-muted-foreground">Prize Pool</div>
             </div>
           </div>
 
           {/* Tabs */}
           <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-6">
-            <TabsList>
-              <TabsTrigger value="active">
-                Active ({activeComps.length})
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="outrights" className="gap-2">
+                <Target className="h-4 w-4" />
+                Outright Winners
               </TabsTrigger>
-              <TabsTrigger value="upcoming">
-                Upcoming ({upcomingComps.length})
-              </TabsTrigger>
-              <TabsTrigger value="past">
-                Past ({pastCompetitions.length})
+              <TabsTrigger value="contests" className="gap-2">
+                <Trophy className="h-4 w-4" />
+                Tipster Contests ({activeComps.length})
               </TabsTrigger>
             </TabsList>
 
-            <TabsContent value="active" className="mt-6">
+            {/* Outright Winners Tab */}
+            <TabsContent value="outrights" className="mt-6">
+              <div className="mb-4 text-sm text-muted-foreground">
+                Bet on who will win each competition. Football leagues shown first.
+              </div>
+              
+              <div className="grid gap-4 md:grid-cols-2">
+                {outrightMarkets.map(market => (
+                  <Card key={market.league.id} className="overflow-hidden transition-all hover:shadow-lg">
+                    <CardHeader className="bg-gradient-to-r from-primary/5 to-transparent pb-3">
+                      <CardTitle className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xl">{market.sportIcon}</span>
+                          <span className="text-sm">{getCountryFlag(market.league.countryCode)}</span>
+                          <span>{market.league.name}</span>
+                        </div>
+                        <Link href={`/leagues/${market.league.slug}`}>
+                          <Button variant="ghost" size="sm">
+                            <ChevronRight className="h-4 w-4" />
+                          </Button>
+                        </Link>
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="pt-3">
+                      {/* Favourite */}
+                      <div className="mb-3 flex items-center justify-between rounded-lg bg-warning/10 p-3">
+                        <div className="flex items-center gap-2">
+                          <Badge className="bg-warning text-warning-foreground">
+                            <Star className="mr-1 h-3 w-3" />
+                            Favourite
+                          </Badge>
+                          <span className="font-semibold">{market.favourite.team.name}</span>
+                        </div>
+                        <span className="font-mono text-lg font-bold text-success">
+                          {market.favourite.odds.toFixed(2)}
+                        </span>
+                      </div>
+                      
+                      {/* Other Contenders */}
+                      <div className="space-y-2">
+                        {market.contenders.slice(1, 4).map((contender, idx) => (
+                          <div 
+                            key={contender.team.id}
+                            className="flex items-center justify-between rounded-lg bg-muted/50 px-3 py-2"
+                          >
+                            <div className="flex items-center gap-2">
+                              <span className={cn(
+                                "flex h-5 w-5 items-center justify-center rounded-full text-xs font-bold",
+                                idx === 0 && "bg-gray-300 text-gray-700",
+                                idx === 1 && "bg-amber-700 text-amber-100",
+                                idx > 1 && "bg-muted"
+                              )}>
+                                {idx + 2}
+                              </span>
+                              <span className="text-sm">{contender.team.name}</span>
+                            </div>
+                            <span className="font-mono font-semibold text-primary">
+                              {contender.odds.toFixed(2)}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                      
+                      <Button variant="outline" className="mt-3 w-full" asChild>
+                        <Link href={`/leagues/${market.league.slug}`}>
+                          View All Odds & Standings
+                          <TrendingUp className="ml-2 h-4 w-4" />
+                        </Link>
+                      </Button>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </TabsContent>
+
+            {/* Tipster Contests Tab */}
+            <TabsContent value="contests" className="mt-6">
               <div className="grid gap-6">
                 {activeComps.map(comp => (
-                  <CompetitionCard key={comp.id} competition={comp} formatTimeLeft={formatTimeLeft} />
+                  <CompetitionCard 
+                    key={comp.id} 
+                    competition={comp} 
+                    formatTimeLeft={formatTimeLeft} 
+                  />
                 ))}
               </div>
-            </TabsContent>
-
-            <TabsContent value="upcoming" className="mt-6">
-              <div className="grid gap-6">
-                {upcomingComps.map(comp => (
-                  <div 
-                    key={comp.id}
-                    className="rounded-xl border border-dashed border-border bg-card p-6"
-                  >
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <Badge variant="secondary" className="mb-2">
-                          <Clock className="mr-1 h-3 w-3" />
-                          {formatStartsIn(comp.startDate)}
-                        </Badge>
-                        <h3 className="text-xl font-bold">{comp.name}</h3>
-                        <p className="mt-1 text-sm text-muted-foreground">{comp.description}</p>
-                      </div>
-                      <div className="text-right">
-                        <div className="text-2xl font-bold text-warning">
-                          KES {comp.prizePool.toLocaleString()}
-                        </div>
-                        <div className="text-sm text-muted-foreground">Prize Pool</div>
-                      </div>
-                    </div>
-                    <div className="mt-4 flex items-center gap-4 text-sm text-muted-foreground">
-                      <span>Entry: KES {comp.entryFee}</span>
-                      <span>Max {comp.maxParticipants} participants</span>
-                    </div>
-                    <Button className="mt-4" disabled>
-                      <Clock className="mr-2 h-4 w-4" />
-                      Notify Me
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            </TabsContent>
-
-            <TabsContent value="past" className="mt-6">
-              <div className="rounded-xl border border-border bg-card overflow-hidden">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b border-border bg-muted/50">
-                      <th className="px-4 py-3 text-left text-xs font-medium uppercase text-muted-foreground">Competition</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium uppercase text-muted-foreground">Winner</th>
-                      <th className="px-4 py-3 text-center text-xs font-medium uppercase text-muted-foreground">Prize Pool</th>
-                      <th className="px-4 py-3 text-center text-xs font-medium uppercase text-muted-foreground">Your Rank</th>
-                      <th className="px-4 py-3 text-center text-xs font-medium uppercase text-muted-foreground">Ended</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {pastCompetitions.map(comp => (
-                      <tr key={comp.id} className="border-b border-border hover:bg-muted/50">
-                        <td className="px-4 py-4">
-                          <div className="font-medium">{comp.name}</div>
-                          <Badge variant="outline" className="mt-1 text-xs">{comp.type}</Badge>
-                        </td>
-                        <td className="px-4 py-4">
-                          <Link href={`/tipsters/${comp.winner}`} className="flex items-center gap-2 hover:text-primary">
-                            <Trophy className="h-4 w-4 text-warning" />
-                            {comp.winner}
-                          </Link>
-                        </td>
-                        <td className="px-4 py-4 text-center font-semibold text-warning">
-                          KES {comp.prizePool.toLocaleString()}
-                        </td>
-                        <td className="px-4 py-4 text-center">
-                          {comp.yourRank ? (
-                            <Badge variant="secondary">#{comp.yourRank}</Badge>
-                          ) : (
-                            <span className="text-muted-foreground">-</span>
-                          )}
-                        </td>
-                        <td className="px-4 py-4 text-center text-sm text-muted-foreground">
-                          {comp.endDate.toLocaleDateString()}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              
+              {activeComps.length === 0 && (
+                <div className="rounded-xl border border-dashed border-border p-12 text-center">
+                  <Trophy className="mx-auto h-12 w-12 text-muted-foreground" />
+                  <h3 className="mt-4 text-lg font-semibold">No active contests</h3>
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    Check back soon for new tipster competitions
+                  </p>
+                </div>
+              )}
             </TabsContent>
           </Tabs>
         </div>
@@ -319,7 +334,7 @@ function CompetitionCard({
   competition, 
   formatTimeLeft 
 }: { 
-  competition: typeof competitions[0]; 
+  competition: typeof tipsterCompetitions[0]; 
   formatTimeLeft: (date: Date) => string;
 }) {
   const participationPercent = (competition.currentParticipants / competition.maxParticipants) * 100;
@@ -399,18 +414,14 @@ function CompetitionCard({
           Entry fee: <span className="font-semibold text-foreground">KES {competition.entryFee}</span>
         </div>
         {competition.yourRank ? (
-          <Button variant="outline" asChild>
-            <Link href={`/competitions/${competition.id}`}>
-              View Details
-              <ChevronRight className="ml-2 h-4 w-4" />
-            </Link>
+          <Button variant="outline">
+            View Details
+            <ChevronRight className="ml-2 h-4 w-4" />
           </Button>
         ) : (
-          <Button asChild>
-            <Link href={`/competitions/${competition.id}`}>
-              Join Competition
-              <ChevronRight className="ml-2 h-4 w-4" />
-            </Link>
+          <Button>
+            Join Competition
+            <ChevronRight className="ml-2 h-4 w-4" />
           </Button>
         )}
       </div>

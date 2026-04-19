@@ -1,69 +1,170 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useMemo } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
-import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Slider } from "@/components/ui/slider"
 import { Switch } from "@/components/ui/switch"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import { Lock, Send, AlertCircle } from "lucide-react"
+import { Badge } from "@/components/ui/badge"
+import { Lock, Send, AlertCircle, Check, TrendingUp } from "lucide-react"
 import { cn } from "@/lib/utils"
+
+interface MarketOdds {
+  key: string
+  name: string
+  outcomes: Array<{
+    name: string
+    price: number
+  }>
+}
 
 interface AddTipFormProps {
   matchId: string
   homeTeam: string
   awayTeam: string
+  odds?: {
+    home: number
+    draw?: number
+    away: number
+  }
+  markets?: MarketOdds[]
   onSubmit?: (data: TipFormData) => void
   isPremiumUser?: boolean
 }
 
 interface TipFormData {
   prediction: string
+  predictionLabel: string
   odds: number
   stake: number
   confidence: number
   analysis: string
   isPremium: boolean
+  marketKey: string
 }
 
-const PREDICTION_OPTIONS = [
-  { value: "home_win", label: "Home Win" },
-  { value: "draw", label: "Draw" },
-  { value: "away_win", label: "Away Win" },
-  { value: "btts_yes", label: "Both Teams to Score - Yes" },
-  { value: "btts_no", label: "Both Teams to Score - No" },
-  { value: "over_1_5", label: "Over 1.5 Goals" },
-  { value: "under_1_5", label: "Under 1.5 Goals" },
-  { value: "over_2_5", label: "Over 2.5 Goals" },
-  { value: "under_2_5", label: "Under 2.5 Goals" },
-  { value: "over_3_5", label: "Over 3.5 Goals" },
-  { value: "under_3_5", label: "Under 3.5 Goals" },
-  { value: "home_draw", label: "Double Chance - Home/Draw" },
-  { value: "away_draw", label: "Double Chance - Away/Draw" },
-  { value: "home_away", label: "Double Chance - Home/Away" },
-  { value: "ht_home", label: "Half Time - Home Win" },
-  { value: "ht_draw", label: "Half Time - Draw" },
-  { value: "ht_away", label: "Half Time - Away Win" },
-]
+// Generate comprehensive markets from basic odds
+function generateMarketsFromOdds(
+  homeTeam: string,
+  awayTeam: string,
+  baseOdds?: { home: number; draw?: number; away: number }
+): MarketOdds[] {
+  const home = baseOdds?.home || 2.1
+  const draw = baseOdds?.draw || 3.4
+  const away = baseOdds?.away || 3.2
+
+  return [
+    {
+      key: 'h2h',
+      name: 'Match Result (1X2)',
+      outcomes: [
+        { name: `${homeTeam} Win`, price: home },
+        { name: 'Draw', price: draw },
+        { name: `${awayTeam} Win`, price: away },
+      ]
+    },
+    {
+      key: 'double_chance',
+      name: 'Double Chance',
+      outcomes: [
+        { name: `${homeTeam} or Draw`, price: Math.round((1 / (1/home + 1/draw)) * 100) / 100 },
+        { name: `${awayTeam} or Draw`, price: Math.round((1 / (1/away + 1/draw)) * 100) / 100 },
+        { name: `${homeTeam} or ${awayTeam}`, price: Math.round((1 / (1/home + 1/away)) * 100) / 100 },
+      ]
+    },
+    {
+      key: 'btts',
+      name: 'Both Teams to Score',
+      outcomes: [
+        { name: 'Yes', price: Math.round((1.7 + Math.random() * 0.3) * 100) / 100 },
+        { name: 'No', price: Math.round((2.0 + Math.random() * 0.3) * 100) / 100 },
+      ]
+    },
+    {
+      key: 'over_under_1_5',
+      name: 'Over/Under 1.5 Goals',
+      outcomes: [
+        { name: 'Over 1.5', price: Math.round((1.35 + Math.random() * 0.2) * 100) / 100 },
+        { name: 'Under 1.5', price: Math.round((2.8 + Math.random() * 0.4) * 100) / 100 },
+      ]
+    },
+    {
+      key: 'over_under_2_5',
+      name: 'Over/Under 2.5 Goals',
+      outcomes: [
+        { name: 'Over 2.5', price: Math.round((1.8 + Math.random() * 0.4) * 100) / 100 },
+        { name: 'Under 2.5', price: Math.round((1.95 + Math.random() * 0.3) * 100) / 100 },
+      ]
+    },
+    {
+      key: 'over_under_3_5',
+      name: 'Over/Under 3.5 Goals',
+      outcomes: [
+        { name: 'Over 3.5', price: Math.round((2.3 + Math.random() * 0.5) * 100) / 100 },
+        { name: 'Under 3.5', price: Math.round((1.55 + Math.random() * 0.2) * 100) / 100 },
+      ]
+    },
+    {
+      key: 'ht_result',
+      name: 'Half Time Result',
+      outcomes: [
+        { name: `${homeTeam} HT`, price: Math.round((home * 1.4) * 100) / 100 },
+        { name: 'Draw HT', price: Math.round((draw * 0.75) * 100) / 100 },
+        { name: `${awayTeam} HT`, price: Math.round((away * 1.4) * 100) / 100 },
+      ]
+    },
+    {
+      key: 'correct_score',
+      name: 'Correct Score',
+      outcomes: [
+        { name: '1-0', price: Math.round((6.5 + Math.random() * 2) * 100) / 100 },
+        { name: '2-0', price: Math.round((8 + Math.random() * 3) * 100) / 100 },
+        { name: '2-1', price: Math.round((8.5 + Math.random() * 3) * 100) / 100 },
+        { name: '0-0', price: Math.round((10 + Math.random() * 4) * 100) / 100 },
+        { name: '1-1', price: Math.round((6 + Math.random() * 2) * 100) / 100 },
+        { name: '0-1', price: Math.round((9 + Math.random() * 3) * 100) / 100 },
+        { name: '0-2', price: Math.round((12 + Math.random() * 4) * 100) / 100 },
+        { name: '1-2', price: Math.round((11 + Math.random() * 4) * 100) / 100 },
+        { name: '2-2', price: Math.round((12 + Math.random() * 5) * 100) / 100 },
+        { name: '3-0', price: Math.round((15 + Math.random() * 5) * 100) / 100 },
+        { name: '3-1', price: Math.round((14 + Math.random() * 5) * 100) / 100 },
+      ]
+    },
+    {
+      key: 'first_goal',
+      name: 'First Team to Score',
+      outcomes: [
+        { name: homeTeam, price: Math.round((1.8 + Math.random() * 0.3) * 100) / 100 },
+        { name: awayTeam, price: Math.round((2.1 + Math.random() * 0.4) * 100) / 100 },
+        { name: 'No Goal', price: Math.round((9 + Math.random() * 3) * 100) / 100 },
+      ]
+    },
+    {
+      key: 'handicap',
+      name: 'Asian Handicap',
+      outcomes: [
+        { name: `${homeTeam} -1`, price: Math.round((home * 1.6) * 100) / 100 },
+        { name: `${awayTeam} +1`, price: Math.round((away * 0.7) * 100) / 100 },
+        { name: `${homeTeam} -2`, price: Math.round((home * 2.5) * 100) / 100 },
+        { name: `${awayTeam} +2`, price: Math.round((away * 0.5) * 100) / 100 },
+      ]
+    },
+  ]
+}
 
 export function AddTipForm({ 
   matchId, 
   homeTeam, 
   awayTeam, 
+  odds,
+  markets: providedMarkets,
   onSubmit,
   isPremiumUser = false 
 }: AddTipFormProps) {
-  const [prediction, setPrediction] = useState("")
-  const [odds, setOdds] = useState("")
+  const [selectedMarketKey, setSelectedMarketKey] = useState<string>("")
+  const [selectedOutcome, setSelectedOutcome] = useState<{ name: string; price: number } | null>(null)
   const [stake, setStake] = useState(3)
   const [confidence, setConfidence] = useState([70])
   const [analysis, setAnalysis] = useState("")
@@ -71,12 +172,21 @@ export function AddTipForm({
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
 
+  // Generate or use provided markets
+  const allMarkets = useMemo(() => {
+    if (providedMarkets && providedMarkets.length > 0) {
+      return providedMarkets
+    }
+    return generateMarketsFromOdds(homeTeam, awayTeam, odds)
+  }, [providedMarkets, homeTeam, awayTeam, odds])
+
+  // Get selected market
+  const selectedMarket = allMarkets.find(m => m.key === selectedMarketKey)
+
   const validate = (): boolean => {
     const newErrors: Record<string, string> = {}
     
-    if (!prediction) newErrors.prediction = "Please select a prediction"
-    if (!odds || parseFloat(odds) < 1.01) newErrors.odds = "Odds must be at least 1.01"
-    if (parseFloat(odds) > 100) newErrors.odds = "Odds seem too high"
+    if (!selectedOutcome) newErrors.prediction = "Please select a prediction from the markets"
     if (analysis.length < 20) newErrors.analysis = "Analysis must be at least 20 characters"
     if (analysis.length > 500) newErrors.analysis = "Analysis must be under 500 characters"
     
@@ -84,20 +194,29 @@ export function AddTipForm({
     return Object.keys(newErrors).length === 0
   }
 
+  const handleSelectOutcome = (market: MarketOdds, outcome: { name: string; price: number }) => {
+    setSelectedMarketKey(market.key)
+    setSelectedOutcome(outcome)
+    // Clear any prediction errors
+    setErrors(prev => ({ ...prev, prediction: "" }))
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
-    if (!validate()) return
+    if (!validate() || !selectedOutcome) return
 
     setIsSubmitting(true)
     
     const data: TipFormData = {
-      prediction,
-      odds: parseFloat(odds),
+      prediction: `${selectedMarketKey}:${selectedOutcome.name}`,
+      predictionLabel: selectedOutcome.name,
+      odds: selectedOutcome.price,
       stake,
       confidence: confidence[0],
       analysis,
       isPremium: isPremiumUser && isPremium,
+      marketKey: selectedMarketKey,
     }
 
     try {
@@ -105,8 +224,8 @@ export function AddTipForm({
         await onSubmit(data)
       }
       // Reset form
-      setPrediction("")
-      setOdds("")
+      setSelectedMarketKey("")
+      setSelectedOutcome(null)
       setStake(3)
       setConfidence([70])
       setAnalysis("")
@@ -122,49 +241,84 @@ export function AddTipForm({
     <Card>
       <CardHeader className="pb-3">
         <CardTitle className="text-lg font-semibold">Add Your Tip</CardTitle>
+        <p className="text-sm text-muted-foreground">
+          Select a market and outcome - odds are auto-filled
+        </p>
       </CardHeader>
       <CardContent>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Prediction */}
-          <div className="space-y-2">
-            <Label htmlFor="prediction">
-              Prediction <span className="text-destructive">*</span>
-            </Label>
-            <Select value={prediction} onValueChange={setPrediction}>
-              <SelectTrigger className={cn(errors.prediction && "border-destructive")}>
-                <SelectValue placeholder="Select your prediction" />
-              </SelectTrigger>
-              <SelectContent>
-                {PREDICTION_OPTIONS.map((option) => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {errors.prediction && (
-              <p className="text-xs text-destructive">{errors.prediction}</p>
-            )}
-          </div>
+        <form onSubmit={handleSubmit} className="space-y-5">
+          {/* Selected Prediction Display */}
+          {selectedOutcome && (
+            <div className="rounded-lg border-2 border-primary bg-primary/5 p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-muted-foreground uppercase tracking-wider">
+                    {selectedMarket?.name}
+                  </p>
+                  <p className="text-lg font-semibold text-foreground">
+                    {selectedOutcome.name}
+                  </p>
+                </div>
+                <div className="text-right">
+                  <p className="text-xs text-muted-foreground">Odds</p>
+                  <p className="text-2xl font-bold text-primary">
+                    {selectedOutcome.price.toFixed(2)}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
 
-          {/* Odds */}
-          <div className="space-y-2">
-            <Label htmlFor="odds">
-              Odds <span className="text-destructive">*</span>
+          {/* Market Selection */}
+          <div className="space-y-3">
+            <Label className="flex items-center gap-2">
+              Select Market & Prediction <span className="text-destructive">*</span>
+              {errors.prediction && (
+                <span className="text-xs text-destructive">{errors.prediction}</span>
+              )}
             </Label>
-            <Input
-              id="odds"
-              type="number"
-              step="0.01"
-              min="1.01"
-              placeholder="e.g., 1.85"
-              value={odds}
-              onChange={(e) => setOdds(e.target.value)}
-              className={cn(errors.odds && "border-destructive")}
-            />
-            {errors.odds && (
-              <p className="text-xs text-destructive">{errors.odds}</p>
-            )}
+            
+            <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2">
+              {allMarkets.map((market) => (
+                <div key={market.key} className="space-y-2">
+                  <p className="text-sm font-medium text-muted-foreground">
+                    {market.name}
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {market.outcomes.map((outcome) => {
+                      const isSelected = selectedMarketKey === market.key && 
+                                       selectedOutcome?.name === outcome.name
+                      return (
+                        <button
+                          key={`${market.key}-${outcome.name}`}
+                          type="button"
+                          onClick={() => handleSelectOutcome(market, outcome)}
+                          className={cn(
+                            "relative flex flex-col items-center rounded-lg border-2 px-4 py-2 text-sm transition-all min-w-[90px]",
+                            isSelected
+                              ? "border-primary bg-primary/10 text-primary"
+                              : "border-border hover:border-primary/50 hover:bg-muted"
+                          )}
+                        >
+                          {isSelected && (
+                            <Check className="absolute -right-1 -top-1 h-4 w-4 rounded-full bg-primary text-white p-0.5" />
+                          )}
+                          <span className="font-medium text-xs text-center line-clamp-2">
+                            {outcome.name}
+                          </span>
+                          <span className={cn(
+                            "font-bold text-base",
+                            isSelected ? "text-primary" : "text-foreground"
+                          )}>
+                            {outcome.price.toFixed(2)}
+                          </span>
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
 
           {/* Stake */}
@@ -253,9 +407,22 @@ export function AddTipForm({
             </div>
           )}
 
+          {/* Potential Returns Preview */}
+          {selectedOutcome && (
+            <div className="flex items-center justify-between rounded-lg bg-muted/50 p-3">
+              <div className="flex items-center gap-2">
+                <TrendingUp className="h-4 w-4 text-emerald-500" />
+                <span className="text-sm text-muted-foreground">Potential return (10 units):</span>
+              </div>
+              <span className="font-semibold text-emerald-500">
+                {(10 * selectedOutcome.price).toFixed(2)} units
+              </span>
+            </div>
+          )}
+
           {/* Warning */}
           <div className="flex items-start gap-2 rounded-lg bg-warning/10 p-3 text-sm">
-            <AlertCircle className="mt-0.5 h-4 w-4 text-warning" />
+            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
             <p className="text-muted-foreground">
               Your tip will be visible to the community and will affect your tipster statistics. 
               Make sure you&apos;ve analyzed the match thoroughly.
@@ -266,10 +433,10 @@ export function AddTipForm({
           <Button 
             type="submit" 
             className="w-full gap-2"
-            disabled={isSubmitting}
+            disabled={isSubmitting || !selectedOutcome}
           >
             <Send className="h-4 w-4" />
-            {isSubmitting ? "Submitting..." : "Submit Tip"}
+            {isSubmitting ? "Submitting..." : selectedOutcome ? `Submit Tip @ ${selectedOutcome.price.toFixed(2)}` : "Select a prediction"}
           </Button>
         </form>
       </CardContent>

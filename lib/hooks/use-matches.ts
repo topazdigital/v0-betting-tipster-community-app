@@ -1,6 +1,7 @@
 'use client';
 
 import useSWR from 'swr';
+import { useState, useEffect } from 'react';
 import { 
   generateAllMatches, 
   getLiveMatches, 
@@ -10,6 +11,7 @@ import {
   filterMatches,
   groupMatchesByLeague,
   groupMatchesBySport,
+  sortMatchesWithPriority,
   type Match,
   type MatchFilters
 } from '@/lib/api/sports-api';
@@ -19,35 +21,108 @@ let matchesCache: Match[] | null = null;
 let lastGenerated = 0;
 const CACHE_DURATION = 30000; // 30 seconds
 
-function getMatches(): Match[] {
+// User's detected country code
+let detectedCountryCode: string | null = null;
+
+// Detect user's country from browser
+async function detectUserCountry(): Promise<string> {
+  if (detectedCountryCode) return detectedCountryCode;
+  
+  try {
+    // Try to get from browser's timezone or locale
+    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const locale = navigator.language || 'en-US';
+    
+    // Common timezone to country mappings
+    const timezoneCountryMap: Record<string, string> = {
+      'Africa/Nairobi': 'KE',
+      'Africa/Lagos': 'NG',
+      'Africa/Accra': 'GH',
+      'Africa/Cairo': 'EG',
+      'Africa/Johannesburg': 'ZA',
+      'Europe/London': 'GB',
+      'Europe/Madrid': 'ES',
+      'Europe/Berlin': 'DE',
+      'Europe/Rome': 'IT',
+      'Europe/Paris': 'FR',
+      'Europe/Amsterdam': 'NL',
+      'Europe/Lisbon': 'PT',
+      'Europe/Istanbul': 'TR',
+      'Europe/Brussels': 'BE',
+      'Europe/Moscow': 'RU',
+      'America/New_York': 'US',
+      'America/Los_Angeles': 'US',
+      'America/Chicago': 'US',
+      'America/Sao_Paulo': 'BR',
+      'America/Argentina/Buenos_Aires': 'AR',
+      'America/Mexico_City': 'MX',
+      'Asia/Tokyo': 'JP',
+      'Asia/Seoul': 'KR',
+      'Asia/Shanghai': 'CN',
+      'Asia/Riyadh': 'SA',
+      'Asia/Kolkata': 'IN',
+      'Australia/Sydney': 'AU',
+      'Australia/Melbourne': 'AU',
+    };
+    
+    detectedCountryCode = timezoneCountryMap[timezone] || 'GB'; // Default to GB
+    return detectedCountryCode;
+  } catch {
+    detectedCountryCode = 'GB';
+    return 'GB';
+  }
+}
+
+// Hook to get user's country code
+export function useUserCountry() {
+  const [countryCode, setCountryCode] = useState<string>('GB');
+  
+  useEffect(() => {
+    detectUserCountry().then(setCountryCode);
+  }, []);
+  
+  return countryCode;
+}
+
+function getMatches(userCountryCode?: string): Match[] {
   const now = Date.now();
   if (!matchesCache || now - lastGenerated > CACHE_DURATION) {
-    matchesCache = generateAllMatches();
+    matchesCache = generateAllMatches(userCountryCode);
     lastGenerated = now;
   }
   return matchesCache;
 }
 
-// Fetcher function
-const matchesFetcher = async (): Promise<Match[]> => {
-  // Simulate API call delay
+// Fetcher function with country code
+const createMatchesFetcher = (countryCode: string) => async (): Promise<Match[]> => {
   await new Promise(resolve => setTimeout(resolve, 100));
-  return getMatches();
+  return getMatches(countryCode);
 };
 
-// Main hook for all matches
+// Main hook for all matches with geo-prioritization
 export function useMatches(filters?: MatchFilters) {
-  const { data, error, isLoading, mutate } = useSWR('matches', matchesFetcher, {
-    refreshInterval: 30000, // Refresh every 30 seconds
-    revalidateOnFocus: false,
-  });
+  const countryCode = useUserCountry();
+  
+  const { data, error, isLoading, mutate } = useSWR(
+    ['matches', countryCode],
+    () => createMatchesFetcher(countryCode)(),
+    {
+      refreshInterval: 30000,
+      revalidateOnFocus: false,
+    }
+  );
 
   const matches = data || [];
-  const filteredMatches = filters ? filterMatches(matches, filters) : matches;
+  
+  // Apply filters and maintain sort order
+  const filteredMatches = filters 
+    ? filterMatches(matches, { ...filters, userCountryCode: countryCode })
+    : sortMatchesWithPriority(matches, countryCode);
 
   return {
     matches: filteredMatches,
     allMatches: matches,
+    userCountryCode: countryCode,
     isLoading,
     error,
     mutate,
@@ -56,10 +131,16 @@ export function useMatches(filters?: MatchFilters) {
 
 // Hook for live matches only
 export function useLiveMatches() {
-  const { data, error, isLoading } = useSWR('matches', matchesFetcher, {
-    refreshInterval: 10000, // Refresh more frequently for live
-    revalidateOnFocus: true,
-  });
+  const countryCode = useUserCountry();
+  
+  const { data, error, isLoading } = useSWR(
+    ['matches', countryCode],
+    () => createMatchesFetcher(countryCode)(),
+    {
+      refreshInterval: 10000, // Refresh more frequently for live
+      revalidateOnFocus: true,
+    }
+  );
 
   return {
     matches: data ? getLiveMatches(data) : [],
@@ -70,9 +151,15 @@ export function useLiveMatches() {
 
 // Hook for today's matches
 export function useTodayMatches() {
-  const { data, error, isLoading } = useSWR('matches', matchesFetcher, {
-    refreshInterval: 30000,
-  });
+  const countryCode = useUserCountry();
+  
+  const { data, error, isLoading } = useSWR(
+    ['matches', countryCode],
+    () => createMatchesFetcher(countryCode)(),
+    {
+      refreshInterval: 30000,
+    }
+  );
 
   return {
     matches: data ? getTodayMatches(data) : [],
@@ -81,11 +168,17 @@ export function useTodayMatches() {
   };
 }
 
-// Hook for upcoming matches
+// Hook for upcoming matches (sorted by time - soonest first)
 export function useUpcomingMatches(limit?: number) {
-  const { data, error, isLoading } = useSWR('matches', matchesFetcher, {
-    refreshInterval: 60000,
-  });
+  const countryCode = useUserCountry();
+  
+  const { data, error, isLoading } = useSWR(
+    ['matches', countryCode],
+    () => createMatchesFetcher(countryCode)(),
+    {
+      refreshInterval: 60000,
+    }
+  );
 
   const upcoming = data ? getUpcomingMatches(data) : [];
   const limited = limit ? upcoming.slice(0, limit) : upcoming;
@@ -100,9 +193,15 @@ export function useUpcomingMatches(limit?: number) {
 
 // Hook for finished matches
 export function useFinishedMatches(date?: Date) {
-  const { data, error, isLoading } = useSWR('matches', matchesFetcher, {
-    refreshInterval: 60000,
-  });
+  const countryCode = useUserCountry();
+  
+  const { data, error, isLoading } = useSWR(
+    ['matches', countryCode],
+    () => createMatchesFetcher(countryCode)(),
+    {
+      refreshInterval: 60000,
+    }
+  );
 
   let finished = data ? getFinishedMatches(data) : [];
   
@@ -120,9 +219,15 @@ export function useFinishedMatches(date?: Date) {
 
 // Hook for a single match
 export function useMatch(matchId: string) {
-  const { data, error, isLoading } = useSWR('matches', matchesFetcher, {
-    refreshInterval: 10000,
-  });
+  const countryCode = useUserCountry();
+  
+  const { data, error, isLoading } = useSWR(
+    ['matches', countryCode],
+    () => createMatchesFetcher(countryCode)(),
+    {
+      refreshInterval: 10000,
+    }
+  );
 
   const match = data?.find(m => m.id === matchId);
 
@@ -133,11 +238,17 @@ export function useMatch(matchId: string) {
   };
 }
 
-// Hook for matches grouped by league
+// Hook for matches grouped by league (with sport priority - football first)
 export function useMatchesByLeague(sportId?: number) {
-  const { data, error, isLoading } = useSWR('matches', matchesFetcher, {
-    refreshInterval: 30000,
-  });
+  const countryCode = useUserCountry();
+  
+  const { data, error, isLoading } = useSWR(
+    ['matches', countryCode],
+    () => createMatchesFetcher(countryCode)(),
+    {
+      refreshInterval: 30000,
+    }
+  );
 
   let matches = data || [];
   if (sportId) {
@@ -151,11 +262,17 @@ export function useMatchesByLeague(sportId?: number) {
   };
 }
 
-// Hook for matches grouped by sport
+// Hook for matches grouped by sport (football first)
 export function useMatchesBySport() {
-  const { data, error, isLoading } = useSWR('matches', matchesFetcher, {
-    refreshInterval: 30000,
-  });
+  const countryCode = useUserCountry();
+  
+  const { data, error, isLoading } = useSWR(
+    ['matches', countryCode],
+    () => createMatchesFetcher(countryCode)(),
+    {
+      refreshInterval: 30000,
+    }
+  );
 
   return {
     groups: groupMatchesBySport(data || []),
@@ -166,9 +283,15 @@ export function useMatchesBySport() {
 
 // Stats hook
 export function useMatchStats() {
-  const { data, isLoading } = useSWR('matches', matchesFetcher, {
-    refreshInterval: 30000,
-  });
+  const countryCode = useUserCountry();
+  
+  const { data, isLoading } = useSWR(
+    ['matches', countryCode],
+    () => createMatchesFetcher(countryCode)(),
+    {
+      refreshInterval: 30000,
+    }
+  );
 
   const matches = data || [];
 
