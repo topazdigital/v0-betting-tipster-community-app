@@ -2,24 +2,7 @@
 
 import useSWR from 'swr';
 import { useState, useEffect } from 'react';
-import { 
-  generateAllMatches, 
-  getLiveMatches, 
-  getTodayMatches, 
-  getUpcomingMatches,
-  getFinishedMatches,
-  filterMatches,
-  groupMatchesByLeague,
-  groupMatchesBySport,
-  sortMatchesWithPriority,
-  type Match,
-  type MatchFilters
-} from '@/lib/api/sports-api';
-
-// Cache for matches - regenerate every 30 seconds to simulate live updates
-let matchesCache: Match[] | null = null;
-let lastGenerated = 0;
-const CACHE_DURATION = 30000; // 30 seconds
+import type { Match } from '@/lib/api/sports-api';
 
 // User's detected country code
 let detectedCountryCode: string | null = null;
@@ -29,11 +12,8 @@ async function detectUserCountry(): Promise<string> {
   if (detectedCountryCode) return detectedCountryCode;
   
   try {
-    // Try to get from browser's timezone or locale
     const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-    const locale = navigator.language || 'en-US';
     
-    // Common timezone to country mappings
     const timezoneCountryMap: Record<string, string> = {
       'Africa/Nairobi': 'KE',
       'Africa/Lagos': 'NG',
@@ -65,7 +45,7 @@ async function detectUserCountry(): Promise<string> {
       'Australia/Melbourne': 'AU',
     };
     
-    detectedCountryCode = timezoneCountryMap[timezone] || 'GB'; // Default to GB
+    detectedCountryCode = timezoneCountryMap[timezone] || 'GB';
     return detectedCountryCode;
   } catch {
     detectedCountryCode = 'GB';
@@ -84,43 +64,142 @@ export function useUserCountry() {
   return countryCode;
 }
 
-function getMatches(userCountryCode?: string): Match[] {
-  const now = Date.now();
-  if (!matchesCache || now - lastGenerated > CACHE_DURATION) {
-    matchesCache = generateAllMatches(userCountryCode);
-    lastGenerated = now;
-  }
-  return matchesCache;
-}
-
-// Fetcher function with country code
-const createMatchesFetcher = (countryCode: string) => async (): Promise<Match[]> => {
-  await new Promise(resolve => setTimeout(resolve, 100));
-  return getMatches(countryCode);
+// Sport priority constants
+const SPORT_PRIORITY: Record<number, number> = {
+  1: 0,   // Football - highest priority
+  2: 1,   // Basketball
+  3: 2,   // Tennis
+  4: 3,   // Cricket
+  5: 4,   // American Football
+  6: 5,   // Baseball
+  7: 6,   // Ice Hockey
+  8: 7,   // Rugby
+  27: 8,  // MMA
+  26: 9,  // Boxing
+  29: 10, // Formula 1
+  33: 11, // Esports
 };
 
-// Main hook for all matches with geo-prioritization
+// API response type
+interface MatchesAPIResponse {
+  matches: Match[];
+  stats: {
+    total: number;
+    live: number;
+    today: number;
+    upcoming: number;
+  };
+  timestamp: string;
+}
+
+// Fetcher for API calls
+const matchesFetcher = async (url: string): Promise<Match[]> => {
+  const res = await fetch(url);
+  if (!res.ok) {
+    console.error('[v0] Failed to fetch matches:', res.status);
+    throw new Error('Failed to fetch matches');
+  }
+  const data: MatchesAPIResponse = await res.json();
+  // API returns { matches, stats }, we extract just matches
+  return data.matches || [];
+};
+
+// Sort matches: Sport priority > League > Live status > Time
+function sortMatchesWithPriority(matches: Match[], countryCode?: string): Match[] {
+  return [...matches].sort((a, b) => {
+    // 1. Sport priority (Football first)
+    const sportPriorityA = SPORT_PRIORITY[a.sportId] ?? 99;
+    const sportPriorityB = SPORT_PRIORITY[b.sportId] ?? 99;
+    if (sportPriorityA !== sportPriorityB) return sportPriorityA - sportPriorityB;
+    
+    // 2. League tier (lower tier = higher priority)
+    const leagueTierA = a.league?.tier ?? 99;
+    const leagueTierB = b.league?.tier ?? 99;
+    if (leagueTierA !== leagueTierB) return leagueTierA - leagueTierB;
+    
+    // 3. Live matches first
+    const statusOrder: Record<string, number> = { live: 0, halftime: 1, scheduled: 2, finished: 3, postponed: 4 };
+    const statusOrderA = statusOrder[a.status] ?? 5;
+    const statusOrderB = statusOrder[b.status] ?? 5;
+    if (statusOrderA !== statusOrderB) return statusOrderA - statusOrderB;
+    
+    // 4. Sort by kickoff time
+    return new Date(a.kickoffTime).getTime() - new Date(b.kickoffTime).getTime();
+  });
+}
+
+// Filter helper functions
+function getLiveMatches(matches: Match[]): Match[] {
+  return matches
+    .filter(m => m.status === 'live' || m.status === 'halftime')
+    .sort((a, b) => {
+      const sportPriorityA = SPORT_PRIORITY[a.sportId] ?? 99;
+      const sportPriorityB = SPORT_PRIORITY[b.sportId] ?? 99;
+      if (sportPriorityA !== sportPriorityB) return sportPriorityA - sportPriorityB;
+      return (b.minute || 0) - (a.minute || 0);
+    });
+}
+
+function getTodayMatches(matches: Match[]): Match[] {
+  const today = new Date().toDateString();
+  return matches
+    .filter(m => new Date(m.kickoffTime).toDateString() === today)
+    .sort((a, b) => {
+      const statusOrder: Record<string, number> = { live: 0, halftime: 1, scheduled: 2, finished: 3, postponed: 4 };
+      const statusOrderA = statusOrder[a.status] ?? 5;
+      const statusOrderB = statusOrder[b.status] ?? 5;
+      if (statusOrderA !== statusOrderB) return statusOrderA - statusOrderB;
+      return new Date(a.kickoffTime).getTime() - new Date(b.kickoffTime).getTime();
+    });
+}
+
+function getUpcomingMatches(matches: Match[]): Match[] {
+  const now = new Date();
+  return matches
+    .filter(m => m.status === 'scheduled' && new Date(m.kickoffTime) > now)
+    .sort((a, b) => new Date(a.kickoffTime).getTime() - new Date(b.kickoffTime).getTime());
+}
+
+function getFinishedMatches(matches: Match[]): Match[] {
+  return matches
+    .filter(m => m.status === 'finished')
+    .sort((a, b) => new Date(b.kickoffTime).getTime() - new Date(a.kickoffTime).getTime());
+}
+
+export interface MatchFilters {
+  sportId?: number;
+  leagueId?: number;
+  status?: string;
+}
+
+// Main hook for all matches - FETCHES FROM REAL API
 export function useMatches(filters?: MatchFilters) {
   const countryCode = useUserCountry();
   
-  const { data, error, isLoading, mutate } = useSWR(
-    ['matches', countryCode],
-    () => createMatchesFetcher(countryCode)(),
+  // Build query params
+  const params = new URLSearchParams();
+  if (filters?.sportId) params.set('sportId', filters.sportId.toString());
+  if (filters?.leagueId) params.set('leagueId', filters.leagueId.toString());
+  if (filters?.status) params.set('status', filters.status);
+  
+  const queryString = params.toString();
+  const url = `/api/matches${queryString ? `?${queryString}` : ''}`;
+  
+  const { data, error, isLoading, mutate } = useSWR<Match[]>(
+    url,
+    matchesFetcher,
     {
-      refreshInterval: 30000,
+      refreshInterval: 30000, // Refresh every 30 seconds
       revalidateOnFocus: false,
+      dedupingInterval: 10000,
     }
   );
 
   const matches = data || [];
-  
-  // Apply filters and maintain sort order
-  const filteredMatches = filters 
-    ? filterMatches(matches, { ...filters, userCountryCode: countryCode })
-    : sortMatchesWithPriority(matches, countryCode);
+  const sortedMatches = sortMatchesWithPriority(matches, countryCode);
 
   return {
-    matches: filteredMatches,
+    matches: sortedMatches,
     allMatches: matches,
     userCountryCode: countryCode,
     isLoading,
@@ -131,13 +210,11 @@ export function useMatches(filters?: MatchFilters) {
 
 // Hook for live matches only
 export function useLiveMatches() {
-  const countryCode = useUserCountry();
-  
-  const { data, error, isLoading } = useSWR(
-    ['matches', countryCode],
-    () => createMatchesFetcher(countryCode)(),
+  const { data, error, isLoading } = useSWR<Match[]>(
+    '/api/matches?status=live',
+    matchesFetcher,
     {
-      refreshInterval: 10000, // Refresh more frequently for live
+      refreshInterval: 10000, // Refresh every 10 seconds for live
       revalidateOnFocus: true,
     }
   );
@@ -151,11 +228,9 @@ export function useLiveMatches() {
 
 // Hook for today's matches
 export function useTodayMatches() {
-  const countryCode = useUserCountry();
-  
-  const { data, error, isLoading } = useSWR(
-    ['matches', countryCode],
-    () => createMatchesFetcher(countryCode)(),
+  const { data, error, isLoading } = useSWR<Match[]>(
+    '/api/matches',
+    matchesFetcher,
     {
       refreshInterval: 30000,
     }
@@ -168,13 +243,11 @@ export function useTodayMatches() {
   };
 }
 
-// Hook for upcoming matches (sorted by time - soonest first)
+// Hook for upcoming matches
 export function useUpcomingMatches(limit?: number) {
-  const countryCode = useUserCountry();
-  
-  const { data, error, isLoading } = useSWR(
-    ['matches', countryCode],
-    () => createMatchesFetcher(countryCode)(),
+  const { data, error, isLoading } = useSWR<Match[]>(
+    '/api/matches?status=scheduled',
+    matchesFetcher,
     {
       refreshInterval: 60000,
     }
@@ -193,11 +266,9 @@ export function useUpcomingMatches(limit?: number) {
 
 // Hook for finished matches
 export function useFinishedMatches(date?: Date) {
-  const countryCode = useUserCountry();
-  
-  const { data, error, isLoading } = useSWR(
-    ['matches', countryCode],
-    () => createMatchesFetcher(countryCode)(),
+  const { data, error, isLoading } = useSWR<Match[]>(
+    '/api/matches?status=finished',
+    matchesFetcher,
     {
       refreshInterval: 60000,
     }
@@ -219,11 +290,9 @@ export function useFinishedMatches(date?: Date) {
 
 // Hook for a single match
 export function useMatch(matchId: string) {
-  const countryCode = useUserCountry();
-  
-  const { data, error, isLoading } = useSWR(
-    ['matches', countryCode],
-    () => createMatchesFetcher(countryCode)(),
+  const { data, error, isLoading } = useSWR<Match[]>(
+    '/api/matches',
+    matchesFetcher,
     {
       refreshInterval: 10000,
     }
@@ -238,37 +307,74 @@ export function useMatch(matchId: string) {
   };
 }
 
-// Hook for matches grouped by league (with sport priority - football first)
-export function useMatchesByLeague(sportId?: number) {
-  const countryCode = useUserCountry();
+// Group matches by league
+export function groupMatchesByLeague(matches: Match[]): Record<string, Match[]> {
+  const groups: Record<string, Match[]> = {};
   
-  const { data, error, isLoading } = useSWR(
-    ['matches', countryCode],
-    () => createMatchesFetcher(countryCode)(),
+  const sortedMatches = [...matches].sort((a, b) => {
+    const sportPriorityA = SPORT_PRIORITY[a.sportId] ?? 99;
+    const sportPriorityB = SPORT_PRIORITY[b.sportId] ?? 99;
+    return sportPriorityA - sportPriorityB;
+  });
+  
+  sortedMatches.forEach(match => {
+    const key = `${match.sport.name} - ${match.league.name}`;
+    if (!groups[key]) groups[key] = [];
+    groups[key].push(match);
+  });
+  
+  return groups;
+}
+
+// Group matches by sport
+export function groupMatchesBySport(matches: Match[]): Record<string, Match[]> {
+  const groups: Record<string, Match[]> = {};
+  
+  matches.forEach(match => {
+    const sportName = match.sport.name;
+    if (!groups[sportName]) groups[sportName] = [];
+    groups[sportName].push(match);
+  });
+  
+  // Sort by sport priority
+  const sortedGroups: Record<string, Match[]> = {};
+  Object.entries(groups)
+    .sort(([, matchesA], [, matchesB]) => {
+      const priorityA = SPORT_PRIORITY[matchesA[0]?.sportId] ?? 99;
+      const priorityB = SPORT_PRIORITY[matchesB[0]?.sportId] ?? 99;
+      return priorityA - priorityB;
+    })
+    .forEach(([key, value]) => {
+      sortedGroups[key] = value;
+    });
+  
+  return sortedGroups;
+}
+
+// Hook for matches grouped by league
+export function useMatchesByLeague(sportId?: number) {
+  const params = sportId ? `?sportId=${sportId}` : '';
+  
+  const { data, error, isLoading } = useSWR<Match[]>(
+    `/api/matches${params}`,
+    matchesFetcher,
     {
       refreshInterval: 30000,
     }
   );
 
-  let matches = data || [];
-  if (sportId) {
-    matches = matches.filter(m => m.sportId === sportId);
-  }
-
   return {
-    groups: groupMatchesByLeague(matches),
+    groups: groupMatchesByLeague(data || []),
     isLoading,
     error,
   };
 }
 
-// Hook for matches grouped by sport (football first)
+// Hook for matches grouped by sport
 export function useMatchesBySport() {
-  const countryCode = useUserCountry();
-  
-  const { data, error, isLoading } = useSWR(
-    ['matches', countryCode],
-    () => createMatchesFetcher(countryCode)(),
+  const { data, error, isLoading } = useSWR<Match[]>(
+    '/api/matches',
+    matchesFetcher,
     {
       refreshInterval: 30000,
     }
@@ -283,11 +389,9 @@ export function useMatchesBySport() {
 
 // Stats hook
 export function useMatchStats() {
-  const countryCode = useUserCountry();
-  
-  const { data, isLoading } = useSWR(
-    ['matches', countryCode],
-    () => createMatchesFetcher(countryCode)(),
+  const { data, isLoading } = useSWR<Match[]>(
+    '/api/matches',
+    matchesFetcher,
     {
       refreshInterval: 30000,
     }

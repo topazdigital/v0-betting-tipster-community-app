@@ -488,6 +488,106 @@ export function SportIcon({ sportSlug, size = 'md', className }: SportIconProps)
   )
 }
 
+// League logo component
+interface LeagueLogoProps {
+  leagueName: string
+  leagueId?: number
+  size?: "xs" | "sm" | "md" | "lg"
+  className?: string
+}
+
+// League logo URLs
+const LEAGUE_LOGOS: Record<string, string> = {
+  // Football - Top Leagues
+  'Premier League': 'https://media.api-sports.io/football/leagues/39.png',
+  'La Liga': 'https://media.api-sports.io/football/leagues/140.png',
+  'Bundesliga': 'https://media.api-sports.io/football/leagues/78.png',
+  'Serie A': 'https://media.api-sports.io/football/leagues/135.png',
+  'Ligue 1': 'https://media.api-sports.io/football/leagues/61.png',
+  'Eredivisie': 'https://media.api-sports.io/football/leagues/88.png',
+  'Primeira Liga': 'https://media.api-sports.io/football/leagues/94.png',
+  'Scottish Premiership': 'https://media.api-sports.io/football/leagues/179.png',
+  'Champions League': 'https://media.api-sports.io/football/leagues/2.png',
+  'UEFA Champions League': 'https://media.api-sports.io/football/leagues/2.png',
+  'Europa League': 'https://media.api-sports.io/football/leagues/3.png',
+  'UEFA Europa League': 'https://media.api-sports.io/football/leagues/3.png',
+  'MLS': 'https://media.api-sports.io/football/leagues/253.png',
+  'Brazilian Serie A': 'https://media.api-sports.io/football/leagues/71.png',
+  'Argentine Primera Division': 'https://media.api-sports.io/football/leagues/128.png',
+  'Saudi Pro League': 'https://media.api-sports.io/football/leagues/307.png',
+  'Turkish Super Lig': 'https://media.api-sports.io/football/leagues/203.png',
+  'Belgian Pro League': 'https://media.api-sports.io/football/leagues/144.png',
+  'Russian Premier League': 'https://media.api-sports.io/football/leagues/235.png',
+  'J1 League': 'https://media.api-sports.io/football/leagues/98.png',
+  'K League 1': 'https://media.api-sports.io/football/leagues/292.png',
+  'A-League': 'https://media.api-sports.io/football/leagues/188.png',
+  'CAF Champions League': 'https://media.api-sports.io/football/leagues/12.png',
+  'Kenya Premier League': 'https://media.api-sports.io/football/leagues/276.png',
+  'Egyptian Premier League': 'https://media.api-sports.io/football/leagues/233.png',
+  'Copa Libertadores': 'https://media.api-sports.io/football/leagues/13.png',
+  
+  // Basketball
+  'NBA': 'https://media.api-sports.io/basketball/leagues/12.png',
+  'EuroLeague': 'https://media.api-sports.io/basketball/leagues/120.png',
+  'NBL': 'https://media.api-sports.io/basketball/leagues/25.png',
+  
+  // American Sports
+  'NFL': 'https://media.api-sports.io/american-football/leagues/1.png',
+  'NCAAF': 'https://media.api-sports.io/american-football/leagues/2.png',
+  'MLB': 'https://media.api-sports.io/baseball/leagues/1.png',
+  'NHL': 'https://media.api-sports.io/hockey/leagues/57.png',
+  
+  // Tennis
+  'ATP Tour': 'https://upload.wikimedia.org/wikipedia/en/thumb/3/3f/ATP_Tour_logo.svg/150px-ATP_Tour_logo.svg.png',
+  'WTA Tour': 'https://upload.wikimedia.org/wikipedia/en/thumb/6/6a/WTA_logo.svg/150px-WTA_logo.svg.png',
+  
+  // Combat Sports
+  'UFC': 'https://media.api-sports.io/mma/leagues/1.png',
+  
+  // Motorsport
+  'Formula 1': 'https://media.api-sports.io/formula-1/leagues/1.png',
+  'F1': 'https://media.api-sports.io/formula-1/leagues/1.png',
+}
+
+export function LeagueLogo({ leagueName, leagueId, size = 'md', className }: LeagueLogoProps) {
+  const [hasError, setHasError] = useState(false)
+  const logoUrl = LEAGUE_LOGOS[leagueName]
+  
+  if (logoUrl && !hasError) {
+    return (
+      <div className={cn(
+        "relative shrink-0 overflow-hidden rounded bg-muted",
+        sizeClasses[size],
+        className
+      )}>
+        <Image
+          src={logoUrl}
+          alt={leagueName}
+          fill
+          className="object-contain p-0.5"
+          onError={() => setHasError(true)}
+          unoptimized
+        />
+      </div>
+    )
+  }
+  
+  // Fallback to first letter with color
+  const initial = leagueName.charAt(0).toUpperCase()
+  const bgColor = getColorFromName(leagueName)
+  
+  return (
+    <div className={cn(
+      "flex shrink-0 items-center justify-center rounded font-bold text-white",
+      sizeClasses[size],
+      bgColor,
+      className
+    )}>
+      {initial}
+    </div>
+  )
+}
+
 // League flag component
 interface LeagueFlagProps {
   countryCode: string
