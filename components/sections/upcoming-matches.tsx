@@ -2,23 +2,22 @@
 
 import Link from 'next/link';
 import { ChevronRight, Clock } from 'lucide-react';
-import { MatchCard } from '@/components/matches/match-card';
-import { mockMatches } from '@/lib/mock-data';
+import { MatchCardNew } from '@/components/matches/match-card-new';
+import { Spinner } from '@/components/ui/spinner';
+import { useUpcomingMatches } from '@/lib/hooks/use-matches';
 
 export function UpcomingMatchesSection() {
-  const upcomingMatches = mockMatches
-    .filter((m) => {
-      const kickoff = new Date(m.kickoff_time);
-      const today = new Date();
-      const tomorrow = new Date(today);
-      tomorrow.setDate(tomorrow.getDate() + 1);
-      return (
-        kickoff > today &&
-        kickoff.toDateString() !== today.toDateString() &&
-        m.status === 'scheduled'
-      );
-    })
-    .slice(0, 6);
+  const { matches: upcomingMatches, isLoading } = useUpcomingMatches(6);
+
+  if (isLoading) {
+    return (
+      <section className="mb-8">
+        <div className="flex h-32 items-center justify-center">
+          <Spinner className="h-6 w-6" />
+        </div>
+      </section>
+    );
+  }
 
   if (upcomingMatches.length === 0) {
     return null;
@@ -42,15 +41,7 @@ export function UpcomingMatchesSection() {
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {upcomingMatches.map((match) => (
-          <MatchCard
-            key={match.id}
-            match={match}
-            odds={{
-              home: 1.5 + Math.random() * 2,
-              draw: 2.5 + Math.random() * 1.5,
-              away: 2 + Math.random() * 3,
-            }}
-          />
+          <MatchCardNew key={match.id} match={match} showSport />
         ))}
       </div>
     </section>
