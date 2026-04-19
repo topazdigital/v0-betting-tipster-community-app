@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useState } from 'react';
 import { Search, Bell, User, ChevronDown, Settings, LogOut, Menu, X } from 'lucide-react';
+import { ThemeToggle } from '@/components/theme-toggle';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -82,6 +83,9 @@ export function Header() {
               </Button>
             )}
           </div>
+
+          {/* Theme Toggle */}
+          <ThemeToggle />
 
           {/* Odds Format Selector */}
           <DropdownMenu>

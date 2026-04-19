@@ -1105,6 +1105,24 @@ export function sortMatchesWithPriority(matches: UnifiedMatch[]): UnifiedMatch[]
   });
 }
 
+// Get a single match by ID
+export async function getMatchById(matchId: string): Promise<UnifiedMatch | null> {
+  try {
+    // Try to find in all matches
+    const allMatches = await getAllMatches();
+    const match = allMatches.find(m => m.id === matchId);
+    
+    if (match) {
+      return match;
+    }
+    
+    return null;
+  } catch (error) {
+    console.error('[API] Error fetching match by ID:', error);
+    return null;
+  }
+}
+
 // Export sport icons mapping
 export function getSportIcon(slug: string): string {
   const icons: Record<string, string> = {
