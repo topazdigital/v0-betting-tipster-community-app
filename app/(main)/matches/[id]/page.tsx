@@ -1,7 +1,8 @@
 "use client"
 
-import { useState, useMemo, use } from "react"
+import { useState, use } from "react"
 import Link from "next/link"
+import useSWR from "swr"
 import { 
   ArrowLeft, Clock, Calendar, Radio, Users, TrendingUp, 
   Share2, Bookmark, Star, CheckCircle2, Trophy, Target, BarChart3
@@ -12,93 +13,23 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
 import { SidebarNew } from "@/components/layout/sidebar-new"
+import { Spinner } from "@/components/ui/spinner"
+import { TeamLogo } from "@/components/ui/team-logo"
 import { cn } from "@/lib/utils"
-import { ALL_SPORTS, ALL_LEAGUES, TEAMS_DATABASE, getSportIcon, BOOKMAKERS } from "@/lib/sports-data"
-import { format, addHours, addDays } from "date-fns"
+import { format } from "date-fns"
 
 interface PageProps {
   params: Promise<{ id: string }>
 }
 
-// Generate a consistent match based on ID
-function generateMatch(id: string) {
-  const numId = parseInt(id?.replace(/\D/g, "")) || 1
-  const sportIndex = numId % ALL_SPORTS.length
-  const sport = ALL_SPORTS[sportIndex]
-  
-  // Get leagues for this sport
-  const sportLeagues = ALL_LEAGUES.filter(l => l.sportId === sport.id)
-  const league = sportLeagues.length > 0 
-    ? sportLeagues[numId % sportLeagues.length]
-    : ALL_LEAGUES[0]
-  
-  // Get teams for this league
-  const leagueTeams = TEAMS_DATABASE.filter(t => t.leagueId === league.id)
-  let homeTeam: string
-  let awayTeam: string
-  
-  if (leagueTeams.length >= 2) {
-    homeTeam = leagueTeams[numId % leagueTeams.length].name
-    awayTeam = leagueTeams[(numId + 1) % leagueTeams.length].name
-  } else {
-    homeTeam = `${league.country} Team ${numId}`
-    awayTeam = `${league.country} Team ${numId + 1}`
-  }
-  
-  const statuses = ["scheduled", "live", "finished"] as const
-  const status = statuses[numId % 3]
-  
-  // Generate kickoff time based on status
-  let kickoff: Date
-  if (status === "scheduled") {
-    kickoff = addHours(new Date(), (numId % 48) + 1)
-  } else if (status === "live") {
-    kickoff = addHours(new Date(), -1)
-  } else {
-    kickoff = addDays(new Date(), -(numId % 7))
-  }
-
-  return {
-    id,
-    sportId: sport.id,
-    sport: sport.name,
-    sportSlug: sport.slug,
-    sportIcon: getSportIcon(sport.slug),
-    leagueId: league.id,
-    league: league.name,
-    country: league.country,
-    countryCode: league.countryCode,
-    homeTeam,
-    awayTeam,
-    homeScore: status !== "scheduled" ? Math.floor(Math.random() * 5) : null,
-    awayScore: status !== "scheduled" ? Math.floor(Math.random() * 5) : null,
-    status,
-    kickoff,
-    minute: status === "live" ? Math.floor(Math.random() * 90) + 1 : null,
-    venue: "Stadium Arena",
-    referee: "John Smith",
-    weather: "Sunny, 22C",
-    homeOdds: (1.5 + Math.random() * 2).toFixed(2),
-    drawOdds: (2.5 + Math.random() * 2).toFixed(2),
-    awayOdds: (2 + Math.random() * 3).toFixed(2),
-    predictions: Math.floor(50 + Math.random() * 200),
-    viewers: Math.floor(500 + Math.random() * 5000)
-  }
+// Fetcher for match data
+const matchFetcher = async (url: string) => {
+  const res = await fetch(url)
+  if (!res.ok) throw new Error('Failed to fetch match')
+  return res.json()
 }
 
-// Generate bookmaker odds
-const generateBookmakerOdds = () => {
-  return BOOKMAKERS.filter(b => b.featured).slice(0, 6).map(b => ({
-    name: b.name,
-    slug: b.slug,
-    homeOdds: (1.5 + Math.random() * 2).toFixed(2),
-    drawOdds: (2.5 + Math.random() * 2).toFixed(2),
-    awayOdds: (2 + Math.random() * 3).toFixed(2),
-    affiliateUrl: b.affiliateUrl
-  }))
-}
-
-// Generate tips
+// Generate tips (still mock for now, can be replaced with real API later)
 const generateTips = () => Array.from({ length: 8 }, (_, i) => ({
   id: i + 1,
   tipster: {
@@ -123,40 +54,51 @@ const generateTips = () => Array.from({ length: 8 }, (_, i) => ({
   createdAt: new Date(Date.now() - Math.random() * 24 * 60 * 60 * 1000)
 }))
 
-// Generate H2H stats
-const generateH2H = () => ({
-  played: 10,
-  homeWins: Math.floor(Math.random() * 5) + 2,
-  draws: Math.floor(Math.random() * 3),
-  awayWins: Math.floor(Math.random() * 5) + 1,
-  recentMatches: Array.from({ length: 5 }, (_, i) => ({
-    date: addDays(new Date(), -(i + 1) * 30).toISOString(),
-    homeScore: Math.floor(Math.random() * 4),
-    awayScore: Math.floor(Math.random() * 4),
-    competition: "League Match"
-  }))
-})
-
-// Generate match stats
-const generateStats = () => [
-  { name: "Possession", home: 55 + Math.floor(Math.random() * 15), away: 30 + Math.floor(Math.random() * 15) },
-  { name: "Shots", home: Math.floor(Math.random() * 15) + 5, away: Math.floor(Math.random() * 15) + 3 },
-  { name: "Shots on Target", home: Math.floor(Math.random() * 8) + 2, away: Math.floor(Math.random() * 8) + 1 },
-  { name: "Corners", home: Math.floor(Math.random() * 8) + 2, away: Math.floor(Math.random() * 8) + 1 },
-  { name: "Fouls", home: Math.floor(Math.random() * 15) + 5, away: Math.floor(Math.random() * 15) + 5 },
-]
-
 export default function MatchDetailPage({ params }: PageProps) {
   const { id } = use(params)
   
-  const match = useMemo(() => generateMatch(id), [id])
-  const bookmakerOdds = useMemo(() => generateBookmakerOdds(), [])
-  const tips = useMemo(() => generateTips(), [])
-  const h2h = useMemo(() => generateH2H(), [])
-  const stats = useMemo(() => generateStats(), [])
+  // Fetch match data from API
+  const { data, error, isLoading } = useSWR(
+    `/api/matches/${encodeURIComponent(id)}`,
+    matchFetcher,
+    { refreshInterval: 10000 } // Refresh every 10 seconds for live matches
+  )
   
   const [savedMatch, setSavedMatch] = useState(false)
   const [activeTab, setActiveTab] = useState("odds")
+  
+  const tips = generateTips()
+
+  if (isLoading) {
+    return (
+      <div className="flex">
+        <SidebarNew />
+        <div className="flex-1 flex h-96 items-center justify-center">
+          <div className="flex items-center gap-3">
+            <Spinner className="h-8 w-8" />
+            <span className="text-muted-foreground">Loading match details...</span>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (error || !data?.match) {
+    return (
+      <div className="flex">
+        <SidebarNew />
+        <div className="flex-1 p-8 text-center">
+          <h1 className="text-2xl font-bold">Match not found</h1>
+          <p className="text-muted-foreground mt-2">The match you&apos;re looking for doesn&apos;t exist or has been removed.</p>
+          <Button asChild className="mt-4">
+            <Link href="/matches">Back to Matches</Link>
+          </Button>
+        </div>
+      </div>
+    )
+  }
+
+  const { match, bookmakerOdds, h2h, stats } = data
 
   return (
     <div className="flex">
@@ -178,10 +120,13 @@ export default function MatchDetailPage({ params }: PageProps) {
               {/* Top Info */}
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <span className="text-2xl">{match.sportIcon}</span>
+                  <span className="text-2xl">{match.sport?.icon || '⚽'}</span>
                   <div>
-                    <p className="font-semibold">{match.league}</p>
-                    <p className="text-sm text-muted-foreground">{match.country} • {match.venue}</p>
+                    <p className="font-semibold">{match.league?.name || 'Unknown League'}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {match.league?.country || 'Unknown'} 
+                      {match.venue && ` • ${match.venue}`}
+                    </p>
                   </div>
                 </div>
 
@@ -196,7 +141,7 @@ export default function MatchDetailPage({ params }: PageProps) {
                   {match.status === "scheduled" && (
                     <Badge variant="secondary" className="gap-1">
                       <Clock className="h-3 w-3" />
-                      {format(match.kickoff, "dd MMM HH:mm")}
+                      {format(new Date(match.kickoffTime), "dd MMM HH:mm")}
                     </Badge>
                   )}
 
@@ -224,10 +169,13 @@ export default function MatchDetailPage({ params }: PageProps) {
               {/* Teams & Score */}
               <div className="mt-8 grid grid-cols-3 items-center gap-4">
                 <div className="text-center">
-                  <div className="mx-auto mb-2 flex h-16 w-16 items-center justify-center rounded-full bg-card text-2xl font-bold">
-                    {match.homeTeam.substring(0, 2).toUpperCase()}
-                  </div>
-                  <h2 className="font-bold text-lg">{match.homeTeam}</h2>
+                  <TeamLogo 
+                    teamName={match.homeTeam.name} 
+                    logoUrl={match.homeTeam.logo} 
+                    size="lg"
+                    className="mx-auto mb-2"
+                  />
+                  <h2 className="font-bold text-lg">{match.homeTeam.name}</h2>
                   <p className="text-sm text-muted-foreground">Home</p>
                 </div>
 
@@ -235,24 +183,24 @@ export default function MatchDetailPage({ params }: PageProps) {
                   {match.status !== "scheduled" ? (
                     <div className="text-5xl font-bold">
                       <span className={cn(
-                        match.homeScore! > match.awayScore! && "text-success"
+                        match.homeScore > match.awayScore && "text-success"
                       )}>{match.homeScore}</span>
                       <span className="mx-2 text-muted-foreground">-</span>
                       <span className={cn(
-                        match.awayScore! > match.homeScore! && "text-success"
+                        match.awayScore > match.homeScore && "text-success"
                       )}>{match.awayScore}</span>
                     </div>
                   ) : (
                     <div>
                       <div className="text-3xl font-bold">
-                        {format(match.kickoff, "HH:mm")}
+                        {format(new Date(match.kickoffTime), "HH:mm")}
                       </div>
                       <div className="text-sm text-muted-foreground">
-                        {format(match.kickoff, "dd MMMM yyyy")}
+                        {format(new Date(match.kickoffTime), "dd MMMM yyyy")}
                       </div>
                     </div>
                   )}
-                  {match.status === "live" && (
+                  {match.status === "live" && match.minute && (
                     <Badge variant="outline" className="mt-2">
                       <Clock className="mr-1 h-3 w-3 text-live" />
                       {match.minute}&apos; min
@@ -261,10 +209,13 @@ export default function MatchDetailPage({ params }: PageProps) {
                 </div>
 
                 <div className="text-center">
-                  <div className="mx-auto mb-2 flex h-16 w-16 items-center justify-center rounded-full bg-card text-2xl font-bold">
-                    {match.awayTeam.substring(0, 2).toUpperCase()}
-                  </div>
-                  <h2 className="font-bold text-lg">{match.awayTeam}</h2>
+                  <TeamLogo 
+                    teamName={match.awayTeam.name} 
+                    logoUrl={match.awayTeam.logo} 
+                    size="lg"
+                    className="mx-auto mb-2"
+                  />
+                  <h2 className="font-bold text-lg">{match.awayTeam.name}</h2>
                   <p className="text-sm text-muted-foreground">Away</p>
                 </div>
               </div>
@@ -273,11 +224,11 @@ export default function MatchDetailPage({ params }: PageProps) {
               <div className="mt-6 flex items-center justify-center gap-6 text-sm">
                 <div className="flex items-center gap-1 text-muted-foreground">
                   <Users className="h-4 w-4" />
-                  {match.viewers.toLocaleString()} watching
+                  {Math.floor(Math.random() * 5000 + 500).toLocaleString()} watching
                 </div>
                 <div className="flex items-center gap-1 text-muted-foreground">
                   <TrendingUp className="h-4 w-4" />
-                  {match.predictions} predictions
+                  {match.tipsCount || Math.floor(Math.random() * 200 + 50)} predictions
                 </div>
               </div>
             </div>
@@ -314,7 +265,7 @@ export default function MatchDetailPage({ params }: PageProps) {
                         </tr>
                       </thead>
                       <tbody>
-                        {bookmakerOdds.map((b, idx) => (
+                        {bookmakerOdds?.map((b: { slug: string; name: string; homeOdds: number; drawOdds: number; awayOdds: number; affiliateUrl: string }, idx: number) => (
                           <tr key={b.slug} className="border-b last:border-0 hover:bg-muted/50">
                             <td className="py-3">
                               <div className="flex items-center gap-2">
@@ -438,32 +389,32 @@ export default function MatchDetailPage({ params }: PageProps) {
                 <CardContent>
                   <div className="mb-6 grid grid-cols-3 gap-4 text-center">
                     <div className="rounded-lg bg-success/10 p-4">
-                      <div className="text-3xl font-bold text-success">{h2h.homeWins}</div>
-                      <div className="text-sm text-muted-foreground">{match.homeTeam} Wins</div>
+                      <div className="text-3xl font-bold text-success">{h2h?.homeWins || 0}</div>
+                      <div className="text-sm text-muted-foreground">{match.homeTeam.name} Wins</div>
                     </div>
                     <div className="rounded-lg bg-muted p-4">
-                      <div className="text-3xl font-bold">{h2h.draws}</div>
+                      <div className="text-3xl font-bold">{h2h?.draws || 0}</div>
                       <div className="text-sm text-muted-foreground">Draws</div>
                     </div>
                     <div className="rounded-lg bg-primary/10 p-4">
-                      <div className="text-3xl font-bold text-primary">{h2h.awayWins}</div>
-                      <div className="text-sm text-muted-foreground">{match.awayTeam} Wins</div>
+                      <div className="text-3xl font-bold text-primary">{h2h?.awayWins || 0}</div>
+                      <div className="text-sm text-muted-foreground">{match.awayTeam.name} Wins</div>
                     </div>
                   </div>
                   
-                  <h4 className="font-semibold mb-3">Recent Meetings</h4>
+                  <h4 className="mb-3 font-semibold">Recent Meetings</h4>
                   <div className="space-y-2">
-                    {h2h.recentMatches.map((m, idx) => (
+                    {h2h?.recentMatches?.map((m: { date: string; homeTeam: string; homeScore: number; awayTeam: string; awayScore: number; competition: string }, idx: number) => (
                       <div key={idx} className="flex items-center justify-between rounded-lg border p-3">
-                        <span className="text-sm text-muted-foreground">
+                        <div className="text-sm text-muted-foreground">
                           {format(new Date(m.date), "dd MMM yyyy")}
-                        </span>
+                        </div>
                         <div className="flex items-center gap-3">
-                          <span className="font-medium">{match.homeTeam}</span>
-                          <span className="font-mono font-bold">
+                          <span className="font-medium">{m.homeTeam}</span>
+                          <span className="font-bold text-lg">
                             {m.homeScore} - {m.awayScore}
                           </span>
-                          <span className="font-medium">{match.awayTeam}</span>
+                          <span className="font-medium">{m.awayTeam}</span>
                         </div>
                         <Badge variant="outline">{m.competition}</Badge>
                       </div>
@@ -482,22 +433,22 @@ export default function MatchDetailPage({ params }: PageProps) {
                     Match Statistics
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-6">
-                  {stats.map((stat) => (
+                <CardContent className="space-y-4">
+                  {stats?.map((stat: { name: string; home: number; away: number }) => (
                     <div key={stat.name}>
-                      <div className="mb-2 flex items-center justify-between text-sm">
-                        <span className="font-medium">{stat.home}</span>
-                        <span className="text-muted-foreground">{stat.name}</span>
-                        <span className="font-medium">{stat.away}</span>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="font-bold">{stat.home}</span>
+                        <span className="text-sm text-muted-foreground">{stat.name}</span>
+                        <span className="font-bold">{stat.away}</span>
                       </div>
-                      <div className="flex gap-1">
+                      <div className="flex h-2 overflow-hidden rounded-full bg-muted">
                         <div 
-                          className="h-2 rounded-l bg-primary" 
-                          style={{ width: `${(stat.home / (stat.home + stat.away)) * 100}%` }}
+                          className="bg-success transition-all"
+                          style={{ width: `${stat.name === 'Possession' ? stat.home : (stat.home / (stat.home + stat.away) * 100)}%` }}
                         />
                         <div 
-                          className="h-2 rounded-r bg-muted" 
-                          style={{ width: `${(stat.away / (stat.home + stat.away)) * 100}%` }}
+                          className="bg-primary transition-all"
+                          style={{ width: `${stat.name === 'Possession' ? stat.away : (stat.away / (stat.home + stat.away) * 100)}%` }}
                         />
                       </div>
                     </div>

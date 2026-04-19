@@ -1,35 +1,16 @@
 "use client"
 
-import { useState, useEffect, useMemo } from "react"
+import { useState, useMemo } from "react"
 import Link from "next/link"
-import { Radio, Clock, TrendingUp, Users, Zap, Filter } from "lucide-react"
+import { Radio, Clock, TrendingUp, Users, Zap } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { SidebarNew } from "@/components/layout/sidebar-new"
+import { TeamLogo } from "@/components/ui/team-logo"
+import { Spinner } from "@/components/ui/spinner"
 import { cn } from "@/lib/utils"
-import { ALL_SPORTS, ALL_LEAGUES, getSportIcon, TEAMS_DATABASE } from "@/lib/sports-data"
-
-interface LiveMatch {
-  id: string
-  sportId: number
-  sport: string
-  sportIcon: string
-  leagueId: number
-  league: string
-  country: string
-  homeTeam: string
-  awayTeam: string
-  homeScore: number
-  awayScore: number
-  minute: number
-  period: string
-  homeOdds: number
-  drawOdds: number
-  awayOdds: number
-  isHot: boolean
-  viewers: number
-  predictions: number
-}
+import { ALL_SPORTS, getSportIcon } from "@/lib/sports-data"
+import { useLiveMatches } from "@/lib/hooks/use-matches"
 
 // Priority order for sports (football first, then by popularity)
 const SPORT_PRIORITY: Record<number, number> = {
@@ -47,105 +28,9 @@ const SPORT_PRIORITY: Record<number, number> = {
   33: 11, // Esports
 }
 
-function generateLiveMatches(): LiveMatch[] {
-  const matches: LiveMatch[] = []
-  
-  // Generate live matches for popular sports - more for football
-  const matchCounts: Record<number, number> = {
-    1: 12,  // Football - most matches
-    2: 6,   // Basketball
-    3: 4,   // Tennis
-    4: 3,   // Cricket
-    5: 3,   // American Football
-    7: 4,   // Ice Hockey
-    27: 2,  // MMA
-    33: 3,  // Esports
-  }
-
-  Object.entries(matchCounts).forEach(([sportIdStr, count]) => {
-    const sportId = parseInt(sportIdStr)
-    const sport = ALL_SPORTS.find(s => s.id === sportId)
-    if (!sport) return
-
-    const sportLeagues = ALL_LEAGUES.filter(l => l.sportId === sportId)
-    if (sportLeagues.length === 0) return
-
-    for (let i = 0; i < count; i++) {
-      const league = sportLeagues[i % sportLeagues.length]
-      const leagueTeams = TEAMS_DATABASE.filter(t => t.leagueId === league.id)
-      
-      let homeTeam: string
-      let awayTeam: string
-      
-      if (leagueTeams.length >= 2) {
-        const shuffled = [...leagueTeams].sort(() => Math.random() - 0.5)
-        homeTeam = shuffled[0].name
-        awayTeam = shuffled[1].name
-      } else {
-        homeTeam = `${league.country} Team ${i * 2 + 1}`
-        awayTeam = `${league.country} Team ${i * 2 + 2}`
-      }
-
-      const minute = Math.floor(Math.random() * 90) + 1
-      const period = minute <= 45 ? "1st Half" : minute <= 90 ? "2nd Half" : "ET"
-      
-      matches.push({
-        id: `live-${sportId}-${league.id}-${i}`,
-        sportId,
-        sport: sport.name,
-        sportIcon: getSportIcon(sport.slug),
-        leagueId: league.id,
-        league: league.name,
-        country: league.country,
-        homeTeam,
-        awayTeam,
-        homeScore: Math.floor(Math.random() * 4),
-        awayScore: Math.floor(Math.random() * 4),
-        minute,
-        period,
-        homeOdds: +(1.2 + Math.random() * 3).toFixed(2),
-        drawOdds: +(2.5 + Math.random() * 2).toFixed(2),
-        awayOdds: +(1.5 + Math.random() * 4).toFixed(2),
-        isHot: Math.random() > 0.7,
-        viewers: Math.floor(100 + Math.random() * 5000),
-        predictions: Math.floor(10 + Math.random() * 200)
-      })
-    }
-  })
-  
-  // Sort by sport priority (football first), then by minute
-  return matches.sort((a, b) => {
-    const priorityA = SPORT_PRIORITY[a.sportId] ?? 99
-    const priorityB = SPORT_PRIORITY[b.sportId] ?? 99
-    if (priorityA !== priorityB) return priorityA - priorityB
-    return b.minute - a.minute // Higher minute first within same sport
-  })
-}
-
 export default function LivePage() {
-  const [matches, setMatches] = useState<LiveMatch[]>([])
+  const { matches, isLoading, error } = useLiveMatches()
   const [selectedSport, setSelectedSport] = useState<number | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
-
-  useEffect(() => {
-    setMatches(generateLiveMatches())
-    setIsLoading(false)
-
-    // Simulate live updates every 5 seconds
-    const interval = setInterval(() => {
-      setMatches(prev => prev.map(match => ({
-        ...match,
-        minute: Math.min(match.minute + 1, 90),
-        homeScore: Math.random() > 0.98 ? match.homeScore + 1 : match.homeScore,
-        awayScore: Math.random() > 0.98 ? match.awayScore + 1 : match.awayScore,
-        viewers: Math.max(0, match.viewers + Math.floor(Math.random() * 20) - 10),
-        homeOdds: Math.max(1.01, +(match.homeOdds + (Math.random() - 0.5) * 0.1).toFixed(2)),
-        awayOdds: Math.max(1.01, +(match.awayOdds + (Math.random() - 0.5) * 0.1).toFixed(2)),
-      })))
-    }, 5000)
-
-    return () => clearInterval(interval)
-  }, [])
 
   const filteredMatches = selectedSport 
     ? matches.filter(m => m.sportId === selectedSport) 
@@ -169,9 +54,10 @@ export default function LivePage() {
 
   // Group matches by league
   const groupedMatches = useMemo(() => {
-    const groups: Record<string, LiveMatch[]> = {}
+    const groups: Record<string, typeof matches> = {}
     filteredMatches.forEach(match => {
-      const key = `${match.sportIcon} ${match.league}`
+      const sportIcon = match.sport?.icon || getSportIcon(match.sport?.slug || 'football')
+      const key = `${sportIcon} ${match.league?.name || 'Unknown League'}`
       if (!groups[key]) groups[key] = []
       groups[key].push(match)
     })
@@ -184,9 +70,22 @@ export default function LivePage() {
         <SidebarNew />
         <div className="flex-1 flex h-96 items-center justify-center">
           <div className="flex items-center gap-3">
-            <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+            <Spinner className="h-8 w-8" />
             <span className="text-muted-foreground">Loading live matches...</span>
           </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="flex">
+        <SidebarNew />
+        <div className="flex-1 p-8 text-center">
+          <Radio className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+          <h1 className="text-xl font-bold">Unable to load live matches</h1>
+          <p className="text-muted-foreground mt-2">Please try again later</p>
         </div>
       </div>
     )
@@ -216,7 +115,7 @@ export default function LivePage() {
             <div className="flex items-center gap-3">
               <Badge variant="outline" className="gap-1 border-success/50 bg-success/10 text-success">
                 <Users className="h-3 w-3" />
-                {matches.reduce((acc, m) => acc + m.viewers, 0).toLocaleString()} watching
+                {matches.reduce((acc, m) => acc + (m.tipsCount || 0) * 10, 0).toLocaleString()} watching
               </Badge>
             </div>
           </div>
@@ -259,80 +158,102 @@ export default function LivePage() {
                     </Badge>
                   </div>
                   <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                    {leagueMatches.map(match => (
-                      <Link 
-                        key={match.id} 
-                        href={`/matches/${match.id}`}
-                        className="group"
-                      >
-                        <div className={cn(
-                          "relative overflow-hidden rounded-xl border border-border bg-card p-4 transition-all hover:border-primary/50 hover:shadow-lg",
-                          match.isHot && "border-warning/50"
-                        )}>
-                          {/* Live Badge */}
-                          <div className="mb-3 flex items-center justify-between">
-                            <span className="text-sm text-muted-foreground">{match.country}</span>
-                            <div className="flex items-center gap-2">
-                              {match.isHot && (
-                                <Badge className="gap-1 bg-warning text-warning-foreground">
-                                  <Zap className="h-3 w-3" /> Hot
+                    {leagueMatches.map(match => {
+                      const isHot = (match.tipsCount || 0) > 30
+                      
+                      return (
+                        <Link 
+                          key={match.id} 
+                          href={`/matches/${match.id}`}
+                          className="group"
+                        >
+                          <div className={cn(
+                            "relative overflow-hidden rounded-xl border border-border bg-card p-4 transition-all hover:border-primary/50 hover:shadow-lg",
+                            isHot && "border-warning/50"
+                          )}>
+                            {/* Live Badge */}
+                            <div className="mb-3 flex items-center justify-between">
+                              <span className="text-sm text-muted-foreground">{match.league?.country || 'Unknown'}</span>
+                              <div className="flex items-center gap-2">
+                                {isHot && (
+                                  <Badge className="gap-1 bg-warning text-warning-foreground">
+                                    <Zap className="h-3 w-3" /> Hot
+                                  </Badge>
+                                )}
+                                <Badge variant="destructive" className="gap-1 animate-pulse">
+                                  <Radio className="h-3 w-3" /> LIVE
                                 </Badge>
-                              )}
-                              <Badge variant="destructive" className="gap-1 animate-pulse">
-                                <Radio className="h-3 w-3" /> LIVE
-                              </Badge>
+                              </div>
                             </div>
-                          </div>
 
-                          {/* Teams & Score */}
-                          <div className="mb-4 space-y-3">
-                            <div className="flex items-center justify-between">
-                              <span className="font-medium">{match.homeTeam}</span>
-                              <span className="text-2xl font-bold text-primary">{match.homeScore}</span>
+                            {/* Teams & Score */}
+                            <div className="mb-4 space-y-3">
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                  <TeamLogo 
+                                    teamName={match.homeTeam.name} 
+                                    logoUrl={match.homeTeam.logo}
+                                    size="sm"
+                                  />
+                                  <span className="font-medium">{match.homeTeam.name}</span>
+                                </div>
+                                <span className="text-2xl font-bold text-primary">{match.homeScore ?? 0}</span>
+                              </div>
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                  <TeamLogo 
+                                    teamName={match.awayTeam.name} 
+                                    logoUrl={match.awayTeam.logo}
+                                    size="sm"
+                                  />
+                                  <span className="font-medium">{match.awayTeam.name}</span>
+                                </div>
+                                <span className="text-2xl font-bold text-primary">{match.awayScore ?? 0}</span>
+                              </div>
                             </div>
-                            <div className="flex items-center justify-between">
-                              <span className="font-medium">{match.awayTeam}</span>
-                              <span className="text-2xl font-bold text-primary">{match.awayScore}</span>
-                            </div>
-                          </div>
 
-                          {/* Match Time */}
-                          <div className="mb-4 flex items-center justify-center gap-2 rounded-lg bg-muted/50 py-2">
-                            <Clock className="h-4 w-4 text-live" />
-                            <span className="font-mono text-lg font-bold text-live">{match.minute}&apos;</span>
-                            <span className="text-sm text-muted-foreground">{match.period}</span>
-                          </div>
+                            {/* Match Time */}
+                            <div className="mb-4 flex items-center justify-center gap-2 rounded-lg bg-muted/50 py-2">
+                              <Clock className="h-4 w-4 text-live" />
+                              <span className="font-mono text-lg font-bold text-live">{match.minute || 0}&apos;</span>
+                              <span className="text-sm text-muted-foreground">
+                                {match.status === 'halftime' ? 'HT' : (match.minute || 0) <= 45 ? '1st Half' : '2nd Half'}
+                              </span>
+                            </div>
 
-                          {/* Odds */}
-                          <div className="grid grid-cols-3 gap-2">
-                            <div className="rounded-lg bg-muted p-2 text-center transition-colors group-hover:bg-primary/10">
-                              <p className="text-xs text-muted-foreground">Home</p>
-                              <p className="font-bold text-primary">{match.homeOdds}</p>
-                            </div>
-                            <div className="rounded-lg bg-muted p-2 text-center transition-colors group-hover:bg-primary/10">
-                              <p className="text-xs text-muted-foreground">Draw</p>
-                              <p className="font-bold text-primary">{match.drawOdds}</p>
-                            </div>
-                            <div className="rounded-lg bg-muted p-2 text-center transition-colors group-hover:bg-primary/10">
-                              <p className="text-xs text-muted-foreground">Away</p>
-                              <p className="font-bold text-primary">{match.awayOdds}</p>
-                            </div>
-                          </div>
+                            {/* Odds */}
+                            {match.odds && (
+                              <div className="grid grid-cols-3 gap-2">
+                                <div className="rounded-lg bg-muted p-2 text-center transition-colors group-hover:bg-primary/10">
+                                  <p className="text-xs text-muted-foreground">Home</p>
+                                  <p className="font-bold text-primary">{match.odds.home}</p>
+                                </div>
+                                <div className="rounded-lg bg-muted p-2 text-center transition-colors group-hover:bg-primary/10">
+                                  <p className="text-xs text-muted-foreground">Draw</p>
+                                  <p className="font-bold text-primary">{match.odds.draw || '-'}</p>
+                                </div>
+                                <div className="rounded-lg bg-muted p-2 text-center transition-colors group-hover:bg-primary/10">
+                                  <p className="text-xs text-muted-foreground">Away</p>
+                                  <p className="font-bold text-primary">{match.odds.away}</p>
+                                </div>
+                              </div>
+                            )}
 
-                          {/* Stats */}
-                          <div className="mt-3 flex items-center justify-between text-xs text-muted-foreground">
-                            <div className="flex items-center gap-1">
-                              <Users className="h-3 w-3" />
-                              {match.viewers.toLocaleString()} watching
-                            </div>
-                            <div className="flex items-center gap-1">
-                              <TrendingUp className="h-3 w-3" />
-                              {match.predictions} predictions
+                            {/* Stats */}
+                            <div className="mt-3 flex items-center justify-between text-xs text-muted-foreground">
+                              <div className="flex items-center gap-1">
+                                <Users className="h-3 w-3" />
+                                {((match.tipsCount || 0) * 10).toLocaleString()} watching
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <TrendingUp className="h-3 w-3" />
+                                {match.tipsCount || 0} predictions
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      </Link>
-                    ))}
+                        </Link>
+                      )
+                    })}
                   </div>
                 </div>
               ))}
