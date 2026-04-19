@@ -1,13 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import {
-  getAllMatches,
-  getMatchesBySport,
-  getMatchesByLeague,
   getLiveMatches,
+  getTodayMatches,
   getUpcomingMatches,
-  sortMatchesWithPriority,
+  getFinishedMatches,
+  getMatchesByLeague,
   type UnifiedMatch,
-} from '@/lib/api/unified-sports-api';
+} from '@/lib/api/api-football';
 import { ALL_SPORTS, ALL_LEAGUES, TEAMS_DATABASE, getSportIcon } from '@/lib/sports-data';
 
 export const dynamic = 'force-dynamic';
@@ -69,7 +68,7 @@ export interface MatchData {
     logo?: string;
   };
   kickoffTime: string;
-  status: 'scheduled' | 'live' | 'halftime' | 'finished' | 'postponed' | 'cancelled';
+  status: 'scheduled' | 'live' | 'halftime' | 'finished' | 'postponed' | 'cancelled' | 'extra_time' | 'penalties';
   homeScore: number | null;
   awayScore: number | null;
   minute?: number;
@@ -80,6 +79,7 @@ export interface MatchData {
     country: string;
     countryCode: string;
     tier: number;
+    logo?: string;
   };
   sport: {
     id: number;
@@ -95,6 +95,7 @@ export interface MatchData {
   markets?: MarketOdds[];
   tipsCount: number;
   source?: string;
+  venue?: string;
 }
 
 export interface MarketOdds {
@@ -136,6 +137,7 @@ function convertToMatchData(match: UnifiedMatch): MatchData {
     markets: match.markets,
     tipsCount: match.tipsCount,
     source: match.source,
+    venue: match.venue,
   };
 }
 
@@ -309,7 +311,7 @@ function generateFallbackMatches(userCountryCode?: string): MatchData[] {
     const leagueOrderB = leaguePriorityB === -1 ? 999 : leaguePriorityB;
     if (leagueOrderA !== leagueOrderB) return leagueOrderA - leagueOrderB;
     
-    const statusOrder: Record<string, number> = { live: 0, halftime: 1, scheduled: 2, finished: 3, postponed: 4, cancelled: 5 };
+    const statusOrder: Record<string, number> = { live: 0, halftime: 1, extra_time: 1.5, penalties: 1.6, scheduled: 2, finished: 3, postponed: 4, cancelled: 5 };
     const statusOrderA = statusOrder[a.status] ?? 5;
     const statusOrderB = statusOrder[b.status] ?? 5;
     if (statusOrderA !== statusOrderB) return statusOrderA - statusOrderB;
@@ -328,28 +330,43 @@ export async function GET(request: NextRequest) {
   
   try {
     let matches: MatchData[] = [];
+    let apiWorking = false;
     
-    // Try to fetch from unified API first
+    // Try to fetch from API-Football
     try {
-      let apiMatches: UnifiedMatch[];
+      let apiMatches: UnifiedMatch[] = [];
       
       if (status === 'live') {
         apiMatches = await getLiveMatches();
+      } else if (status === 'finished' || status === 'results') {
+        apiMatches = await getFinishedMatches(3);
       } else if (status === 'upcoming') {
-        apiMatches = await getUpcomingMatches();
+        apiMatches = await getUpcomingMatches(7);
       } else if (leagueId) {
         apiMatches = await getMatchesByLeague(parseInt(leagueId));
-      } else if (sportId) {
-        apiMatches = await getMatchesBySport(parseInt(sportId));
       } else {
-        apiMatches = await getAllMatches();
+        // Get combined data: live + today + upcoming
+        const [live, today, upcoming] = await Promise.all([
+          getLiveMatches(),
+          getTodayMatches(),
+          getUpcomingMatches(3),
+        ]);
+        
+        // Combine and dedupe
+        const seen = new Set<string>();
+        apiMatches = [...live, ...today, ...upcoming].filter(m => {
+          if (seen.has(m.id)) return false;
+          seen.add(m.id);
+          return true;
+        });
       }
       
       if (apiMatches.length > 0) {
         matches = apiMatches.map(convertToMatchData);
+        apiWorking = true;
       }
     } catch (apiError) {
-      console.error('[API] Unified API error, falling back:', apiError);
+      console.error('[API] API-Football error, falling back:', apiError);
     }
     
     // If no API matches, use fallback
@@ -367,13 +384,20 @@ export async function GET(request: NextRequest) {
       
       if (status && status !== 'all') {
         if (status === 'live') {
-          matches = matches.filter(m => m.status === 'live' || m.status === 'halftime');
+          matches = matches.filter(m => m.status === 'live' || m.status === 'halftime' || m.status === 'extra_time' || m.status === 'penalties');
         } else if (status === 'upcoming') {
           matches = matches.filter(m => m.status === 'scheduled');
+        } else if (status === 'finished' || status === 'results') {
+          matches = matches.filter(m => m.status === 'finished');
         } else {
           matches = matches.filter(m => m.status === status);
         }
       }
+    }
+    
+    // Apply sport filter (for API data)
+    if (apiWorking && sportId) {
+      matches = matches.filter(m => m.sportId === parseInt(sportId));
     }
     
     // Filter by specific match ID
@@ -382,20 +406,43 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ match });
     }
     
+    // Sort matches
+    matches.sort((a, b) => {
+      // Live matches first
+      const statusOrder: Record<string, number> = { 
+        live: 0, 
+        halftime: 1, 
+        extra_time: 1.5, 
+        penalties: 1.6, 
+        scheduled: 2, 
+        finished: 3, 
+        postponed: 4, 
+        cancelled: 5 
+      };
+      const statusOrderA = statusOrder[a.status] ?? 5;
+      const statusOrderB = statusOrder[b.status] ?? 5;
+      if (statusOrderA !== statusOrderB) return statusOrderA - statusOrderB;
+      
+      // Then by kickoff time
+      return new Date(a.kickoffTime).getTime() - new Date(b.kickoffTime).getTime();
+    });
+    
     // Calculate stats
     const stats = {
       total: matches.length,
-      live: matches.filter(m => m.status === 'live' || m.status === 'halftime').length,
+      live: matches.filter(m => m.status === 'live' || m.status === 'halftime' || m.status === 'extra_time' || m.status === 'penalties').length,
       today: matches.filter(m => {
         const matchDate = new Date(m.kickoffTime).toDateString();
         return matchDate === new Date().toDateString();
       }).length,
       upcoming: matches.filter(m => m.status === 'scheduled').length,
+      finished: matches.filter(m => m.status === 'finished').length,
     };
     
     return NextResponse.json({ 
       matches,
       stats,
+      source: apiWorking ? 'api-football' : 'fallback',
       timestamp: new Date().toISOString(),
     });
   } catch (error) {

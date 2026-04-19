@@ -5,12 +5,21 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { 
   Home, Calendar, Trophy, Users, BarChart3, Radio, Bookmark,
-  Menu, X, Search, Bell, Settings, LogIn, ChevronDown,
-  Star, Wallet
+  Menu, X, Search, Bell, Settings, LogIn, LogOut, ChevronDown,
+  Star, Wallet, User
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { cn } from "@/lib/utils"
+import { useAuth } from "@/contexts/auth-context"
+import { ThemeToggle } from "@/components/theme-toggle"
 
 // ✅ FIX: import correct export and alias it
 import { ALL_SPORTS as SPORTS_LIST, getSportIcon } from "@/lib/sports-data"
@@ -28,6 +37,7 @@ const mainNavItems = [
 
 export default function MainLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
+  const { user, isAuthenticated, logout, isLoading } = useAuth()
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [showSports, setShowSports] = useState(true)
 
@@ -118,13 +128,15 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
           )}
         </div>
 
-        {/* Admin */}
-        <div className="absolute bottom-0 left-0 right-0 border-t border-border p-3">
-          <Link href="/admin" className="flex items-center gap-3 px-3 py-2.5 text-sm hover:bg-muted rounded-lg">
-            <Settings className="h-5 w-5" />
-            Admin Panel
-          </Link>
-        </div>
+        {/* Admin - only visible for admin users */}
+        {isAuthenticated && user?.role === 'admin' && (
+          <div className="absolute bottom-0 left-0 right-0 border-t border-border p-3">
+            <Link href="/admin" className="flex items-center gap-3 px-3 py-2.5 text-sm hover:bg-muted rounded-lg text-primary">
+              <Settings className="h-5 w-5" />
+              Admin Panel
+            </Link>
+          </div>
+        )}
       </aside>
 
       {/* Main */}
@@ -141,16 +153,85 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
           </div>
 
           <div className="ml-auto flex items-center gap-2">
+            <ThemeToggle />
             <Button variant="ghost" size="icon">
               <Bell className="h-5 w-5" />
             </Button>
             <Button variant="ghost" size="icon">
               <Bookmark className="h-5 w-5" />
             </Button>
-            <Button className="hidden md:flex gap-2">
-              <LogIn className="h-4 w-4" />
-              Sign In
-            </Button>
+            
+            {isLoading ? (
+              <div className="h-8 w-8 animate-pulse rounded-full bg-muted" />
+            ) : isAuthenticated && user ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="sm" className="gap-2">
+                    <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">
+                      {user.displayName?.charAt(0).toUpperCase() || user.username?.charAt(0).toUpperCase() || 'U'}
+                    </div>
+                    <span className="hidden sm:inline">{user.displayName || user.username}</span>
+                    <ChevronDown className="h-3 w-3" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <div className="p-2">
+                    <p className="font-medium">{user.displayName || user.username}</p>
+                    <p className="text-xs text-muted-foreground">@{user.username}</p>
+                    {user.balance !== undefined && (
+                      <p className="mt-1 font-mono text-sm text-success">
+                        KES {user.balance?.toLocaleString() || '0'}
+                      </p>
+                    )}
+                  </div>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem asChild>
+                    <Link href="/dashboard">
+                      <User className="mr-2 h-4 w-4" />
+                      Dashboard
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link href="/dashboard/tips">
+                      My Tips
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link href="/dashboard/wallet">
+                      Wallet
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  {user.role === 'admin' && (
+                    <>
+                      <DropdownMenuItem asChild>
+                        <Link href="/admin" className="text-primary">
+                          <Settings className="mr-2 h-4 w-4" />
+                          Admin Panel
+                        </Link>
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                    </>
+                  )}
+                  <DropdownMenuItem onClick={logout} className="text-destructive">
+                    <LogOut className="mr-2 h-4 w-4" />
+                    Logout
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : (
+              <div className="flex items-center gap-2">
+                <Button variant="ghost" size="sm" asChild>
+                  <Link href="/login">Login</Link>
+                </Button>
+                <Button size="sm" className="hidden md:flex gap-2" asChild>
+                  <Link href="/register">
+                    <LogIn className="h-4 w-4" />
+                    Sign Up
+                  </Link>
+                </Button>
+              </div>
+            )}
           </div>
         </header>
 

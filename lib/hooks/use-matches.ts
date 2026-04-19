@@ -2,7 +2,53 @@
 
 import useSWR from 'swr';
 import { useState, useEffect } from 'react';
-import type { Match } from '@/lib/api/sports-api';
+
+// Match type from our API
+export interface Match {
+  id: string;
+  sportId: number;
+  leagueId: number;
+  homeTeam: {
+    id: number | string;
+    name: string;
+    shortName: string;
+    logo?: string;
+  };
+  awayTeam: {
+    id: number | string;
+    name: string;
+    shortName: string;
+    logo?: string;
+  };
+  kickoffTime: string | Date;
+  status: 'scheduled' | 'live' | 'halftime' | 'finished' | 'postponed' | 'cancelled' | 'extra_time' | 'penalties' | string;
+  homeScore: number | null;
+  awayScore: number | null;
+  minute?: number;
+  league: {
+    id: number;
+    name: string;
+    slug?: string;
+    country: string;
+    countryCode: string;
+    tier: number;
+    logo?: string;
+  };
+  sport: {
+    id: number;
+    name: string;
+    slug: string;
+    icon: string;
+  };
+  odds?: {
+    home: number;
+    draw?: number;
+    away: number;
+  };
+  tipsCount: number;
+  source?: string;
+  venue?: string;
+}
 
 // User's detected country code
 let detectedCountryCode: string | null = null;
@@ -118,7 +164,16 @@ function sortMatchesWithPriority(matches: Match[], countryCode?: string): Match[
     if (leagueTierA !== leagueTierB) return leagueTierA - leagueTierB;
     
     // 3. Live matches first
-    const statusOrder: Record<string, number> = { live: 0, halftime: 1, scheduled: 2, finished: 3, postponed: 4 };
+    const statusOrder: Record<string, number> = { 
+      live: 0, 
+      halftime: 1, 
+      extra_time: 1.5, 
+      penalties: 1.6, 
+      scheduled: 2, 
+      finished: 3, 
+      postponed: 4,
+      cancelled: 5 
+    };
     const statusOrderA = statusOrder[a.status] ?? 5;
     const statusOrderB = statusOrder[b.status] ?? 5;
     if (statusOrderA !== statusOrderB) return statusOrderA - statusOrderB;
@@ -131,7 +186,7 @@ function sortMatchesWithPriority(matches: Match[], countryCode?: string): Match[
 // Filter helper functions
 function getLiveMatches(matches: Match[]): Match[] {
   return matches
-    .filter(m => m.status === 'live' || m.status === 'halftime')
+    .filter(m => m.status === 'live' || m.status === 'halftime' || m.status === 'extra_time' || m.status === 'penalties')
     .sort((a, b) => {
       const sportPriorityA = SPORT_PRIORITY[a.sportId] ?? 99;
       const sportPriorityB = SPORT_PRIORITY[b.sportId] ?? 99;
