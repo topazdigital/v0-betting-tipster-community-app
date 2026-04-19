@@ -182,13 +182,24 @@ function setCache(key: string, data: unknown): void {
 // The Odds API Client
 // ============================================
 
+// Track API status for debugging
+const apiStatus = {
+  theOddsApi: { working: false, lastError: '', lastCheck: 0 },
+  sportsDataIo: { working: true, lastError: '', lastCheck: 0 },
+  oddsApiIo: { working: false, lastError: '', lastCheck: 0 },
+};
+
+export function getApiStatus() {
+  return apiStatus;
+}
+
 export async function fetchTheOddsAPI(
   endpoint: string,
   params: Record<string, string> = {}
 ): Promise<unknown> {
   const apiKey = process.env.THE_ODDS_API_KEY;
-  if (!apiKey) {
-    console.warn('[UnifiedAPI] THE_ODDS_API_KEY not configured');
+  if (!apiKey || apiKey === 'your_api_key_here') {
+    // Silently skip if no valid key
     return null;
   }
 
@@ -205,18 +216,30 @@ export async function fetchTheOddsAPI(
     });
 
     if (!response.ok) {
-      console.error(`[TheOddsAPI] Error: ${response.status}`);
+      apiStatus.theOddsApi.working = false;
+      apiStatus.theOddsApi.lastError = `HTTP ${response.status}`;
+      apiStatus.theOddsApi.lastCheck = Date.now();
+      // Only log errors once every 5 minutes to reduce noise
+      if (Date.now() - apiStatus.theOddsApi.lastCheck > 300000) {
+        console.warn(`[TheOddsAPI] Error: ${response.status} - API key may be invalid`);
+      }
       return null;
     }
+
+    apiStatus.theOddsApi.working = true;
+    apiStatus.theOddsApi.lastCheck = Date.now();
 
     // Log remaining quota
     const remaining = response.headers.get('x-requests-remaining');
     const used = response.headers.get('x-requests-used');
-    console.log(`[TheOddsAPI] Quota: ${remaining} remaining, ${used} used`);
+    if (remaining) {
+      console.log(`[TheOddsAPI] Quota: ${remaining} remaining, ${used} used`);
+    }
 
     return await response.json();
   } catch (error) {
-    console.error('[TheOddsAPI] Fetch error:', error);
+    apiStatus.theOddsApi.working = false;
+    apiStatus.theOddsApi.lastError = String(error);
     return null;
   }
 }
@@ -562,6 +585,218 @@ export async function getSportsDataIONBAGames(): Promise<UnifiedMatch[]> {
   return matches;
 }
 
+// Get Soccer matches from SportsData.io (this API supports various leagues)
+export async function getSportsDataIOSoccerGames(competition: string = 'EPL'): Promise<UnifiedMatch[]> {
+  const cacheKey = `sportsdata-soccer-${competition}`;
+  const cached = getCached<UnifiedMatch[]>(cacheKey, CACHE_DURATION.upcoming);
+  if (cached) return cached;
+
+  // Competition codes: EPL, BUNDESLIGA, LA_LIGA, SERIE_A, LIGUE_1, MLS, UEFA_CHAMPIONS_LEAGUE
+  const today = new Date().toISOString().split('T')[0];
+  const data = await fetchSportsDataIO('soccer', `scores/json/GamesByDate/${competition}/${today}`);
+  if (!data || !Array.isArray(data)) return [];
+
+  const leagueMapping: Record<string, { id: number; name: string; country: string; countryCode: string }> = {
+    'EPL': { id: 1, name: 'Premier League', country: 'England', countryCode: 'GB' },
+    'BUNDESLIGA': { id: 3, name: 'Bundesliga', country: 'Germany', countryCode: 'DE' },
+    'LA_LIGA': { id: 2, name: 'La Liga', country: 'Spain', countryCode: 'ES' },
+    'SERIE_A': { id: 4, name: 'Serie A', country: 'Italy', countryCode: 'IT' },
+    'LIGUE_1': { id: 5, name: 'Ligue 1', country: 'France', countryCode: 'FR' },
+    'MLS': { id: 11, name: 'MLS', country: 'USA', countryCode: 'US' },
+    'UEFA_CHAMPIONS_LEAGUE': { id: 9, name: 'Champions League', country: 'Europe', countryCode: 'EU' },
+  };
+
+  const league = leagueMapping[competition] || leagueMapping['EPL'];
+
+  const matches: UnifiedMatch[] = data.map((game: {
+    GameId: number;
+    DateTime: string;
+    HomeTeamName: string;
+    AwayTeamName: string;
+    HomeTeamScore?: number;
+    AwayTeamScore?: number;
+    Status: string;
+    Clock?: number;
+    Period?: string;
+  }) => ({
+    id: `sdio_soccer_${game.GameId}`,
+    externalId: String(game.GameId),
+    source: 'sportsdata-io' as const,
+    sportId: 1,
+    sportKey: 'soccer',
+    leagueId: league.id,
+    leagueKey: competition.toLowerCase(),
+    homeTeam: {
+      id: generateTeamId(game.HomeTeamName),
+      name: game.HomeTeamName,
+      shortName: getShortName(game.HomeTeamName),
+    },
+    awayTeam: {
+      id: generateTeamId(game.AwayTeamName),
+      name: game.AwayTeamName,
+      shortName: getShortName(game.AwayTeamName),
+    },
+    kickoffTime: new Date(game.DateTime),
+    status: mapSportsDataIOStatus(game.Status),
+    homeScore: game.HomeTeamScore ?? null,
+    awayScore: game.AwayTeamScore ?? null,
+    minute: game.Clock,
+    period: game.Period,
+    league: {
+      id: league.id,
+      name: league.name,
+      slug: competition.toLowerCase().replace(/_/g, '-'),
+      country: league.country,
+      countryCode: league.countryCode,
+      tier: 1,
+    },
+    sport: {
+      id: 1,
+      name: 'Football',
+      slug: 'football',
+      icon: 'soccer',
+    },
+    tipsCount: 0,
+  }));
+
+  setCache(cacheKey, matches);
+  return matches;
+}
+
+// Get MLB games
+export async function getSportsDataIOMLBGames(): Promise<UnifiedMatch[]> {
+  const cacheKey = 'sportsdata-mlb-games';
+  const cached = getCached<UnifiedMatch[]>(cacheKey, CACHE_DURATION.upcoming);
+  if (cached) return cached;
+
+  const today = new Date().toISOString().split('T')[0];
+  const data = await fetchSportsDataIO('mlb', `scores/json/GamesByDate/${today}`);
+  if (!data || !Array.isArray(data)) return [];
+
+  const matches: UnifiedMatch[] = data.map((game: {
+    GameID: number;
+    DateTime: string;
+    HomeTeam: string;
+    AwayTeam: string;
+    HomeTeamName?: string;
+    AwayTeamName?: string;
+    HomeTeamRuns?: number;
+    AwayTeamRuns?: number;
+    Status: string;
+    Inning?: number;
+    InningHalf?: string;
+  }) => ({
+    id: `sdio_mlb_${game.GameID}`,
+    externalId: String(game.GameID),
+    source: 'sportsdata-io' as const,
+    sportId: 6,
+    sportKey: 'mlb',
+    leagueId: 501,
+    leagueKey: 'mlb',
+    homeTeam: {
+      id: generateTeamId(game.HomeTeam),
+      name: game.HomeTeamName || game.HomeTeam,
+      shortName: game.HomeTeam,
+    },
+    awayTeam: {
+      id: generateTeamId(game.AwayTeam),
+      name: game.AwayTeamName || game.AwayTeam,
+      shortName: game.AwayTeam,
+    },
+    kickoffTime: new Date(game.DateTime),
+    status: mapSportsDataIOStatus(game.Status),
+    homeScore: game.HomeTeamRuns ?? null,
+    awayScore: game.AwayTeamRuns ?? null,
+    minute: game.Inning,
+    period: game.InningHalf,
+    league: {
+      id: 501,
+      name: 'MLB',
+      slug: 'mlb',
+      country: 'USA',
+      countryCode: 'US',
+      tier: 1,
+    },
+    sport: {
+      id: 6,
+      name: 'Baseball',
+      slug: 'baseball',
+      icon: 'baseball',
+    },
+    tipsCount: 0,
+  }));
+
+  setCache(cacheKey, matches);
+  return matches;
+}
+
+// Get NHL games
+export async function getSportsDataIONHLGames(): Promise<UnifiedMatch[]> {
+  const cacheKey = 'sportsdata-nhl-games';
+  const cached = getCached<UnifiedMatch[]>(cacheKey, CACHE_DURATION.upcoming);
+  if (cached) return cached;
+
+  const today = new Date().toISOString().split('T')[0];
+  const data = await fetchSportsDataIO('nhl', `scores/json/GamesByDate/${today}`);
+  if (!data || !Array.isArray(data)) return [];
+
+  const matches: UnifiedMatch[] = data.map((game: {
+    GameID: number;
+    DateTime: string;
+    HomeTeam: string;
+    AwayTeam: string;
+    HomeTeamName?: string;
+    AwayTeamName?: string;
+    HomeTeamScore?: number;
+    AwayTeamScore?: number;
+    Status: string;
+    Period?: string;
+    TimeRemainingMinutes?: number;
+  }) => ({
+    id: `sdio_nhl_${game.GameID}`,
+    externalId: String(game.GameID),
+    source: 'sportsdata-io' as const,
+    sportId: 7,
+    sportKey: 'nhl',
+    leagueId: 601,
+    leagueKey: 'nhl',
+    homeTeam: {
+      id: generateTeamId(game.HomeTeam),
+      name: game.HomeTeamName || game.HomeTeam,
+      shortName: game.HomeTeam,
+    },
+    awayTeam: {
+      id: generateTeamId(game.AwayTeam),
+      name: game.AwayTeamName || game.AwayTeam,
+      shortName: game.AwayTeam,
+    },
+    kickoffTime: new Date(game.DateTime),
+    status: mapSportsDataIOStatus(game.Status),
+    homeScore: game.HomeTeamScore ?? null,
+    awayScore: game.AwayTeamScore ?? null,
+    minute: game.TimeRemainingMinutes,
+    period: game.Period,
+    league: {
+      id: 601,
+      name: 'NHL',
+      slug: 'nhl',
+      country: 'USA',
+      countryCode: 'US',
+      tier: 1,
+    },
+    sport: {
+      id: 7,
+      name: 'Ice Hockey',
+      slug: 'ice-hockey',
+      icon: 'hockey',
+    },
+    tipsCount: 0,
+  }));
+
+  setCache(cacheKey, matches);
+  return matches;
+}
+
 // Get MMA events
 export async function getSportsDataIOMMAEvents(): Promise<UnifiedMatch[]> {
   const cacheKey = 'sportsdata-mma-events';
@@ -644,8 +879,8 @@ export async function fetchOddsAPIIO(
   endpoint: string
 ): Promise<unknown> {
   const apiKey = process.env.ODDS_API_IO_KEY;
-  if (!apiKey) {
-    console.warn('[UnifiedAPI] ODDS_API_IO_KEY not configured');
+  if (!apiKey || apiKey === 'your_api_key_here') {
+    // Silently skip if no valid key
     return null;
   }
 
@@ -661,13 +896,19 @@ export async function fetchOddsAPIIO(
     });
 
     if (!response.ok) {
-      console.error(`[OddsAPIIO] Error: ${response.status}`);
+      apiStatus.oddsApiIo.working = false;
+      apiStatus.oddsApiIo.lastError = `HTTP ${response.status}`;
+      apiStatus.oddsApiIo.lastCheck = Date.now();
       return null;
     }
 
+    apiStatus.oddsApiIo.working = true;
+    apiStatus.oddsApiIo.lastCheck = Date.now();
+
     return await response.json();
   } catch (error) {
-    console.error('[OddsAPIIO] Fetch error:', error);
+    apiStatus.oddsApiIo.working = false;
+    apiStatus.oddsApiIo.lastError = String(error);
     return null;
   }
 }
@@ -769,20 +1010,23 @@ export async function getAllMatches(): Promise<UnifiedMatch[]> {
   };
 
   // Fetch from all sources in parallel
-  const [
-    theOddsAPIEPL,
-    theOddsAPILaLiga,
-    theOddsAPIBundesliga,
-    theOddsAPINBA,
-    theOddsAPINFL,
-    theOddsAPINHL,
-    theOddsAPIMLB,
-    theOddsAPIMMA,
-    sportsDataNFL,
-    sportsDataNBA,
-    sportsDataMMA,
-    oddsAPIIOSoccer,
-  ] = await Promise.allSettled([
+  // SportsData.io is our primary working API
+  // The Odds API and Odds-API.io are secondary (require valid API keys)
+  const results = await Promise.allSettled([
+    // SportsData.io - Primary source (WORKING)
+    getSportsDataIOSoccerGames('EPL'),
+    getSportsDataIOSoccerGames('BUNDESLIGA'),
+    getSportsDataIOSoccerGames('LA_LIGA'),
+    getSportsDataIOSoccerGames('SERIE_A'),
+    getSportsDataIOSoccerGames('LIGUE_1'),
+    getSportsDataIOSoccerGames('MLS'),
+    getSportsDataIOSoccerGames('UEFA_CHAMPIONS_LEAGUE'),
+    getSportsDataIONFLGames(),
+    getSportsDataIONBAGames(),
+    getSportsDataIOMLBGames(),
+    getSportsDataIONHLGames(),
+    getSportsDataIOMMAEvents(),
+    // The Odds API - Secondary source (requires valid API key)
     getTheOddsAPIMatches('soccer_epl'),
     getTheOddsAPIMatches('soccer_spain_la_liga'),
     getTheOddsAPIMatches('soccer_germany_bundesliga'),
@@ -791,28 +1035,11 @@ export async function getAllMatches(): Promise<UnifiedMatch[]> {
     getTheOddsAPIMatches('icehockey_nhl'),
     getTheOddsAPIMatches('baseball_mlb'),
     getTheOddsAPIMatches('mma_mixed_martial_arts'),
-    getSportsDataIONFLGames(),
-    getSportsDataIONBAGames(),
-    getSportsDataIOMMAEvents(),
+    // Odds-API.io - Tertiary source
     getOddsAPIIOMatches('soccer'),
   ]);
 
-  // Process results
-  const results = [
-    theOddsAPIEPL,
-    theOddsAPILaLiga,
-    theOddsAPIBundesliga,
-    theOddsAPINBA,
-    theOddsAPINFL,
-    theOddsAPINHL,
-    theOddsAPIMLB,
-    theOddsAPIMMA,
-    sportsDataNFL,
-    sportsDataNBA,
-    sportsDataMMA,
-    oddsAPIIOSoccer,
-  ];
-
+  // Process all results
   for (const result of results) {
     if (result.status === 'fulfilled' && result.value) {
       for (const match of result.value) {
