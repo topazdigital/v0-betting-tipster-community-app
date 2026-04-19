@@ -5,7 +5,52 @@ import { cn } from '@/lib/utils';
 import { useUserSettings } from '@/contexts/user-settings-context';
 import { formatOdds } from '@/lib/utils/odds-converter';
 import { TeamLogo, SportIcon, LeagueFlag } from '@/components/ui/team-logo';
-import type { Match } from '@/lib/api/sports-api';
+import { getBrowserTimezone, formatTime, formatDate, isToday, isTomorrow } from '@/lib/utils/timezone';
+
+// Match type from our API
+interface Match {
+  id: string;
+  sportId: number;
+  leagueId: number;
+  homeTeam: {
+    id: number | string;
+    name: string;
+    shortName: string;
+    logo?: string;
+  };
+  awayTeam: {
+    id: number | string;
+    name: string;
+    shortName: string;
+    logo?: string;
+  };
+  kickoffTime: string | Date;
+  status: string;
+  homeScore: number | null;
+  awayScore: number | null;
+  minute?: number;
+  league: {
+    id: number;
+    name: string;
+    slug?: string;
+    country: string;
+    countryCode: string;
+    tier: number;
+    logo?: string;
+  };
+  sport: {
+    id: number;
+    name: string;
+    slug: string;
+    icon: string;
+  };
+  odds?: {
+    home: number;
+    draw?: number;
+    away: number;
+  };
+  tipsCount: number;
+}
 
 interface MatchCardNewProps {
   match: Match;
@@ -21,19 +66,23 @@ export function MatchCardNew({
   showSport = false 
 }: MatchCardNewProps) {
   const { settings } = useUserSettings();
-  const isLive = match.status === 'live' || match.status === 'halftime';
+  const isLive = match.status === 'live' || match.status === 'halftime' || match.status === 'extra_time' || match.status === 'penalties';
   const isFinished = match.status === 'finished';
 
+  // Use browser timezone for display
+  const timezone = getBrowserTimezone();
   const kickoffTime = new Date(match.kickoffTime);
-  const timeStr = kickoffTime.toLocaleTimeString('en-US', { 
-    hour: '2-digit', 
-    minute: '2-digit',
-    hour12: false 
-  });
-  const dateStr = kickoffTime.toLocaleDateString('en-US', { 
-    month: 'short', 
-    day: 'numeric' 
-  });
+  const timeStr = formatTime(kickoffTime, timezone);
+  
+  // Smart date display: Today, Tomorrow, or date
+  let dateStr: string;
+  if (isToday(kickoffTime, timezone)) {
+    dateStr = 'Today';
+  } else if (isTomorrow(kickoffTime, timezone)) {
+    dateStr = 'Tomorrow';
+  } else {
+    dateStr = formatDate(kickoffTime, timezone);
+  }
 
   if (variant === 'compact') {
     return (
