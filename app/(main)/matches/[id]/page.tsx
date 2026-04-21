@@ -16,6 +16,7 @@ import { Progress } from "@/components/ui/progress"
 import { Spinner } from "@/components/ui/spinner"
 import { TeamLogo } from "@/components/ui/team-logo"
 import { AddTipForm } from "@/components/matches/add-tip-form"
+import { SportSpecificStats } from "@/components/matches/sport-specific-stats"
 import { cn } from "@/lib/utils"
 import { format } from "date-fns"
 import { useAuth } from "@/contexts/auth-context"
@@ -134,7 +135,20 @@ export default function MatchDetailPage({ params }: PageProps) {
             {/* Top Info */}
             <div className="flex items-center justify-between flex-wrap gap-2">
               <div className="flex items-center gap-2">
-                <span className="text-2xl">{match.sport?.icon === 'soccer' ? '⚽' : match.sport?.icon === 'basketball' ? '🏀' : '🏆'}</span>
+                <span className="text-2xl">{
+                  match.sport?.icon === 'soccer' ? '⚽' : 
+                  match.sport?.icon === 'basketball' ? '🏀' : 
+                  match.sport?.icon === 'football' ? '🏈' :
+                  match.sport?.icon === 'tennis' ? '🎾' :
+                  match.sport?.icon === 'baseball' ? '⚾' :
+                  match.sport?.icon === 'hockey' ? '🏒' :
+                  match.sport?.icon === 'mma' ? '🥊' :
+                  match.sport?.icon === 'cricket' ? '🏏' :
+                  match.sport?.icon === 'rugby' ? '🏉' :
+                  match.sport?.icon === 'golf' ? '⛳' :
+                  match.sport?.icon === 'formula-1' ? '🏎️' :
+                  '🏆'
+                }</span>
                 <div>
                   <p className="font-semibold">{match.league?.name || 'Unknown League'}</p>
                   <p className="text-sm text-muted-foreground">
@@ -549,40 +563,53 @@ export default function MatchDetailPage({ params }: PageProps) {
 
           {/* Stats Tab */}
           <TabsContent value="stats" className="space-y-4">
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="flex items-center gap-2 text-base">
-                  <BarChart3 className="h-5 w-5 text-primary" />
-                  Match Statistics
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {stats?.map((stat: { name: string; home: number; away: number; unit?: string }) => {
-                  const total = stat.home + stat.away;
-                  const homePercent = total > 0 ? (stat.home / total) * 100 : 50;
-                  
-                  return (
-                    <div key={stat.name}>
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="font-bold text-sm">{stat.home}{stat.unit}</span>
-                        <span className="text-xs text-muted-foreground">{stat.name}</span>
-                        <span className="font-bold text-sm">{stat.away}{stat.unit}</span>
+            {/* Sport-Specific Stats Component */}
+            <SportSpecificStats
+              sportId={match.sportId}
+              sportName={match.sport?.name || 'Sport'}
+              homeTeam={match.homeTeam.name}
+              awayTeam={match.awayTeam.name}
+              data={match.sportSpecificData}
+              status={match.status}
+            />
+            
+            {/* Fallback to generic stats if sport-specific data not available */}
+            {stats && stats.length > 0 && !match.sportSpecificData && (
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <BarChart3 className="h-5 w-5 text-primary" />
+                    Match Statistics
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {stats?.map((stat: { name: string; home: number; away: number; unit?: string }) => {
+                    const total = stat.home + stat.away;
+                    const homePercent = total > 0 ? (stat.home / total) * 100 : 50;
+                    
+                    return (
+                      <div key={stat.name}>
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="font-bold text-sm">{stat.home}{stat.unit}</span>
+                          <span className="text-xs text-muted-foreground">{stat.name}</span>
+                          <span className="font-bold text-sm">{stat.away}{stat.unit}</span>
+                        </div>
+                        <div className="flex h-2 rounded-full overflow-hidden bg-muted">
+                          <div 
+                            className="bg-primary transition-all"
+                            style={{ width: `${homePercent}%` }}
+                          />
+                          <div 
+                            className="bg-muted-foreground/30"
+                            style={{ width: `${100 - homePercent}%` }}
+                          />
+                        </div>
                       </div>
-                      <div className="flex h-2 rounded-full overflow-hidden bg-muted">
-                        <div 
-                          className="bg-primary transition-all"
-                          style={{ width: `${homePercent}%` }}
-                        />
-                        <div 
-                          className="bg-muted-foreground/30"
-                          style={{ width: `${100 - homePercent}%` }}
-                        />
-                      </div>
-                    </div>
-                  )
-                })}
-              </CardContent>
-            </Card>
+                    )
+                  })}
+                </CardContent>
+              </Card>
+            )}
           </TabsContent>
 
           {/* Lineups Tab */}
