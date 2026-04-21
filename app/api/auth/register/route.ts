@@ -2,9 +2,21 @@ import { NextResponse } from 'next/server';
 import { hashPassword, setAuthCookie } from '@/lib/auth';
 import { mockUsers } from '@/lib/mock-data';
 
+export const dynamic = 'force-dynamic';
+
 export async function POST(request: Request) {
   try {
-    const { email, password, username, displayName, phone, countryCode } = await request.json();
+    let body;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json(
+        { success: false, error: 'Invalid request body' },
+        { status: 400 }
+      );
+    }
+    
+    const { email, password, username, displayName, phone, countryCode } = body;
 
     // Validation
     if (!email || !password || !username || !displayName) {
@@ -85,9 +97,9 @@ export async function POST(request: Request) {
       },
     });
   } catch (error) {
-    console.error('Registration error:', error);
+    console.error('[v0] Registration error:', error);
     return NextResponse.json(
-      { success: false, error: 'Registration failed' },
+      { success: false, error: 'An unexpected error occurred. Please try again.' },
       { status: 500 }
     );
   }

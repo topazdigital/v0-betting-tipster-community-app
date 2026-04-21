@@ -45,7 +45,7 @@ interface TipFormData {
   marketKey: string
 }
 
-// Generate comprehensive markets from basic odds
+// Generate comprehensive markets from basic odds - now using seeded random for consistency
 function generateMarketsFromOdds(
   homeTeam: string,
   awayTeam: string,
@@ -54,6 +54,19 @@ function generateMarketsFromOdds(
   const home = baseOdds?.home || 2.1
   const draw = baseOdds?.draw || 3.4
   const away = baseOdds?.away || 3.2
+  
+  // Use team names for consistent seeding
+  const hashCode = (str: string) => {
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+      hash = ((hash << 5) - hash) + str.charCodeAt(i);
+      hash = hash & hash;
+    }
+    return Math.abs(hash);
+  };
+  
+  const seed = hashCode(homeTeam + awayTeam);
+  const seededRandom = (offset: number) => ((seed + offset) % 100) / 100;
 
   return [
     {
@@ -78,32 +91,32 @@ function generateMarketsFromOdds(
       key: 'btts',
       name: 'Both Teams to Score',
       outcomes: [
-        { name: 'Yes', price: Math.round((1.7 + Math.random() * 0.3) * 100) / 100 },
-        { name: 'No', price: Math.round((2.0 + Math.random() * 0.3) * 100) / 100 },
+        { name: 'Yes', price: Math.round((1.7 + seededRandom(1) * 0.3) * 100) / 100 },
+        { name: 'No', price: Math.round((2.0 + seededRandom(2) * 0.3) * 100) / 100 },
       ]
     },
     {
       key: 'over_under_1_5',
       name: 'Over/Under 1.5 Goals',
       outcomes: [
-        { name: 'Over 1.5', price: Math.round((1.35 + Math.random() * 0.2) * 100) / 100 },
-        { name: 'Under 1.5', price: Math.round((2.8 + Math.random() * 0.4) * 100) / 100 },
+        { name: 'Over 1.5', price: Math.round((1.35 + seededRandom(3) * 0.2) * 100) / 100 },
+        { name: 'Under 1.5', price: Math.round((2.8 + seededRandom(4) * 0.4) * 100) / 100 },
       ]
     },
     {
       key: 'over_under_2_5',
       name: 'Over/Under 2.5 Goals',
       outcomes: [
-        { name: 'Over 2.5', price: Math.round((1.8 + Math.random() * 0.4) * 100) / 100 },
-        { name: 'Under 2.5', price: Math.round((1.95 + Math.random() * 0.3) * 100) / 100 },
+        { name: 'Over 2.5', price: Math.round((1.8 + seededRandom(5) * 0.4) * 100) / 100 },
+        { name: 'Under 2.5', price: Math.round((1.95 + seededRandom(6) * 0.3) * 100) / 100 },
       ]
     },
     {
       key: 'over_under_3_5',
       name: 'Over/Under 3.5 Goals',
       outcomes: [
-        { name: 'Over 3.5', price: Math.round((2.3 + Math.random() * 0.5) * 100) / 100 },
-        { name: 'Under 3.5', price: Math.round((1.55 + Math.random() * 0.2) * 100) / 100 },
+        { name: 'Over 3.5', price: Math.round((2.3 + seededRandom(7) * 0.5) * 100) / 100 },
+        { name: 'Under 3.5', price: Math.round((1.55 + seededRandom(8) * 0.2) * 100) / 100 },
       ]
     },
     {
@@ -119,26 +132,26 @@ function generateMarketsFromOdds(
       key: 'correct_score',
       name: 'Correct Score',
       outcomes: [
-        { name: '1-0', price: Math.round((6.5 + Math.random() * 2) * 100) / 100 },
-        { name: '2-0', price: Math.round((8 + Math.random() * 3) * 100) / 100 },
-        { name: '2-1', price: Math.round((8.5 + Math.random() * 3) * 100) / 100 },
-        { name: '0-0', price: Math.round((10 + Math.random() * 4) * 100) / 100 },
-        { name: '1-1', price: Math.round((6 + Math.random() * 2) * 100) / 100 },
-        { name: '0-1', price: Math.round((9 + Math.random() * 3) * 100) / 100 },
-        { name: '0-2', price: Math.round((12 + Math.random() * 4) * 100) / 100 },
-        { name: '1-2', price: Math.round((11 + Math.random() * 4) * 100) / 100 },
-        { name: '2-2', price: Math.round((12 + Math.random() * 5) * 100) / 100 },
-        { name: '3-0', price: Math.round((15 + Math.random() * 5) * 100) / 100 },
-        { name: '3-1', price: Math.round((14 + Math.random() * 5) * 100) / 100 },
+        { name: '1-0', price: Math.round((6.5 + seededRandom(9) * 2) * 100) / 100 },
+        { name: '2-0', price: Math.round((8 + seededRandom(10) * 3) * 100) / 100 },
+        { name: '2-1', price: Math.round((8.5 + seededRandom(11) * 3) * 100) / 100 },
+        { name: '0-0', price: Math.round((10 + seededRandom(12) * 4) * 100) / 100 },
+        { name: '1-1', price: Math.round((6 + seededRandom(13) * 2) * 100) / 100 },
+        { name: '0-1', price: Math.round((9 + seededRandom(14) * 3) * 100) / 100 },
+        { name: '0-2', price: Math.round((12 + seededRandom(15) * 4) * 100) / 100 },
+        { name: '1-2', price: Math.round((11 + seededRandom(16) * 4) * 100) / 100 },
+        { name: '2-2', price: Math.round((12 + seededRandom(17) * 5) * 100) / 100 },
+        { name: '3-0', price: Math.round((15 + seededRandom(18) * 5) * 100) / 100 },
+        { name: '3-1', price: Math.round((14 + seededRandom(19) * 5) * 100) / 100 },
       ]
     },
     {
       key: 'first_goal',
       name: 'First Team to Score',
       outcomes: [
-        { name: homeTeam, price: Math.round((1.8 + Math.random() * 0.3) * 100) / 100 },
-        { name: awayTeam, price: Math.round((2.1 + Math.random() * 0.4) * 100) / 100 },
-        { name: 'No Goal', price: Math.round((9 + Math.random() * 3) * 100) / 100 },
+        { name: homeTeam, price: Math.round((1.8 + seededRandom(20) * 0.3) * 100) / 100 },
+        { name: awayTeam, price: Math.round((2.1 + seededRandom(21) * 0.4) * 100) / 100 },
+        { name: 'No Goal', price: Math.round((9 + seededRandom(22) * 3) * 100) / 100 },
       ]
     },
     {

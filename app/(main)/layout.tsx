@@ -20,6 +20,7 @@ import {
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/contexts/auth-context"
 import { ThemeToggle } from "@/components/theme-toggle"
+import { BottomNav } from "@/components/layout/bottom-nav"
 
 // ✅ FIX: import correct export and alias it
 import { ALL_SPORTS as SPORTS_LIST, getSportIcon } from "@/lib/sports-data"
@@ -235,7 +236,10 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
           </div>
         </header>
 
-        <main className="p-4">{children}</main>
+        <main className="p-4 pb-20 md:pb-4">{children}</main>
+        
+        {/* Mobile Bottom Navigation */}
+        <BottomNav />
       </div>
     </div>
   )

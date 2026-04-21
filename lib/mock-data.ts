@@ -137,14 +137,14 @@ function generateMatches(): MatchWithDetails[] {
     tips_count: 45,
   });
   
-  // Today's upcoming matches
+  // Today's upcoming matches - using safe indexes within mockTeams bounds (0-16)
   const todayMatches = [
-    { home: 3, away: 4, league: 0, hours: 2 },
-    { home: 5, away: 6, league: 0, hours: 4 },
-    { home: 9, away: 10, league: 2, hours: 3 },
-    { home: 12, away: 13, league: 3, hours: 5 },
-    { home: 14, away: 15, league: 4, hours: 6 },
-    { home: 17, away: 18, league: 5, hours: 1 },
+    { home: 2, away: 3, league: 0, hours: 2 },  // Liverpool vs Man City
+    { home: 4, away: 5, league: 0, hours: 4 },  // Man Utd vs Tottenham
+    { home: 6, away: 7, league: 1, hours: 3 },  // Real Madrid vs Barcelona
+    { home: 9, away: 10, league: 2, hours: 5 },  // Bayern vs Dortmund
+    { home: 11, away: 12, league: 3, hours: 6 },  // Juventus vs AC Milan
+    { home: 14, away: 15, league: 4, hours: 1 },  // PSG vs Marseille
   ];
   
   todayMatches.forEach((m, idx) => {

@@ -61,43 +61,73 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = async (email: string, password: string) => {
     try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000);
+      
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
+        signal: controller.signal,
       });
+      
+      clearTimeout(timeoutId);
+
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        return { success: false, error: errorData.error || `Server error: ${res.status}` };
+      }
 
       const data = await res.json();
 
-      if (res.ok && data.success) {
+      if (data.success) {
         setUser(data.user);
         return { success: true };
       }
 
       return { success: false, error: data.error || 'Login failed' };
-    } catch {
-      return { success: false, error: 'Network error' };
+    } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') {
+        return { success: false, error: 'Request timed out. Please try again.' };
+      }
+      console.error('[v0] Login error:', error);
+      return { success: false, error: 'Unable to connect. Please check your connection.' };
     }
   };
 
   const register = async (registerData: RegisterData) => {
     try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000);
+      
       const res = await fetch('/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(registerData),
+        signal: controller.signal,
       });
+      
+      clearTimeout(timeoutId);
+
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        return { success: false, error: errorData.error || `Server error: ${res.status}` };
+      }
 
       const data = await res.json();
 
-      if (res.ok && data.success) {
+      if (data.success) {
         setUser(data.user);
         return { success: true };
       }
 
       return { success: false, error: data.error || 'Registration failed' };
-    } catch {
-      return { success: false, error: 'Network error' };
+    } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') {
+        return { success: false, error: 'Request timed out. Please try again.' };
+      }
+      console.error('[v0] Registration error:', error);
+      return { success: false, error: 'Unable to connect. Please check your connection.' };
     }
   };
 

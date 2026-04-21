@@ -274,8 +274,11 @@ export function useLiveMatches() {
     }
   );
 
+  // Ensure data is an array before filtering
+  const matches = Array.isArray(data) ? data : [];
+
   return {
-    matches: data ? getLiveMatches(data) : [],
+    matches: getLiveMatches(matches),
     isLoading,
     error,
   };
@@ -291,8 +294,11 @@ export function useTodayMatches() {
     }
   );
 
+  // Ensure data is an array before filtering
+  const matches = Array.isArray(data) ? data : [];
+
   return {
-    matches: data ? getTodayMatches(data) : [],
+    matches: getTodayMatches(matches),
     isLoading,
     error,
   };

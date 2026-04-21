@@ -2,9 +2,21 @@ import { NextResponse } from 'next/server';
 import { setAuthCookie, verifyPassword } from '@/lib/auth';
 import { mockUsers } from '@/lib/mock-data';
 
+export const dynamic = 'force-dynamic';
+
 export async function POST(request: Request) {
   try {
-    const { email, password } = await request.json();
+    let body;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json(
+        { success: false, error: 'Invalid request body' },
+        { status: 400 }
+      );
+    }
+    
+    const { email, password } = body;
 
     if (!email || !password) {
       return NextResponse.json(
@@ -13,9 +25,12 @@ export async function POST(request: Request) {
       );
     }
 
+    // Normalize email
+    const normalizedEmail = email.toLowerCase().trim();
+
     // In development/preview, allow demo login
     // Demo credentials: admin@betcheza.co.ke / admin123
-    const user = mockUsers.find((u) => u.email === email);
+    const user = mockUsers.find((u) => u.email.toLowerCase() === normalizedEmail);
 
     if (!user) {
       return NextResponse.json(
@@ -54,9 +69,10 @@ export async function POST(request: Request) {
         balance: user.balance,
       },
     });
-  } catch {
+  } catch (error) {
+    console.error('[v0] Login error:', error);
     return NextResponse.json(
-      { success: false, error: 'Login failed' },
+      { success: false, error: 'An unexpected error occurred. Please try again.' },
       { status: 500 }
     );
   }

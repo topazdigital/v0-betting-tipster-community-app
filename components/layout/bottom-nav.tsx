@@ -2,22 +2,40 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, Calendar, TrendingUp, Trophy, User } from 'lucide-react';
+import { Home, Calendar, Radio, Trophy, User } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import useSWR from 'swr';
 
-const navItems = [
+interface NavItem {
+  href: string;
+  label: string;
+  icon: typeof Home;
+  badge?: boolean;
+}
+
+const navItems: NavItem[] = [
   { href: '/', label: 'Home', icon: Home },
+  { href: '/live', label: 'Live', icon: Radio, badge: true },
   { href: '/matches', label: 'Matches', icon: Calendar },
-  { href: '/tipsters', label: 'Tips', icon: TrendingUp },
   { href: '/leaderboard', label: 'Ranks', icon: Trophy },
-  { href: '/dashboard', label: 'Profile', icon: User },
+  { href: '/tipsters', label: 'Tipsters', icon: User },
 ];
+
+const fetcher = (url: string) => fetch(url).then(res => res.json());
 
 export function BottomNav() {
   const pathname = usePathname();
+  
+  // Fetch live match count
+  const { data } = useSWR('/api/matches?status=live', fetcher, {
+    refreshInterval: 30000,
+    revalidateOnFocus: false,
+  });
+  
+  const liveCount = data?.stats?.live || 0;
 
-  // Don't show on admin pages
-  if (pathname.startsWith('/admin')) {
+  // Don't show on admin pages or auth pages
+  if (pathname.startsWith('/admin') || pathname.startsWith('/login') || pathname.startsWith('/register')) {
     return null;
   }
 
@@ -34,13 +52,20 @@ export function BottomNav() {
               key={item.href}
               href={item.href}
               className={cn(
-                'flex flex-col items-center justify-center gap-1 transition-colors',
+                'relative flex flex-col items-center justify-center gap-1 transition-colors',
                 isActive
                   ? 'text-primary'
                   : 'text-muted-foreground hover:text-foreground'
               )}
             >
-              <Icon className={cn('h-5 w-5', isActive && 'text-primary')} />
+              <div className="relative">
+                <Icon className={cn('h-5 w-5', isActive && 'text-primary')} />
+                {item.badge && liveCount > 0 && (
+                  <span className="absolute -right-2 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[9px] font-bold text-white">
+                    {liveCount > 99 ? '99+' : liveCount}
+                  </span>
+                )}
+              </div>
               <span className="text-[10px] font-medium">{item.label}</span>
             </Link>
           );
