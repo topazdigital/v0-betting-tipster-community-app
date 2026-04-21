@@ -1,0 +1,483 @@
+"use client"
+
+import { use, useState } from "react"
+import Link from "next/link"
+import useSWR from "swr"
+import { format } from "date-fns"
+import { 
+  ArrowLeft, Check, Star, Users, TrendingUp, Target, Flame, 
+  Calendar, MapPin, Trophy, ChevronRight, ExternalLink,
+  BarChart3, Activity, Clock
+} from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Progress } from "@/components/ui/progress"
+import { Spinner } from "@/components/ui/spinner"
+import { cn } from "@/lib/utils"
+import { useAuth } from "@/contexts/auth-context"
+
+interface PageProps {
+  params: Promise<{ id: string }>
+}
+
+const fetcher = async (url: string) => {
+  const res = await fetch(url)
+  if (!res.ok) throw new Error('Failed to fetch')
+  return res.json()
+}
+
+export default function TipsterProfilePage({ params }: PageProps) {
+  const { id } = use(params)
+  const { isAuthenticated } = useAuth()
+  const [isFollowing, setIsFollowing] = useState(false)
+  const [activeTab, setActiveTab] = useState("tips")
+  
+  const { data, error, isLoading } = useSWR(
+    `/api/tipsters/${id}`,
+    fetcher
+  )
+  
+  if (isLoading) {
+    return (
+      <div className="flex-1 flex h-96 items-center justify-center">
+        <div className="flex items-center gap-3">
+          <Spinner className="h-8 w-8" />
+          <span className="text-muted-foreground">Loading tipster profile...</span>
+        </div>
+      </div>
+    )
+  }
+  
+  if (error || !data?.tipster) {
+    return (
+      <div className="flex-1 p-8 text-center">
+        <h1 className="text-2xl font-bold">Tipster not found</h1>
+        <p className="text-muted-foreground mt-2">The tipster you&apos;re looking for doesn&apos;t exist.</p>
+        <Button asChild className="mt-4">
+          <Link href="/tipsters">Back to Tipsters</Link>
+        </Button>
+      </div>
+    )
+  }
+  
+  const { tipster, recentTips, monthlyStats, sportBreakdown } = data
+  
+  return (
+    <div className="flex-1 overflow-hidden">
+      <div className="mx-auto max-w-5xl px-4 py-6 pb-24 md:pb-6">
+        {/* Back Button */}
+        <Button variant="ghost" size="sm" className="mb-4" asChild>
+          <Link href="/tipsters">
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back to Tipsters
+          </Link>
+        </Button>
+        
+        {/* Profile Header Card */}
+        <Card className="mb-6 overflow-hidden">
+          <div className="bg-gradient-to-r from-primary/10 to-transparent p-6">
+            <div className="flex flex-col sm:flex-row sm:items-start gap-6">
+              {/* Avatar */}
+              <div className="relative flex-shrink-0">
+                <div className="flex h-24 w-24 items-center justify-center rounded-full bg-primary text-3xl font-bold text-primary-foreground">
+                  {tipster.displayName.charAt(0)}
+                </div>
+                {tipster.rank <= 3 && (
+                  <div className={cn(
+                    "absolute -bottom-1 -right-1 flex h-8 w-8 items-center justify-center rounded-full text-sm font-bold",
+                    tipster.rank === 1 && "bg-yellow-500 text-yellow-950",
+                    tipster.rank === 2 && "bg-gray-300 text-gray-700",
+                    tipster.rank === 3 && "bg-amber-700 text-amber-100"
+                  )}>
+                    #{tipster.rank}
+                  </div>
+                )}
+              </div>
+              
+              {/* Info */}
+              <div className="flex-1 min-w-0">
+                <div className="flex flex-wrap items-center gap-2 mb-1">
+                  <h1 className="text-2xl font-bold">{tipster.displayName}</h1>
+                  {tipster.verified && (
+                    <Check className="h-5 w-5 rounded-full bg-primary p-0.5 text-primary-foreground" />
+                  )}
+                  {tipster.isPro && (
+                    <Badge className="bg-gradient-to-r from-primary to-primary/80">
+                      <Star className="mr-1 h-3 w-3" />
+                      PRO
+                    </Badge>
+                  )}
+                </div>
+                
+                <p className="text-sm text-muted-foreground mb-2">@{tipster.username}</p>
+                
+                <p className="text-sm text-foreground/80 mb-4 max-w-2xl">
+                  {tipster.bio}
+                </p>
+                
+                {/* Meta info */}
+                <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground mb-4">
+                  <div className="flex items-center gap-1">
+                    <MapPin className="h-4 w-4" />
+                    {tipster.country}
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Calendar className="h-4 w-4" />
+                    Joined {format(new Date(tipster.joinedAt), "MMM yyyy")}
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Users className="h-4 w-4" />
+                    {tipster.followers.toLocaleString()} followers
+                  </div>
+                </div>
+                
+                {/* Specialties */}
+                <div className="flex flex-wrap gap-1.5 mb-4">
+                  {tipster.specialties.map((spec: string) => (
+                    <Badge key={spec} variant="secondary" className="text-xs">
+                      {spec}
+                    </Badge>
+                  ))}
+                </div>
+                
+                {/* Actions */}
+                <div className="flex flex-wrap gap-2">
+                  <Button 
+                    variant={isFollowing ? "secondary" : "default"}
+                    onClick={() => setIsFollowing(!isFollowing)}
+                  >
+                    {isFollowing ? "Following" : "Follow"}
+                  </Button>
+                  
+                  {tipster.isPro && tipster.subscriptionPrice && (
+                    <Button variant="outline">
+                      Subscribe {tipster.currency} {tipster.subscriptionPrice}/mo
+                    </Button>
+                  )}
+                  
+                  {tipster.socials?.twitter && (
+                    <Button variant="ghost" size="icon" asChild>
+                      <a 
+                        href={`https://twitter.com/${tipster.socials.twitter}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        <ExternalLink className="h-4 w-4" />
+                      </a>
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </div>
+            
+            {/* Stats Grid */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3 mt-6">
+              <div className="rounded-xl bg-card border border-border p-3 text-center">
+                <div className="text-2xl font-bold text-success">{tipster.winRate}%</div>
+                <div className="text-xs text-muted-foreground">Win Rate</div>
+              </div>
+              <div className="rounded-xl bg-card border border-border p-3 text-center">
+                <div className="text-2xl font-bold text-primary">+{tipster.roi}%</div>
+                <div className="text-xs text-muted-foreground">ROI</div>
+              </div>
+              <div className="rounded-xl bg-card border border-border p-3 text-center">
+                <div className="text-2xl font-bold">{tipster.totalTips}</div>
+                <div className="text-xs text-muted-foreground">Total Tips</div>
+              </div>
+              <div className="rounded-xl bg-card border border-border p-3 text-center">
+                <div className="flex items-center justify-center gap-1">
+                  <div className="text-2xl font-bold text-warning">{tipster.streak}</div>
+                  {tipster.streak > 0 && <Flame className="h-5 w-5 text-warning" />}
+                </div>
+                <div className="text-xs text-muted-foreground">Win Streak</div>
+              </div>
+              <div className="rounded-xl bg-card border border-border p-3 text-center">
+                <div className="text-2xl font-bold">{tipster.avgOdds}</div>
+                <div className="text-xs text-muted-foreground">Avg Odds</div>
+              </div>
+              <div className="rounded-xl bg-card border border-border p-3 text-center">
+                <div className="text-2xl font-bold">#{tipster.rank}</div>
+                <div className="text-xs text-muted-foreground">Rank</div>
+              </div>
+            </div>
+          </div>
+        </Card>
+        
+        {/* Tabs */}
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="tips">Recent Tips</TabsTrigger>
+            <TabsTrigger value="stats">Statistics</TabsTrigger>
+            <TabsTrigger value="performance">Performance</TabsTrigger>
+          </TabsList>
+          
+          {/* Tips Tab */}
+          <TabsContent value="tips" className="space-y-4">
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <Target className="h-5 w-5 text-primary" />
+                  Recent Predictions
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {recentTips?.map((tip: {
+                  id: number;
+                  match: {
+                    homeTeam: string;
+                    awayTeam: string;
+                    kickoffTime: string;
+                    league: string;
+                    homeScore: number | null;
+                    awayScore: number | null;
+                  };
+                  market: string;
+                  selection: string;
+                  odds: number;
+                  stake: number;
+                  analysis: string;
+                  status: 'won' | 'lost' | 'pending';
+                  confidence: number;
+                  likes: number;
+                  createdAt: string;
+                }) => (
+                  <div 
+                    key={tip.id} 
+                    className={cn(
+                      "rounded-lg border p-4 transition-colors",
+                      tip.status === 'won' && "border-success/30 bg-success/5",
+                      tip.status === 'lost' && "border-destructive/30 bg-destructive/5",
+                      tip.status === 'pending' && "border-warning/30 bg-warning/5"
+                    )}
+                  >
+                    <div className="flex items-start justify-between gap-2 mb-2">
+                      <div>
+                        <div className="font-semibold text-sm">
+                          {tip.match.homeTeam} vs {tip.match.awayTeam}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          {tip.match.league} - {format(new Date(tip.match.kickoffTime), "dd MMM HH:mm")}
+                        </div>
+                      </div>
+                      <Badge 
+                        variant={tip.status === 'won' ? 'default' : tip.status === 'lost' ? 'destructive' : 'secondary'}
+                        className={cn(
+                          tip.status === 'won' && "bg-success text-success-foreground"
+                        )}
+                      >
+                        {tip.status.toUpperCase()}
+                      </Badge>
+                    </div>
+                    
+                    <div className="flex items-center gap-3 mb-2">
+                      <Badge variant="outline">{tip.market}</Badge>
+                      <span className="font-medium">{tip.selection}</span>
+                      <span className="font-mono text-primary font-bold">@{tip.odds}</span>
+                    </div>
+                    
+                    <p className="text-sm text-muted-foreground mb-2">{tip.analysis}</p>
+                    
+                    <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                      <span>Confidence: {tip.confidence}%</span>
+                      <span>Stake: {tip.stake}/5</span>
+                      {tip.status !== 'pending' && tip.match.homeScore !== null && (
+                        <span>Result: {tip.match.homeScore} - {tip.match.awayScore}</span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          </TabsContent>
+          
+          {/* Stats Tab */}
+          <TabsContent value="stats" className="space-y-4">
+            <div className="grid gap-4 md:grid-cols-2">
+              {/* Win/Loss Breakdown */}
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <BarChart3 className="h-5 w-5 text-primary" />
+                    Results Breakdown
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    <div>
+                      <div className="flex justify-between mb-1 text-sm">
+                        <span className="text-success">Won</span>
+                        <span className="font-bold">{tipster.wonTips}</span>
+                      </div>
+                      <Progress 
+                        value={(tipster.wonTips / tipster.totalTips) * 100} 
+                        className="h-2 bg-muted"
+                      />
+                    </div>
+                    <div>
+                      <div className="flex justify-between mb-1 text-sm">
+                        <span className="text-destructive">Lost</span>
+                        <span className="font-bold">{tipster.lostTips}</span>
+                      </div>
+                      <Progress 
+                        value={(tipster.lostTips / tipster.totalTips) * 100} 
+                        className="h-2 bg-muted [&>div]:bg-destructive"
+                      />
+                    </div>
+                    <div>
+                      <div className="flex justify-between mb-1 text-sm">
+                        <span className="text-warning">Pending</span>
+                        <span className="font-bold">{tipster.pendingTips}</span>
+                      </div>
+                      <Progress 
+                        value={(tipster.pendingTips / tipster.totalTips) * 100} 
+                        className="h-2 bg-muted [&>div]:bg-warning"
+                      />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              
+              {/* Sport Breakdown */}
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <Activity className="h-5 w-5 text-primary" />
+                    Sports Focus
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {sportBreakdown?.map((sport: { sport: string; percentage: number; tips: number }) => (
+                      <div key={sport.sport}>
+                        <div className="flex justify-between mb-1 text-sm">
+                          <span>{sport.sport}</span>
+                          <span className="font-bold">{sport.percentage}%</span>
+                        </div>
+                        <Progress 
+                          value={sport.percentage} 
+                          className="h-2"
+                        />
+                        <div className="text-xs text-muted-foreground mt-1">
+                          {sport.tips} tips
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+            
+            {/* Key Stats */}
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <Trophy className="h-5 w-5 text-warning" />
+                  Key Statistics
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                  <div className="text-center p-3 rounded-lg bg-muted/50">
+                    <div className="text-2xl font-bold">{tipster.avgOdds}</div>
+                    <div className="text-xs text-muted-foreground">Average Odds</div>
+                  </div>
+                  <div className="text-center p-3 rounded-lg bg-muted/50">
+                    <div className="text-2xl font-bold">{tipster.followers}</div>
+                    <div className="text-xs text-muted-foreground">Followers</div>
+                  </div>
+                  <div className="text-center p-3 rounded-lg bg-muted/50">
+                    <div className="text-2xl font-bold">{tipster.following}</div>
+                    <div className="text-xs text-muted-foreground">Following</div>
+                  </div>
+                  <div className="text-center p-3 rounded-lg bg-muted/50">
+                    <div className="text-2xl font-bold">
+                      {Math.round(tipster.totalTips / 12)}
+                    </div>
+                    <div className="text-xs text-muted-foreground">Tips/Month (Avg)</div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+          
+          {/* Performance Tab */}
+          <TabsContent value="performance" className="space-y-4">
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <TrendingUp className="h-5 w-5 text-primary" />
+                  Monthly Performance
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="overflow-x-auto -mx-4 px-4">
+                  <table className="w-full min-w-[500px] text-sm">
+                    <thead>
+                      <tr className="border-b">
+                        <th className="text-left py-2 font-medium text-muted-foreground">Month</th>
+                        <th className="text-center py-2 font-medium text-muted-foreground">Tips</th>
+                        <th className="text-center py-2 font-medium text-muted-foreground">Won</th>
+                        <th className="text-center py-2 font-medium text-muted-foreground">Lost</th>
+                        <th className="text-center py-2 font-medium text-muted-foreground">Win Rate</th>
+                        <th className="text-right py-2 font-medium text-muted-foreground">Profit</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {monthlyStats?.map((month: {
+                        month: string;
+                        tips: number;
+                        won: number;
+                        lost: number;
+                        profit: number;
+                        winRate: number;
+                      }) => (
+                        <tr key={month.month} className="border-b last:border-0">
+                          <td className="py-3 font-medium">{month.month}</td>
+                          <td className="py-3 text-center">{month.tips}</td>
+                          <td className="py-3 text-center text-success">{month.won}</td>
+                          <td className="py-3 text-center text-destructive">{month.lost}</td>
+                          <td className="py-3 text-center">
+                            <Badge variant={month.winRate >= 60 ? "default" : "secondary"}>
+                              {month.winRate}%
+                            </Badge>
+                          </td>
+                          <td className={cn(
+                            "py-3 text-right font-bold",
+                            month.profit > 0 ? "text-success" : "text-destructive"
+                          )}>
+                            {month.profit > 0 ? '+' : ''}{month.profit}%
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
+            
+            {/* Profit Chart Placeholder */}
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <Activity className="h-5 w-5 text-primary" />
+                  Cumulative Profit
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="h-48 flex items-center justify-center bg-muted/30 rounded-lg">
+                  <div className="text-center text-muted-foreground">
+                    <TrendingUp className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                    <p className="text-sm">Profit chart showing +{tipster.roi}% ROI</p>
+                    <p className="text-xs">Based on {tipster.totalTips} tips</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
+      </div>
+    </div>
+  )
+}
