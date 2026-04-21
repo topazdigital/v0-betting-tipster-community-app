@@ -12,7 +12,7 @@ import { generateAllMatches, filterMatches } from '@/lib/api/sports-api';
 import { ALL_SPORTS, ALL_LEAGUES, TEAMS_DATABASE, getSportIcon } from '@/lib/sports-data';
 
 export const dynamic = 'force-dynamic';
-export const revalidate = 30;
+export const revalidate = 15; // Reduced for more real-time updates
 
 // Sport priority - Football always first
 const SPORT_PRIORITY: Record<number, number> = {

@@ -1,18 +1,22 @@
 'use client';
 
 import { Calendar } from 'lucide-react';
-import { MatchList } from '@/components/matches/match-list';
-import { mockMatches } from '@/lib/mock-data';
+import { MatchCardNew } from '@/components/matches/match-card-new';
+import { Spinner } from '@/components/ui/spinner';
+import { useTodayMatches } from '@/lib/hooks/use-matches';
 
 export function TodayMatchesSection() {
-  const todayMatches = mockMatches.filter((m) => {
-    const kickoff = new Date(m.kickoff_time);
-    const today = new Date();
+  const { matches: todayMatches, isLoading } = useTodayMatches();
+
+  if (isLoading) {
     return (
-      kickoff.toDateString() === today.toDateString() &&
-      m.status === 'scheduled'
+      <section className="mb-8">
+        <div className="flex h-32 items-center justify-center">
+          <Spinner className="h-6 w-6" />
+        </div>
+      </section>
     );
-  });
+  }
 
   return (
     <section className="mb-8">
@@ -22,7 +26,11 @@ export function TodayMatchesSection() {
       </div>
 
       {todayMatches.length > 0 ? (
-        <MatchList title="Today" matches={todayMatches} />
+        <div className="space-y-2">
+          {todayMatches.slice(0, 10).map((match) => (
+            <MatchCardNew key={match.id} match={match} variant="compact" showSport />
+          ))}
+        </div>
       ) : (
         <div className="rounded-lg border border-border bg-card p-8 text-center">
           <p className="text-muted-foreground">No scheduled matches for today</p>

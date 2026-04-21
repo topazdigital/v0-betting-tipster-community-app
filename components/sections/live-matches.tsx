@@ -2,14 +2,23 @@
 
 import Link from 'next/link';
 import { ChevronRight } from 'lucide-react';
-import { MatchCard } from '@/components/matches/match-card';
+import { MatchCardNew } from '@/components/matches/match-card-new';
 import { LiveIndicator } from '@/components/matches/live-indicator';
-import { mockMatches } from '@/lib/mock-data';
+import { Spinner } from '@/components/ui/spinner';
+import { useLiveMatches } from '@/lib/hooks/use-matches';
 
 export function LiveMatchesSection() {
-  const liveMatches = mockMatches.filter(
-    (m) => m.status === 'live' || m.status === 'halftime'
-  );
+  const { matches: liveMatches, isLoading } = useLiveMatches();
+
+  if (isLoading) {
+    return (
+      <section className="mb-8">
+        <div className="flex h-32 items-center justify-center">
+          <Spinner className="h-6 w-6" />
+        </div>
+      </section>
+    );
+  }
 
   if (liveMatches.length === 0) {
     return null;
@@ -37,14 +46,7 @@ export function LiveMatchesSection() {
       <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-hide">
         {liveMatches.map((match) => (
           <div key={match.id} className="w-72 shrink-0">
-            <MatchCard
-              match={match}
-              odds={{
-                home: 1.5 + Math.random() * 2,
-                draw: 2.5 + Math.random() * 1.5,
-                away: 2 + Math.random() * 3,
-              }}
-            />
+            <MatchCardNew match={match} showSport />
           </div>
         ))}
       </div>

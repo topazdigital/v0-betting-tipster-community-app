@@ -1,11 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { 
   getMatchById, 
-  getH2H, 
-  getMatchStatistics, 
-  getMatchOdds,
   type UnifiedMatch 
-} from '@/lib/api/api-football';
+} from '@/lib/api/unified-sports-api';
 import { ALL_SPORTS, ALL_LEAGUES, TEAMS_DATABASE, getSportIcon, BOOKMAKERS } from '@/lib/sports-data';
 
 export const dynamic = 'force-dynamic';
@@ -170,28 +167,10 @@ export async function GET(request: NextRequest, context: RouteContext) {
     let statsData = null;
     let oddsData = null;
     
-    // Try to fetch from API-Football first
-    if (id.startsWith('af_')) {
+    // Try to fetch from unified sports API
+    if (!id.startsWith('fallback-')) {
       match = await getMatchById(id);
-      
-      if (match) {
-        // Fetch additional data in parallel
-        const [h2h, stats, odds] = await Promise.allSettled([
-          getH2H(match.homeTeam.id, match.awayTeam.id),
-          getMatchStatistics(id),
-          getMatchOdds(id),
-        ]);
-        
-        if (h2h.status === 'fulfilled' && h2h.value) {
-          h2hData = h2h.value;
-        }
-        if (stats.status === 'fulfilled' && stats.value) {
-          statsData = stats.value;
-        }
-        if (odds.status === 'fulfilled' && odds.value) {
-          oddsData = odds.value;
-        }
-      }
+      // H2H, stats, and odds will use fallback data for now
     }
     
     // Try fallback if no match found
