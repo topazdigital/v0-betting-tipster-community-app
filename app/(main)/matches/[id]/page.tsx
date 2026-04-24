@@ -100,6 +100,13 @@ interface MatchEvent {
   description?: string
   period?: number
 }
+interface SegmentBreakdown {
+  variant: 'quarters' | 'periods' | 'innings' | 'sets' | 'rounds' | 'generic'
+  labels: string[]
+  home: number[]
+  away: number[]
+  totals?: { home: number; away: number }
+}
 interface MatchDetails {
   match: {
     id: string
@@ -128,6 +135,7 @@ interface MatchDetails {
   news: NewsItem[]
   leaders: LeaderItem[]
   matchEvents: MatchEvent[]
+  segmentBreakdown: SegmentBreakdown | null
   hasRealOdds: boolean
   hasLineups: boolean
   hasStandings: boolean
@@ -473,6 +481,91 @@ function OddsProbBar({ home, draw, away }: { home: number; draw?: number; away: 
   )
 }
 
+// ---- Sport-specific score breakdown grid ----
+// Renders quarters / periods / innings / sets / rounds in a tight, readable grid.
+// One component handles every sport — labels and totals come from the API.
+function SegmentBreakdownGrid({
+  data,
+  homeName,
+  awayName,
+  homeLogo,
+  awayLogo,
+}: {
+  data: SegmentBreakdown
+  homeName: string
+  awayName: string
+  homeLogo?: string
+  awayLogo?: string
+}) {
+  if (!data || data.labels.length === 0) return null
+
+  const heading: Record<SegmentBreakdown['variant'], string> = {
+    quarters: 'Quarter-by-quarter',
+    periods: 'Period-by-period',
+    innings: 'Inning-by-inning',
+    sets: 'Set-by-set',
+    rounds: 'Round-by-round',
+    generic: 'Score by segment',
+  }
+
+  // Choose how to colour the winning side per segment (small visual cue).
+  const cellClass = (a: number, b: number) =>
+    a > b
+      ? 'text-emerald-600 dark:text-emerald-400 font-bold'
+      : a < b
+        ? 'text-muted-foreground'
+        : 'text-foreground font-medium'
+
+  return (
+    <div className="rounded-xl border border-border bg-card p-3 md:p-4">
+      <div className="mb-2 flex items-center justify-between">
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          {heading[data.variant]}
+        </h3>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[320px] text-center text-sm tabular-nums">
+          <thead>
+            <tr className="text-[11px] uppercase text-muted-foreground">
+              <th className="px-1.5 py-1 text-left font-medium">Team</th>
+              {data.labels.map((l) => (
+                <th key={l} className="px-1.5 py-1 font-medium">{l}</th>
+              ))}
+              <th className="px-1.5 py-1 font-semibold text-foreground">T</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr className="border-t border-border">
+              <td className="px-1.5 py-1.5 text-left">
+                <div className="flex items-center gap-2">
+                  {homeLogo ? <img src={homeLogo} alt="" className="h-4 w-4 rounded-sm object-contain" /> : null}
+                  <span className="truncate text-xs font-medium">{homeName}</span>
+                </div>
+              </td>
+              {data.home.map((v, i) => (
+                <td key={i} className={cn('px-1.5 py-1.5', cellClass(v, data.away[i] ?? 0))}>{v}</td>
+              ))}
+              <td className="px-1.5 py-1.5 text-base font-bold">{data.totals?.home ?? data.home.reduce((a, b) => a + b, 0)}</td>
+            </tr>
+            <tr className="border-t border-border">
+              <td className="px-1.5 py-1.5 text-left">
+                <div className="flex items-center gap-2">
+                  {awayLogo ? <img src={awayLogo} alt="" className="h-4 w-4 rounded-sm object-contain" /> : null}
+                  <span className="truncate text-xs font-medium">{awayName}</span>
+                </div>
+              </td>
+              {data.away.map((v, i) => (
+                <td key={i} className={cn('px-1.5 py-1.5', cellClass(v, data.home[i] ?? 0))}>{v}</td>
+              ))}
+              <td className="px-1.5 py-1.5 text-base font-bold">{data.totals?.away ?? data.away.reduce((a, b) => a + b, 0)}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
+
 // ---- Scorers inline display for hero ----
 function ScorersList({ events, side }: { events: MatchEvent[]; side: 'home' | 'away' }) {
   const goals = events.filter(e => e.side === side && (e.type === 'goal' || e.type === 'own_goal' || e.type === 'penalty_goal'))
@@ -542,7 +635,7 @@ export default function MatchDetailPage({ params }: PageProps) {
     )
   }
 
-  const { bookmakerOdds, lineups, h2h, standings, news, leaders, matchEvents, hasRealOdds } = data
+  const { bookmakerOdds, lineups, h2h, standings, news, leaders, matchEvents, segmentBreakdown, hasRealOdds } = data
   const sport = match.sport.slug
 
   return (
@@ -737,6 +830,23 @@ export default function MatchDetailPage({ params }: PageProps) {
             </div>
           )}
         </div>
+
+        {/* ─── SPORT-SPECIFIC SCORE BREAKDOWN ───
+            Quarter / inning / set / round grids. Only renders when ESPN
+            actually returned linescores (i.e. live or finished games). For
+            soccer we skip — there are no meaningful periods beyond HT/FT
+            which the hero already shows. */}
+        {segmentBreakdown && sport !== 'soccer' && segmentBreakdown.labels.length > 0 && (
+          <div className="mb-4">
+            <SegmentBreakdownGrid
+              data={segmentBreakdown}
+              homeName={match.homeTeam.name}
+              awayName={match.awayTeam.name}
+              homeLogo={match.homeTeam.logo}
+              awayLogo={match.awayTeam.logo}
+            />
+          </div>
+        )}
 
         {/* ─── TABS ─── */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">

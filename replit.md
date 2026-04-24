@@ -46,6 +46,30 @@ Wired in `lib/api/unified-sports-api.ts`:
 - `components/ui/team-logo.tsx` — team logos, sport icons, country flags
 - `scripts/setup-database.sql` — MySQL schema (includes lineup_type, tip confidence, is_premium, etc.)
 
+## AI Chat (`app/api/ai/chat/route.ts`)
+- OpenAI client is **lazy-init** in `getOpenAI()` so a missing key never throws.
+- Reads, in order: `AI_INTEGRATIONS_OPENAI_API_KEY` → `OPENAI_API_KEY`.
+- Base URL via `AI_INTEGRATIONS_OPENAI_BASE_URL` → `OPENAI_BASE_URL` (optional).
+- Model overridable via `OPENAI_MODEL` (default `gpt-5`).
+- When no provider is configured, the route returns a deterministic local
+  rules-based reply via `localReply()` instead of failing — chat keeps working.
+
+## Sport-Specific Score Breakdown
+- API: `app/api/matches/[id]/details/route.ts` exposes `segmentBreakdown`
+  built from ESPN competitor `linescores` (handles both `value` and
+  `displayValue`).
+- Variants: `quarters` (basketball, american-football), `periods` (hockey),
+  `innings` (baseball, cricket), `sets` (tennis, volleyball), `rounds`
+  (mma, boxing).
+- UI: `<SegmentBreakdownGrid />` in `app/(main)/matches/[id]/page.tsx`
+  renders one compact table for any sport. Skipped for soccer (no useful
+  segments beyond HT/FT shown in the hero).
+
+## Live Page
+- `getLiveMatches()` includes `live`, `halftime`, `extra_time`, `penalties`.
+- Empty state explains live-window timing and offers links to "all sports"
+  / upcoming matches.
+
 ## Match Detail Page Features (app/(main)/matches/[id]/page.tsx)
 8-tab layout:
 1. **Overview** — tip preview cards, match events, top performers, form, H2H summary

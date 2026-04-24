@@ -237,16 +237,7 @@ CREATE TABLE IF NOT EXISTS tips (
   INDEX idx_tip_premium (is_premium)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE IF NOT EXISTS ai_predictions (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  match_id INT NOT NULL UNIQUE,
-  prediction TEXT NOT NULL,
-  confidence TINYINT NOT NULL,
-  reasoning TEXT,
-  result VARCHAR(50),
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (match_id) REFERENCES matches(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+-- NOTE: ai_predictions is defined later (richer schema) — see bottom of file.
 
 -- ============================================
 -- Social Features

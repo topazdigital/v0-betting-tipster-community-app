@@ -192,6 +192,120 @@ function buildHeader(summary: ESPNSummaryResponse) {
   };
 }
 
+// ─── Sport-specific period / set / round / inning breakdown ──────────────────
+// ESPN exposes `linescores[].value` per competitor for every game segment.
+// Different sports have different segment counts and labels — basketball has
+// quarters (Q1..Q4 + OT), football has innings (T1..T9), hockey has periods
+// (P1..P3 + OT/SO), tennis has sets (S1..S5), MMA has rounds (R1..R5), etc.
+// We compute readable labels here so the UI can render a single grid widget
+// for any sport without conditional logic.
+// ESPN can use either `value` (number) or `displayValue` (string) on linescores.
+type LineScores = Array<{ value?: number; displayValue?: string }> | undefined;
+
+interface SportSegmentBreakdown {
+  variant: 'quarters' | 'periods' | 'innings' | 'sets' | 'rounds' | 'generic';
+  labels: string[];
+  home: number[];
+  away: number[];
+  totals?: { home: number; away: number };
+}
+
+function pickSegmentVariant(sportType: string): SportSegmentBreakdown['variant'] {
+  switch (sportType) {
+    case 'basketball':
+    case 'american-football':
+    case 'football': // ESPN sometimes labels American football "football"
+      return 'quarters';
+    case 'hockey':
+    case 'ice-hockey':
+      return 'periods';
+    case 'baseball':
+    case 'cricket':
+      return 'innings';
+    case 'tennis':
+    case 'volleyball':
+    case 'table-tennis':
+      return 'sets';
+    case 'mma':
+    case 'boxing':
+      return 'rounds';
+    default:
+      return 'generic';
+  }
+}
+
+function makeSegmentLabels(variant: SportSegmentBreakdown['variant'], n: number, sportType: string): string[] {
+  const labels: string[] = [];
+  for (let i = 0; i < n; i++) {
+    switch (variant) {
+      case 'quarters': {
+        // Basketball normally has 4 quarters then OT; American football is also 4 + OT.
+        if (i < 4) labels.push(`Q${i + 1}`);
+        else labels.push(n - i === 1 ? 'OT' : `OT${i - 3}`);
+        break;
+      }
+      case 'periods': {
+        if (i < 3) labels.push(`P${i + 1}`);
+        else labels.push(i === 3 ? 'OT' : 'SO');
+        break;
+      }
+      case 'innings': {
+        // Baseball regulation = 9 innings; cricket usually 2.
+        const max = sportType === 'cricket' ? 2 : 9;
+        if (i < max) labels.push(`${i + 1}`);
+        else labels.push(`${i + 1}`);
+        break;
+      }
+      case 'sets':
+        labels.push(`S${i + 1}`);
+        break;
+      case 'rounds':
+        labels.push(`R${i + 1}`);
+        break;
+      default:
+        labels.push(`${i + 1}`);
+    }
+  }
+  return labels;
+}
+
+function buildSegmentBreakdown(summary: ESPNSummaryResponse, sportType: string): SportSegmentBreakdown | null {
+  const competition = summary.header?.competitions?.[0];
+  if (!competition) return null;
+  const home = competition.competitors?.find(c => c.homeAway === 'home');
+  const away = competition.competitors?.find(c => c.homeAway === 'away');
+  const homeLs: LineScores = home?.linescores;
+  const awayLs: LineScores = away?.linescores;
+  if (!homeLs?.length && !awayLs?.length) return null;
+
+  const len = Math.max(homeLs?.length || 0, awayLs?.length || 0);
+  const variant = pickSegmentVariant(sportType);
+  const labels = makeSegmentLabels(variant, len, sportType);
+  const readVal = (ls: LineScores, i: number): number => {
+    const slot = ls?.[i];
+    if (!slot) return 0;
+    if (typeof slot.value === 'number') return slot.value;
+    if (slot.displayValue !== undefined) {
+      const n = Number(String(slot.displayValue).replace(/[^\d-]/g, ''));
+      return Number.isFinite(n) ? n : 0;
+    }
+    return 0;
+  };
+  const homeArr = Array.from({ length: len }, (_, i) => readVal(homeLs, i));
+  const awayArr = Array.from({ length: len }, (_, i) => readVal(awayLs, i));
+
+  const homeTotal = home?.score ? Number(home.score) : homeArr.reduce((a, b) => a + b, 0);
+  const awayTotal = away?.score ? Number(away.score) : awayArr.reduce((a, b) => a + b, 0);
+
+  return {
+    variant,
+    labels,
+    home: homeArr,
+    away: awayArr,
+    totals: { home: homeTotal, away: awayTotal },
+  };
+}
+
 function buildNews(summary: ESPNSummaryResponse) {
   if (!summary.news?.articles) return [];
   return summary.news.articles.slice(0, 8).map(a => ({
@@ -435,6 +549,7 @@ export async function GET(_request: NextRequest, context: RouteContext) {
     const homeComp = competition?.competitors?.find(c => c.homeAway === 'home');
     const awayComp = competition?.competitors?.find(c => c.homeAway === 'away');
     const matchEvents = summary ? buildMatchEvents(summary, homeComp?.team?.id, awayComp?.team?.id) : [];
+    const segmentBreakdown = summary ? buildSegmentBreakdown(summary, cfg?.sportType || 'soccer') : null;
 
     const venue =
       summary?.gameInfo?.venue?.fullName ||
@@ -492,6 +607,7 @@ export async function GET(_request: NextRequest, context: RouteContext) {
       news,
       leaders,
       matchEvents,
+      segmentBreakdown,
       hasRealOdds: !!realOdds,
       hasLineups: !!lineups,
       hasStandings: !!standings,

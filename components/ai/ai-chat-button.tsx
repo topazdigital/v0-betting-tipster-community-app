@@ -71,12 +71,25 @@ export function AIChatButton() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ messages: [...msgs, userMsg].map(({ role, content }) => ({ role, content })) }),
       })
-      const j = await res.json() as { reply?: string }
-      const reply = j.reply || "Sorry, I'm having trouble right now. Try again in a sec."
+      let reply = "I'm here — give me a second and try again."
+      try {
+        const j = (await res.json()) as { reply?: string }
+        if (j?.reply) reply = j.reply
+      } catch {
+        /* non-JSON response — keep default reply */
+      }
       setMsgs((m) => [...m, { role: "assistant", content: reply, ts: Date.now() }])
       if (!open) setUnread(true)
     } catch {
-      setMsgs((m) => [...m, { role: "assistant", content: "Network blip — please try again.", ts: Date.now() }])
+      setMsgs((m) => [
+        ...m,
+        {
+          role: "assistant",
+          content:
+            "Lost connection for a moment. Check your internet and tap send again — I'll pick up right where we left off.",
+          ts: Date.now(),
+        },
+      ])
     } finally {
       setBusy(false)
     }

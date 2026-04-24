@@ -181,10 +181,24 @@ export default function LivePage() {
               ))}
             </div>
           ) : (
-            <div className="flex h-64 flex-col items-center justify-center rounded-xl border border-dashed border-border">
-              <Radio className="mb-4 h-12 w-12 text-muted-foreground" />
-              <p className="text-lg font-medium">No live matches</p>
-              <p className="text-muted-foreground">Check back soon for live action</p>
+            <div className="flex h-72 flex-col items-center justify-center rounded-xl border border-dashed border-border px-6 text-center">
+              <Radio className="mb-3 h-10 w-10 text-muted-foreground" />
+              <p className="text-lg font-semibold">
+                {selectedSport ? "No live matches in this sport right now" : "Nothing live at this minute"}
+              </p>
+              <p className="mt-1 max-w-md text-sm text-muted-foreground">
+                Live games typically peak between 14:00 and 23:00 UTC. We poll the feeds every 20 seconds — anything that kicks off will pop up here automatically.
+              </p>
+              <div className="mt-4 flex gap-2">
+                {selectedSport && (
+                  <Button size="sm" variant="outline" onClick={() => setSelectedSport(null)}>
+                    See all sports
+                  </Button>
+                )}
+                <Button size="sm" asChild>
+                  <a href="/matches">Browse upcoming matches</a>
+                </Button>
+              </div>
             </div>
           )}
         </div>

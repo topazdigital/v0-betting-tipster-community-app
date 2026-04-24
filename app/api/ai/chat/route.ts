@@ -15,10 +15,32 @@ interface ChatRequestBody {
   context?: string; // optional match/team context the UI may attach
 }
 
-const openai = new OpenAI({
-  apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
-  baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
-});
+// Lazy-init the OpenAI client. We support several env-var names so the same
+// code works whether the deployment is using:
+//   • Replit AI Integrations (AI_INTEGRATIONS_OPENAI_*)
+//   • a plain OpenAI key (OPENAI_API_KEY)
+//   • a self-hosted OpenAI-compatible endpoint (OPENAI_BASE_URL)
+// If NO key is present we never construct the client and we just fall back to
+// the local rules-based replies — the chat keeps working either way.
+function getOpenAI(): OpenAI | null {
+  const apiKey =
+    process.env.AI_INTEGRATIONS_OPENAI_API_KEY ||
+    process.env.OPENAI_API_KEY;
+  if (!apiKey) return null;
+  const baseURL =
+    process.env.AI_INTEGRATIONS_OPENAI_BASE_URL ||
+    process.env.OPENAI_BASE_URL ||
+    undefined;
+  try {
+    return new OpenAI({ apiKey, baseURL });
+  } catch {
+    return null;
+  }
+}
+
+// Default model — overridable via env so swapping providers requires no code
+// changes (e.g. set OPENAI_MODEL=gpt-4o-mini when not using AI Integrations).
+const MODEL = process.env.OPENAI_MODEL || 'gpt-5';
 
 // ----- App-knowledge system prompt -----
 // Detailed, opinionated, structured. The LLM answers grounded in this app's
@@ -148,8 +170,15 @@ export async function POST(request: NextRequest) {
 
     const system = `${SYSTEM_BASE}\n\n${liveContext ? liveContext + '\n\n' : ''}${body.context ? `EXTRA CONTEXT FROM CURRENT PAGE:\n${body.context}\n\n` : ''}Answer the user now.`;
 
+    const openai = getOpenAI();
+    if (!openai) {
+      // No provider configured — return a deterministic local reply so the
+      // chat still feels responsive and never throws.
+      return NextResponse.json({ reply: localReply(lastUserText), source: 'fallback' });
+    }
+
     const completion = await openai.chat.completions.create({
-      model: 'gpt-5',
+      model: MODEL,
       messages: [
         { role: 'system', content: system },
         ...history.map((m) => ({ role: m.role, content: m.content })),

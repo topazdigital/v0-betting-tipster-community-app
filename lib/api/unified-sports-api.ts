@@ -1736,7 +1736,12 @@ export async function getMatchesByLeague(leagueId: number): Promise<UnifiedMatch
 
 export async function getLiveMatches(): Promise<UnifiedMatch[]> {
   const allMatches = await getAllMatches();
-  return allMatches.filter(m => m.status === 'live' || m.status === 'halftime');
+  return allMatches.filter(m =>
+    m.status === 'live' ||
+    m.status === 'halftime' ||
+    m.status === 'extra_time' ||
+    m.status === 'penalties'
+  );
 }
 
 export async function getUpcomingMatches(): Promise<UnifiedMatch[]> {
