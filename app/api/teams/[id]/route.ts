@@ -1,0 +1,173 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { getEspnLeagueConfigForId } from '@/lib/api/unified-sports-api';
+
+export const dynamic = 'force-dynamic';
+export const revalidate = 300;
+
+const ESPN_BASE = 'https://site.api.espn.com/apis/site/v2/sports';
+
+function parseTeamId(teamId: string): { sport: string; league: string; espnTeamId: string } | null {
+  const m = teamId.match(/^espn_([a-z0-9]+)_(\d+)$/i);
+  if (!m) return null;
+  const leagueSlug = m[1];
+  const espnTeamId = m[2];
+  const fake = `espn_${leagueSlug}_999999`;
+  const cfg = getEspnLeagueConfigForId(fake);
+  if (!cfg) return null;
+  return { sport: cfg.sport, league: cfg.league, espnTeamId };
+}
+
+async function fetchTeamInfo(sport: string, league: string, teamId: string) {
+  const url = `${ESPN_BASE}/${sport}/${league}/teams/${teamId}`;
+  try {
+    const r = await fetch(url, { headers: { Accept: 'application/json' }, next: { revalidate: 300 } });
+    if (!r.ok) return null;
+    return await r.json();
+  } catch { return null; }
+}
+
+async function fetchTeamSchedule(sport: string, league: string, teamId: string) {
+  const url = `${ESPN_BASE}/${sport}/${league}/teams/${teamId}/schedule`;
+  try {
+    const r = await fetch(url, { headers: { Accept: 'application/json' }, next: { revalidate: 300 } });
+    if (!r.ok) return null;
+    return await r.json();
+  } catch { return null; }
+}
+
+function mapStatus(state: string, completed: boolean): string {
+  if (state === 'in') return 'live';
+  if (completed || state === 'post') return 'finished';
+  return 'scheduled';
+}
+
+export async function GET(
+  _request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
+  const parsed = parseTeamId(id);
+  if (!parsed) {
+    return NextResponse.json({ error: 'Invalid team ID format' }, { status: 400 });
+  }
+
+  const { sport, league, espnTeamId } = parsed;
+
+  const [teamData, scheduleData] = await Promise.all([
+    fetchTeamInfo(sport, league, espnTeamId),
+    fetchTeamSchedule(sport, league, espnTeamId),
+  ]);
+
+  if (!teamData?.team) {
+    return NextResponse.json({ error: 'Team not found' }, { status: 404 });
+  }
+
+  const t = teamData.team;
+  const team = {
+    id: t.id,
+    name: t.displayName || t.name,
+    shortName: t.abbreviation,
+    nickname: t.nickname || t.shortDisplayName,
+    logo: t.logos?.[0]?.href,
+    color: t.color ? `#${t.color}` : undefined,
+    alternateColor: t.alternateColor ? `#${t.alternateColor}` : undefined,
+    location: t.location,
+    venue: t.franchise?.venue?.fullName || t.venue?.fullName,
+    venueCity: t.franchise?.venue?.address?.city || t.venue?.address?.city,
+    founded: t.franchise?.yearFounded,
+    record: t.record?.items?.find((r: { type?: string }) => r.type === 'total')?.summary,
+    standing: {
+      position: t.standingSummary,
+    },
+    links: {
+      espn: t.links?.find((l: { rel?: string[] }) => l.rel?.includes('clubhouse'))?.href,
+    },
+  };
+
+  const events = (scheduleData?.events || []).map((ev: {
+    id: string;
+    date: string;
+    name?: string;
+    shortName?: string;
+    status?: { type?: { state?: string; completed?: boolean } };
+    competitions?: Array<{
+      competitors?: Array<{
+        homeAway: string;
+        team?: { id: string; displayName?: string; abbreviation?: string; logo?: string };
+        score?: string;
+        winner?: boolean;
+        records?: Array<{ type?: string; summary?: string }>;
+      }>;
+      odds?: Array<{
+        details?: string;
+        moneyline?: { home?: { close?: { odds?: string } }; away?: { close?: { odds?: string } }; draw?: { close?: { odds?: string } } };
+        homeTeamOdds?: { moneyLine?: number };
+        awayTeamOdds?: { moneyLine?: number };
+        drawOdds?: { moneyLine?: number };
+        provider?: { displayName?: string };
+      }>;
+      venue?: { fullName?: string };
+    }>;
+  }) => {
+    const comp = ev.competitions?.[0];
+    const home = comp?.competitors?.find(c => c.homeAway === 'home');
+    const away = comp?.competitors?.find(c => c.homeAway === 'away');
+    const statusState = ev.status?.type?.state || 'pre';
+    const statusCompleted = ev.status?.type?.completed || false;
+    const isHome = home?.team?.id === espnTeamId;
+    const opponent = isHome ? away : home;
+    const teamComp = isHome ? home : away;
+    const opponentComp = isHome ? away : home;
+
+    // Extract odds
+    const rawOdds = comp?.odds?.[0];
+    let odds: { home?: number; draw?: number; away?: number } | undefined;
+    if (rawOdds) {
+      const parseAmerican = (v?: string | number) => {
+        if (v === undefined || v === null || v === '') return undefined;
+        const n = typeof v === 'string' ? parseFloat(v.replace(/[^\d.\-+]/g, '')) : v;
+        if (!isFinite(n) || n === 0) return undefined;
+        const d = n > 0 ? 1 + n / 100 : 1 + 100 / Math.abs(n);
+        return Math.round(d * 100) / 100;
+      };
+      const h = parseAmerican(rawOdds.moneyline?.home?.close?.odds ?? rawOdds.homeTeamOdds?.moneyLine);
+      const a = parseAmerican(rawOdds.moneyline?.away?.close?.odds ?? rawOdds.awayTeamOdds?.moneyLine);
+      const d = parseAmerican(rawOdds.moneyline?.draw?.close?.odds ?? rawOdds.drawOdds?.moneyLine);
+      if (h && a) odds = { home: h, away: a, draw: d };
+    }
+
+    return {
+      id: ev.id,
+      date: ev.date,
+      name: ev.shortName || ev.name,
+      status: mapStatus(statusState, statusCompleted),
+      isHome,
+      opponent: opponent?.team ? {
+        id: opponent.team.id,
+        name: opponent.team.displayName,
+        shortName: opponent.team.abbreviation,
+        logo: opponent.team.logo,
+      } : null,
+      score: teamComp?.score !== undefined && opponentComp?.score !== undefined ? {
+        team: parseInt(teamComp.score, 10),
+        opponent: parseInt(opponentComp.score || '0', 10),
+      } : null,
+      result: statusCompleted && teamComp?.winner !== undefined
+        ? (teamComp.winner ? 'W' : opponentComp?.winner ? 'L' : 'D')
+        : null,
+      venue: comp?.venue?.fullName,
+      odds: isHome ? odds : odds ? { home: odds.away, draw: odds.draw, away: odds.home } : undefined,
+    };
+  });
+
+  const past = events.filter((e: { status: string }) => e.status === 'finished').slice(-10).reverse();
+  const upcoming = events.filter((e: { status: string }) => e.status === 'scheduled' || e.status === 'live').slice(0, 10);
+
+  return NextResponse.json({
+    team,
+    past,
+    upcoming,
+    league: { sport, league },
+    timestamp: new Date().toISOString(),
+  });
+}

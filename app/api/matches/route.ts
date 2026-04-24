@@ -71,8 +71,8 @@ export interface MatchData {
   id: string;
   sportId: number;
   leagueId: number;
-  homeTeam: { id: number | string; name: string; shortName: string; logo?: string };
-  awayTeam: { id: number | string; name: string; shortName: string; logo?: string };
+  homeTeam: { id: number | string; name: string; shortName: string; logo?: string; form?: string; record?: string };
+  awayTeam: { id: number | string; name: string; shortName: string; logo?: string; form?: string; record?: string };
   kickoffTime: string;
   status: 'scheduled' | 'live' | 'halftime' | 'finished' | 'postponed' | 'cancelled' | 'extra_time' | 'penalties';
   homeScore: number | null;
@@ -111,12 +111,16 @@ function convertToMatchData(match: UnifiedMatch): MatchData {
       name: match.homeTeam.name,
       shortName: match.homeTeam.shortName,
       logo: match.homeTeam.logo,
+      form: match.homeTeam.form,
+      record: match.homeTeam.record,
     },
     awayTeam: {
       id: match.awayTeam.id,
       name: match.awayTeam.name,
       shortName: match.awayTeam.shortName,
       logo: match.awayTeam.logo,
+      form: match.awayTeam.form,
+      record: match.awayTeam.record,
     },
     kickoffTime: new Date(match.kickoffTime).toISOString(),
     status: match.status as MatchData['status'],

@@ -456,11 +456,16 @@ export async function GET(_request: NextRequest, context: RouteContext) {
           ...match.homeTeam,
           form: header?.home?.form,
           record: header?.home?.record,
+          // espnId used to build team profile URL
+          espnTeamId: match.homeTeam.id,
+          leagueSlug: cfg?.league?.replace(/[^a-z0-9]/gi, '') || '',
         },
         awayTeam: {
           ...match.awayTeam,
           form: header?.away?.form,
           record: header?.away?.record,
+          espnTeamId: match.awayTeam.id,
+          leagueSlug: cfg?.league?.replace(/[^a-z0-9]/gi, '') || '',
         },
         kickoffTime: new Date(match.kickoffTime).toISOString(),
         status: match.status,

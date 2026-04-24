@@ -17,12 +17,16 @@ interface Match {
     name: string;
     shortName: string;
     logo?: string;
+    form?: string;
+    record?: string;
   };
   awayTeam: {
     id: number | string;
     name: string;
     shortName: string;
     logo?: string;
+    form?: string;
+    record?: string;
   };
   kickoffTime: string | Date;
   status: string;
@@ -223,13 +227,18 @@ export function MatchCardNew({
           <div className="flex items-center justify-between gap-3">
             <div className="flex min-w-0 flex-1 items-center gap-2">
               <TeamLogo teamName={match.homeTeam.name} size="sm" />
-              <span className={cn(
-                'truncate text-sm font-semibold',
-                isFinished && match.homeScore !== null && match.awayScore !== null && 
-                match.homeScore > match.awayScore && 'text-success'
-              )}>
-                {match.homeTeam.name}
-              </span>
+              <div className="min-w-0 flex-1">
+                <span className={cn(
+                  'block truncate text-sm font-semibold',
+                  isFinished && match.homeScore !== null && match.awayScore !== null && 
+                  match.homeScore > match.awayScore && 'text-success'
+                )}>
+                  {match.homeTeam.name}
+                </span>
+                {match.homeTeam.form && !isLive && !isFinished && (
+                  <FormDots form={match.homeTeam.form} />
+                )}
+              </div>
             </div>
             {(isLive || isFinished) && match.homeScore !== null && (
               <span className={cn(
@@ -245,13 +254,18 @@ export function MatchCardNew({
           <div className="flex items-center justify-between gap-3">
             <div className="flex min-w-0 flex-1 items-center gap-2">
               <TeamLogo teamName={match.awayTeam.name} size="sm" />
-              <span className={cn(
-                'truncate text-sm font-semibold',
-                isFinished && match.homeScore !== null && match.awayScore !== null && 
-                match.awayScore > match.homeScore && 'text-success'
-              )}>
-                {match.awayTeam.name}
-              </span>
+              <div className="min-w-0 flex-1">
+                <span className={cn(
+                  'block truncate text-sm font-semibold',
+                  isFinished && match.homeScore !== null && match.awayScore !== null && 
+                  match.awayScore > match.homeScore && 'text-success'
+                )}>
+                  {match.awayTeam.name}
+                </span>
+                {match.awayTeam.form && !isLive && !isFinished && (
+                  <FormDots form={match.awayTeam.form} />
+                )}
+              </div>
             </div>
             {(isLive || isFinished) && match.awayScore !== null && (
               <span className={cn(
@@ -281,6 +295,25 @@ export function MatchCardNew({
           View details
         </Link>
       </div>
+    </div>
+  );
+}
+
+// Form Dots Component — shows last 5 results as tiny colored dots
+function FormDots({ form }: { form: string }) {
+  const results = form.split('').slice(-5);
+  return (
+    <div className="mt-0.5 flex items-center gap-0.5">
+      {results.map((r, i) => (
+        <span
+          key={i}
+          title={r === 'W' ? 'Win' : r === 'D' ? 'Draw' : 'Loss'}
+          className={cn(
+            'inline-block h-1.5 w-1.5 rounded-full',
+            r === 'W' ? 'bg-green-500' : r === 'D' ? 'bg-yellow-500' : 'bg-red-500'
+          )}
+        />
+      ))}
     </div>
   );
 }

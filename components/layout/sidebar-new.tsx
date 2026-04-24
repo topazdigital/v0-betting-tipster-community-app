@@ -17,6 +17,7 @@ import {
 import { cn } from '@/lib/utils';
 import { ALL_SPORTS, ALL_LEAGUES, BOOKMAKERS, getSportIcon } from '@/lib/sports-data';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { useMatchStats } from '@/lib/hooks/use-matches';
 
 interface SidebarNewProps {
   selectedSportId?: number | null;
@@ -26,6 +27,7 @@ interface SidebarNewProps {
 export function SidebarNew({ selectedSportId, onSelectSport }: SidebarNewProps) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const stats = useMatchStats();
 
   // Group sports by category
   const popularSports = ALL_SPORTS.filter(s => s.category === 'popular');
@@ -52,15 +54,19 @@ export function SidebarNew({ selectedSportId, onSelectSport }: SidebarNewProps) 
             >
               <Flame className="mx-auto h-5 w-5 text-live" />
               <div className="mt-1 text-sm font-semibold text-live">Live</div>
-              <div className="text-xs text-muted-foreground">12 matches</div>
+              <div className="text-xs text-muted-foreground">
+                {stats.live > 0 ? `${stats.live} matches` : 'No live'}
+              </div>
             </Link>
             <Link 
               href="/leaderboard"
               className="rounded-lg bg-primary/10 p-3 text-center transition-colors hover:bg-primary/20"
             >
               <TrendingUp className="mx-auto h-5 w-5 text-primary" />
-              <div className="mt-1 text-sm font-semibold text-primary">Hot Tips</div>
-              <div className="text-xs text-muted-foreground">156 today</div>
+              <div className="mt-1 text-sm font-semibold text-primary">Today</div>
+              <div className="text-xs text-muted-foreground">
+                {stats.today > 0 ? `${stats.today} matches` : 'No matches'}
+              </div>
             </Link>
           </div>
 

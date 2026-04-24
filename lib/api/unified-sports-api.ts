@@ -22,12 +22,16 @@ export interface UnifiedMatch {
     name: string;
     shortName: string;
     logo?: string;
+    form?: string;
+    record?: string;
   };
   awayTeam: {
     id: string;
     name: string;
     shortName: string;
     logo?: string;
+    form?: string;
+    record?: string;
   };
   kickoffTime: Date;
   status: 'scheduled' | 'live' | 'halftime' | 'finished' | 'postponed' | 'cancelled';
@@ -366,6 +370,8 @@ interface ESPNEvent {
       };
       homeAway: 'home' | 'away';
       score?: string;
+      form?: string;
+      records?: Array<{ summary?: string; type?: string }>;
       statistics?: Array<{
         name: string;
         displayValue: string;
@@ -453,8 +459,22 @@ interface ESPNOddsRaw {
   homeTeamOdds?: { moneyLine?: number; spreadOdds?: number; favorite?: boolean; team?: { id?: string } };
   awayTeamOdds?: { moneyLine?: number; spreadOdds?: number; favorite?: boolean; team?: { id?: string } };
   total?: {
-    over?: { close?: { odds?: string }, open?: { odds?: string } };
-    under?: { close?: { odds?: string }, open?: { odds?: string } };
+    over?: { close?: { odds?: string; line?: string }, open?: { odds?: string; line?: string } };
+    under?: { close?: { odds?: string; line?: string }, open?: { odds?: string; line?: string } };
+  };
+  // New ESPN scoreboard format (2024+)
+  moneyline?: {
+    displayName?: string;
+    shortDisplayName?: string;
+    home?: { open?: { odds?: string }; close?: { odds?: string } };
+    away?: { open?: { odds?: string }; close?: { odds?: string } };
+    draw?: { open?: { odds?: string }; close?: { odds?: string } };
+  };
+  pointSpread?: {
+    displayName?: string;
+    shortDisplayName?: string;
+    home?: { open?: { line?: string; odds?: string }; close?: { line?: string; odds?: string } };
+    away?: { open?: { line?: string; odds?: string }; close?: { line?: string; odds?: string } };
   };
 }
 
@@ -464,13 +484,24 @@ interface ESPNScoreboardResponseFull extends ESPNScoreboardResponse {
 
 export function extractEspnOdds(rawOddsList: ESPNOddsRaw[] | undefined, hasDraw: boolean = true): { odds?: MatchOdds; markets?: Market[] } {
   if (!rawOddsList || rawOddsList.length === 0) return {};
-  // Pick first non-empty provider
-  const o = rawOddsList.find(x => x.homeTeamOdds?.moneyLine !== undefined || x.awayTeamOdds?.moneyLine !== undefined) || rawOddsList[0];
+
+  // Try to find provider with moneyline data — support BOTH ESPN formats:
+  // Old: homeTeamOdds.moneyLine (number)
+  // New (2024+): moneyline.home.close.odds (string like "+180")
+  const o = rawOddsList.find(x =>
+    x.homeTeamOdds?.moneyLine !== undefined ||
+    x.awayTeamOdds?.moneyLine !== undefined ||
+    x.moneyline?.home?.close?.odds !== undefined ||
+    x.moneyline?.away?.close?.odds !== undefined
+  ) || rawOddsList[0];
   if (!o) return {};
 
-  const home = americanToDecimal(o.homeTeamOdds?.moneyLine);
-  const away = americanToDecimal(o.awayTeamOdds?.moneyLine);
-  const draw = hasDraw ? americanToDecimal(o.drawOdds?.moneyLine) : undefined;
+  // Extract moneyline: prefer new format, fallback to old
+  const home = americanToDecimal(o.moneyline?.home?.close?.odds ?? o.homeTeamOdds?.moneyLine);
+  const away = americanToDecimal(o.moneyline?.away?.close?.odds ?? o.awayTeamOdds?.moneyLine);
+  const draw = hasDraw
+    ? americanToDecimal(o.moneyline?.draw?.close?.odds ?? o.drawOdds?.moneyLine)
+    : undefined;
 
   if (!home || !away) return {};
 
@@ -478,7 +509,7 @@ export function extractEspnOdds(rawOddsList: ESPNOddsRaw[] | undefined, hasDraw:
     home,
     away,
     draw,
-    bookmaker: o.provider?.displayName || o.provider?.name || 'Bookmaker',
+    bookmaker: o.provider?.displayName || o.provider?.name || 'DraftKings',
     lastUpdate: new Date(),
   };
 
@@ -492,8 +523,22 @@ export function extractEspnOdds(rawOddsList: ESPNOddsRaw[] | undefined, hasDraw:
     ],
   }];
 
-  // Spread / handicap
-  if (o.spread !== undefined && o.homeTeamOdds?.spreadOdds !== undefined) {
+  // Spread / handicap — support new format (pointSpread) and old (homeTeamOdds.spreadOdds)
+  if (o.pointSpread?.home?.close?.odds && o.pointSpread?.away?.close?.odds) {
+    const homeSpread = americanToDecimal(o.pointSpread.home.close.odds);
+    const awaySpread = americanToDecimal(o.pointSpread.away.close.odds);
+    const spreadLine = parseFloat(o.pointSpread.home.close.line || '0');
+    if (homeSpread && awaySpread) {
+      markets.push({
+        key: 'spreads',
+        name: 'Handicap',
+        outcomes: [
+          { name: 'Home', price: homeSpread, point: spreadLine },
+          { name: 'Away', price: awaySpread, point: -spreadLine },
+        ],
+      });
+    }
+  } else if (o.spread !== undefined && o.homeTeamOdds?.spreadOdds !== undefined) {
     const homeSpread = americanToDecimal(o.homeTeamOdds.spreadOdds);
     const awaySpread = americanToDecimal(o.awayTeamOdds?.spreadOdds);
     if (homeSpread && awaySpread) {
@@ -1079,12 +1124,16 @@ async function getESPNMatches(config: ESPNLeagueConfig): Promise<UnifiedMatch[]>
         name: homeTeamName,
         shortName: homeCompetitor?.team?.abbreviation || homeCompetitor?.athlete?.shortName || 'TBD',
         logo: homeCompetitor?.team?.logo,
+        form: homeCompetitor?.form || undefined,
+        record: homeCompetitor?.records?.find(r => r.type === 'total' || !r.type)?.summary || undefined,
       },
       awayTeam: {
         id: awayCompetitor?.team?.id || awayCompetitor?.athlete?.id || '',
         name: awayTeamName,
         shortName: awayCompetitor?.team?.abbreviation || awayCompetitor?.athlete?.shortName || 'TBD',
         logo: awayCompetitor?.team?.logo,
+        form: awayCompetitor?.form || undefined,
+        record: awayCompetitor?.records?.find(r => r.type === 'total' || !r.type)?.summary || undefined,
       },
       kickoffTime: new Date(event.date),
       status,

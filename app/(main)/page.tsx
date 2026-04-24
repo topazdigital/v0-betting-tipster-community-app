@@ -118,11 +118,11 @@ export default function HomePage() {
                 {/* Quick Stats */}
                 <div className="mt-8 grid grid-cols-4 gap-4">
                   <div className="text-center">
-                    <div className="text-2xl font-bold text-foreground">{stats.live || 12}</div>
+                    <div className="text-2xl font-bold text-foreground">{stats.live ?? 0}</div>
                     <div className="text-xs text-muted-foreground">Live Now</div>
                   </div>
                   <div className="text-center">
-                    <div className="text-2xl font-bold text-foreground">{stats.today || 156}</div>
+                    <div className="text-2xl font-bold text-foreground">{stats.today ?? 0}</div>
                     <div className="text-xs text-muted-foreground">Today</div>
                   </div>
                   <div className="text-center">

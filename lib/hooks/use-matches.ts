@@ -13,12 +13,16 @@ export interface Match {
     name: string;
     shortName: string;
     logo?: string;
+    form?: string;
+    record?: string;
   };
   awayTeam: {
     id: number | string;
     name: string;
     shortName: string;
     logo?: string;
+    form?: string;
+    record?: string;
   };
   kickoffTime: string | Date;
   status: 'scheduled' | 'live' | 'halftime' | 'finished' | 'postponed' | 'cancelled' | 'extra_time' | 'penalties' | string;

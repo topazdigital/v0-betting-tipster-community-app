@@ -100,8 +100,8 @@ interface MatchEvent {
 interface MatchDetails {
   match: {
     id: string
-    homeTeam: { name: string; logo?: string; form?: string; record?: string }
-    awayTeam: { name: string; logo?: string; form?: string; record?: string }
+    homeTeam: { name: string; logo?: string; form?: string; record?: string; espnTeamId?: string; leagueSlug?: string }
+    awayTeam: { name: string; logo?: string; form?: string; record?: string; espnTeamId?: string; leagueSlug?: string }
     kickoffTime: string
     status: string
     homeScore: number | null
@@ -568,7 +568,17 @@ export default function MatchDetailPage({ params }: PageProps) {
                 <div className="mb-3">
                   <TeamLogo teamName={match.homeTeam.name} logoUrl={match.homeTeam.logo} size="lg" />
                 </div>
-                <p className="text-base md:text-lg font-bold text-white line-clamp-2">{match.homeTeam.name}</p>
+                {match.homeTeam.espnTeamId && match.homeTeam.leagueSlug ? (
+                  <Link
+                    href={`/teams/espn_${match.homeTeam.leagueSlug}_${match.homeTeam.espnTeamId}`}
+                    className="text-base md:text-lg font-bold text-white line-clamp-2 hover:text-white/80 hover:underline"
+                    onClick={e => e.stopPropagation()}
+                  >
+                    {match.homeTeam.name}
+                  </Link>
+                ) : (
+                  <p className="text-base md:text-lg font-bold text-white line-clamp-2">{match.homeTeam.name}</p>
+                )}
                 {match.homeTeam.record && (
                   <p className="mt-0.5 text-xs text-white/40">{match.homeTeam.record}</p>
                 )}
@@ -622,7 +632,17 @@ export default function MatchDetailPage({ params }: PageProps) {
                 <div className="mb-3">
                   <TeamLogo teamName={match.awayTeam.name} logoUrl={match.awayTeam.logo} size="lg" />
                 </div>
-                <p className="text-base md:text-lg font-bold text-white line-clamp-2">{match.awayTeam.name}</p>
+                {match.awayTeam.espnTeamId && match.awayTeam.leagueSlug ? (
+                  <Link
+                    href={`/teams/espn_${match.awayTeam.leagueSlug}_${match.awayTeam.espnTeamId}`}
+                    className="text-base md:text-lg font-bold text-white line-clamp-2 hover:text-white/80 hover:underline"
+                    onClick={e => e.stopPropagation()}
+                  >
+                    {match.awayTeam.name}
+                  </Link>
+                ) : (
+                  <p className="text-base md:text-lg font-bold text-white line-clamp-2">{match.awayTeam.name}</p>
+                )}
                 {match.awayTeam.record && (
                   <p className="mt-0.5 text-xs text-white/40">{match.awayTeam.record}</p>
                 )}
@@ -1227,7 +1247,17 @@ export default function MatchDetailPage({ params }: PageProps) {
                                 <td className="px-3 py-2.5">
                                   <div className="flex items-center gap-2">
                                     <TeamLogo teamName={r.teamName || ''} logoUrl={r.teamLogo} size="sm" />
-                                    <span className={cn("truncate", isCurrent && "font-bold text-primary")}>{r.teamName}</span>
+                                    {r.teamId && match.homeTeam.leagueSlug ? (
+                                      <Link
+                                        href={`/teams/espn_${match.homeTeam.leagueSlug}_${r.teamId}`}
+                                        className={cn("truncate hover:underline", isCurrent ? "font-bold text-primary" : "hover:text-foreground")}
+                                        onClick={e => e.stopPropagation()}
+                                      >
+                                        {r.teamName}
+                                      </Link>
+                                    ) : (
+                                      <span className={cn("truncate", isCurrent && "font-bold text-primary")}>{r.teamName}</span>
+                                    )}
                                   </div>
                                 </td>
                                 <td className="px-3 py-2.5 text-center">{r.played}</td>
