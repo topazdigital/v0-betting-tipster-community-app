@@ -9,7 +9,9 @@ import {
   Trophy, BarChart3, Shirt, Newspaper, MapPin, Tv,
   TrendingUp, Award, ChevronUp, ChevronDown, Minus,
   Users, Zap, AlertTriangle, RotateCcw, Target,
+  Star, ThumbsUp, ThumbsDown, MessageCircle, Lock, ChevronRight,
 } from "lucide-react"
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -130,9 +132,42 @@ interface MatchDetails {
   hasEvents: boolean
 }
 
-const fetcher = async (url: string): Promise<MatchDetails> => {
+interface TipsterInfo {
+  id: string
+  displayName: string
+  totalTips: number
+  wonTips: number
+  winRate: number
+  roi: number
+  streak: number
+  rank: number
+  isPremium: boolean
+  monthlyPrice: number
+  followers: number
+  verified: boolean
+}
+interface MatchTip {
+  id: string
+  matchId: string
+  prediction: string
+  market: string
+  odds: number
+  stake: number
+  confidence: number
+  analysis: string
+  isPremium: boolean
+  status: string
+  likes: number
+  dislikes: number
+  comments: number
+  createdAt: string
+  tipster: TipsterInfo
+}
+interface TipsData { tips: MatchTip[]; total: number }
+
+const fetcher = async (url: string) => {
   const res = await fetch(url)
-  if (!res.ok) throw new Error('Failed to fetch match')
+  if (!res.ok) throw new Error('Failed to fetch')
   return res.json()
 }
 
@@ -432,6 +467,13 @@ export default function MatchDetailPage({ params }: PageProps) {
     { refreshInterval: 20000 }
   )
 
+  const match0 = data?.match
+  const tipsUrl = match0
+    ? `/api/matches/${encodeURIComponent(id)}/tips?home=${encodeURIComponent(match0.homeTeam.name)}&away=${encodeURIComponent(match0.awayTeam.name)}`
+    : null
+  const { data: tipsData } = useSWR<TipsData>(tipsUrl, fetcher)
+  const tips = tipsData?.tips || []
+
   const match = data?.match
   const isLive = match && (match.status === 'live' || match.status === 'halftime' || match.status === 'extra_time' || match.status === 'penalties')
   const isFinished = match?.status === 'finished'
@@ -642,6 +684,13 @@ export default function MatchDetailPage({ params }: PageProps) {
             <TabsTrigger value="overview" className="flex-1 text-xs md:text-sm rounded-lg">
               <BarChart3 className="mr-1 h-3.5 w-3.5 hidden sm:inline" />Overview
             </TabsTrigger>
+            <TabsTrigger value="tips" className="flex-1 text-xs md:text-sm rounded-lg relative">
+              <Star className="mr-1 h-3.5 w-3.5 hidden sm:inline text-amber-400" />
+              Tips
+              {tips.length > 0 && (
+                <span className="ml-1 rounded-full bg-amber-500 px-1.5 py-0 text-[9px] font-bold text-white leading-4">{tips.length}</span>
+              )}
+            </TabsTrigger>
             <TabsTrigger value="events" className="flex-1 text-xs md:text-sm rounded-lg relative">
               <Zap className="mr-1 h-3.5 w-3.5 hidden sm:inline" />Events
               {isLive && <span className="absolute -top-1 -right-1 h-2 w-2 rounded-full bg-rose-500 animate-pulse" />}
@@ -665,6 +714,53 @@ export default function MatchDetailPage({ params }: PageProps) {
 
           {/* ══ OVERVIEW ══ */}
           <TabsContent value="overview" className="mt-0 space-y-4">
+            {/* Tips Preview */}
+            {tips.length > 0 && (
+              <Card className="overflow-hidden border-amber-500/20">
+                <div className="flex items-center justify-between px-4 pt-4 pb-3 bg-gradient-to-r from-amber-500/10 to-transparent">
+                  <h3 className="flex items-center gap-2 text-sm font-bold">
+                    <Star className="h-4 w-4 text-amber-400 fill-amber-400" />
+                    Expert Tips
+                    <Badge className="bg-amber-500/20 text-amber-600 border-amber-500/30 text-[10px]">{tips.length} predictions</Badge>
+                  </h3>
+                  <Button variant="ghost" size="sm" className="text-xs h-7 text-amber-600 hover:text-amber-700" onClick={() => setActiveTab('tips')}>
+                    View all <ChevronRight className="h-3 w-3 ml-0.5" />
+                  </Button>
+                </div>
+                <CardContent className="p-3 space-y-2">
+                  {tips.slice(0, 2).map((tip, i) => (
+                    <div key={i} className="flex items-center gap-3 rounded-xl border border-border/40 bg-muted/30 px-3 py-2.5">
+                      <Avatar className="h-8 w-8 shrink-0">
+                        <AvatarFallback className="text-xs font-bold bg-primary/10 text-primary">
+                          {tip.tipster.displayName.slice(0, 2).toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="text-xs font-semibold">{tip.tipster.displayName}</span>
+                          {tip.tipster.isPremium && <Badge className="h-4 text-[9px] bg-amber-500/20 text-amber-600 border-0">PRO</Badge>}
+                          <span className="text-[10px] text-muted-foreground">• {tip.tipster.winRate}% win rate</span>
+                        </div>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <span className="text-sm font-bold text-primary">{tip.prediction}</span>
+                          <span className="text-xs text-muted-foreground">@ {tip.odds.toFixed(2)}</span>
+                        </div>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <div className="text-xs font-bold text-emerald-500">{tip.confidence}%</div>
+                        <div className="text-[9px] text-muted-foreground">confident</div>
+                      </div>
+                    </div>
+                  ))}
+                  {tips.length > 2 && (
+                    <button onClick={() => setActiveTab('tips')} className="w-full py-2 text-xs text-amber-600 hover:text-amber-700 font-medium text-center rounded-lg hover:bg-amber-50 dark:hover:bg-amber-900/10 transition-colors">
+                      +{tips.length - 2} more tips →
+                    </button>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
             {/* Match summary events preview */}
             {matchEvents.length > 0 && (
               <Card className="overflow-hidden">
@@ -784,6 +880,64 @@ export default function MatchDetailPage({ params }: PageProps) {
                 </CardContent>
               </Card>
             )}
+          </TabsContent>
+
+          {/* ══ TIPS ══ */}
+          <TabsContent value="tips" className="mt-0 space-y-4">
+            {/* Tips Header Stats */}
+            {tips.length > 0 && (
+              <div className="grid grid-cols-3 gap-3">
+                <div className="rounded-xl border border-border/40 bg-card p-3 text-center">
+                  <div className="text-2xl font-black text-foreground">{tips.length}</div>
+                  <div className="text-[10px] text-muted-foreground mt-0.5">Total Tips</div>
+                </div>
+                <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-3 text-center">
+                  <div className="text-2xl font-black text-emerald-500">
+                    {Math.round(tips.reduce((s, t) => s + t.confidence, 0) / tips.length)}%
+                  </div>
+                  <div className="text-[10px] text-muted-foreground mt-0.5">Avg Confidence</div>
+                </div>
+                <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-3 text-center">
+                  <div className="text-2xl font-black text-amber-500">
+                    {(tips.reduce((s, t) => s + t.odds, 0) / tips.length).toFixed(2)}
+                  </div>
+                  <div className="text-[10px] text-muted-foreground mt-0.5">Avg Odds</div>
+                </div>
+              </div>
+            )}
+
+            {/* Tips List */}
+            {tips.length > 0 ? (
+              <div className="space-y-3">
+                {tips.map((tip) => (
+                  <TipCard key={tip.id} tip={tip} />
+                ))}
+              </div>
+            ) : (
+              <Card>
+                <CardContent className="py-16 text-center">
+                  <Star className="h-12 w-12 mx-auto mb-3 text-amber-400/30" />
+                  <p className="font-semibold text-lg">No tips yet for this match</p>
+                  <p className="text-sm mt-1 text-muted-foreground">Be the first tipster to add a prediction.</p>
+                  <Button asChild className="mt-5">
+                    <Link href="/register">Join & Add a Tip</Link>
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Add Tip CTA */}
+            <Card className="border-dashed border-2 border-primary/20 bg-primary/3">
+              <CardContent className="p-5 flex flex-col sm:flex-row items-center gap-4">
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold">Share your prediction</p>
+                  <p className="text-sm text-muted-foreground mt-0.5">Build your tipster record and get followers by posting accurate tips.</p>
+                </div>
+                <Button asChild size="sm" className="shrink-0">
+                  <Link href="/register">Add Your Tip</Link>
+                </Button>
+              </CardContent>
+            </Card>
           </TabsContent>
 
           {/* ══ EVENTS ══ */}
@@ -953,13 +1107,30 @@ export default function MatchDetailPage({ params }: PageProps) {
           <TabsContent value="lineups" className="mt-0 space-y-4">
             {lineups && (lineups.home || lineups.away) ? (
               <>
+                {/* Lineup status badge */}
+                <div className="flex items-center gap-2">
+                  <Badge className={cn(
+                    "gap-1.5 px-3 py-1",
+                    data?.hasLineups
+                      ? "bg-emerald-500/15 text-emerald-600 border-emerald-500/30"
+                      : "bg-amber-500/15 text-amber-600 border-amber-500/30"
+                  )}>
+                    {data?.hasLineups ? (
+                      <><CheckCircle2 className="h-3 w-3" />Confirmed Lineup</>
+                    ) : (
+                      <><AlertTriangle className="h-3 w-3" />Predicted Lineup — Official lineup not yet announced</>
+                    )}
+                  </Badge>
+                </div>
+
                 {/* Formation Pitch */}
                 <Card className="overflow-hidden">
                   <div className="px-4 pt-4 pb-3 border-b border-border/50">
                     <h3 className="flex items-center gap-2 text-sm font-bold">
-                      <Shirt className="h-4 w-4 text-primary" />Formation
-                      {lineups.home?.formation && <span className="text-muted-foreground font-normal">({match.homeTeam.name}: {lineups.home.formation})</span>}
-                      {lineups.away?.formation && <span className="text-muted-foreground font-normal">({match.awayTeam.name}: {lineups.away.formation})</span>}
+                      <Shirt className="h-4 w-4 text-primary" />
+                      {data?.hasLineups ? 'Confirmed Formation' : 'Predicted Formation'}
+                      {lineups.home?.formation && <span className="text-muted-foreground font-normal text-xs">({match.homeTeam.name}: {lineups.home.formation})</span>}
+                      {lineups.away?.formation && <span className="text-muted-foreground font-normal text-xs">({match.awayTeam.name}: {lineups.away.formation})</span>}
                     </h3>
                   </div>
                   <CardContent className="p-4">
@@ -969,16 +1140,19 @@ export default function MatchDetailPage({ params }: PageProps) {
 
                 {/* Squad lists */}
                 <div className="grid gap-4 md:grid-cols-2">
-                  {lineups.home && <RosterCard side="Home" roster={lineups.home} />}
-                  {lineups.away && <RosterCard side="Away" roster={lineups.away} />}
+                  {lineups.home && <RosterCard side="Home" roster={lineups.home} isConfirmed={!!data?.hasLineups} />}
+                  {lineups.away && <RosterCard side="Away" roster={lineups.away} isConfirmed={!!data?.hasLineups} />}
                 </div>
               </>
             ) : (
               <Card>
                 <CardContent className="py-14 text-center text-muted-foreground">
                   <Shirt className="h-12 w-12 mx-auto mb-3 opacity-30" />
-                  <p className="font-semibold text-base">No lineups yet</p>
-                  <p className="text-sm mt-1">Squad lists are usually published 1 hour before kickoff.</p>
+                  <p className="font-semibold text-base">Lineup not announced yet</p>
+                  <p className="text-sm mt-1">Squad lists are usually confirmed 1 hour before kickoff.</p>
+                  <Badge variant="outline" className="mt-3 text-amber-500 border-amber-500/30">
+                    <AlertTriangle className="h-3 w-3 mr-1" />Expected 1h before kickoff
+                  </Badge>
                 </CardContent>
               </Card>
             )}
@@ -1198,7 +1372,7 @@ function H2HRow({ game, timezone, homeName }: { game: H2HGame; timezone: string;
   )
 }
 
-function RosterCard({ side, roster }: { side: string; roster: TeamRoster }) {
+function RosterCard({ side, roster, isConfirmed }: { side: string; roster: TeamRoster; isConfirmed?: boolean }) {
   const [showBench, setShowBench] = useState(false)
   return (
     <Card className="overflow-hidden">
@@ -1213,6 +1387,14 @@ function RosterCard({ side, roster }: { side: string; roster: TeamRoster }) {
               </p>
             </div>
           </div>
+          <Badge className={cn(
+            "text-[9px] px-2 py-0.5",
+            isConfirmed
+              ? "bg-emerald-500/15 text-emerald-600 border-emerald-500/30"
+              : "bg-amber-500/15 text-amber-600 border-amber-500/30"
+          )}>
+            {isConfirmed ? 'Confirmed' : 'Predicted'}
+          </Badge>
         </div>
         {roster.coach && (
           <p className="mt-2 text-xs text-muted-foreground flex items-center gap-1">
@@ -1290,4 +1472,131 @@ function NewsRow({ item }: { item: NewsItem }) {
     </div>
   )
   return item.link ? <a href={item.link} target="_blank" rel="noopener noreferrer">{inner}</a> : inner
+}
+
+// ===== TipCard Component =====
+function TipCard({ tip }: { tip: MatchTip }) {
+  const [likes, setLikes] = useState(tip.likes)
+  const [userVote, setUserVote] = useState<'like' | 'dislike' | null>(null)
+
+  const handleLike = () => {
+    if (userVote === 'like') { setLikes(l => l - 1); setUserVote(null) }
+    else { setLikes(l => userVote === 'dislike' ? l + 1 : l + 1); setUserVote('like') }
+  }
+
+  const confidenceColor =
+    tip.confidence >= 80 ? 'text-emerald-500' :
+    tip.confidence >= 65 ? 'text-amber-500' :
+    'text-muted-foreground'
+
+  return (
+    <Card className={cn(
+      "overflow-hidden transition-all hover:shadow-md",
+      tip.tipster.isPremium && tip.isPremium && "border-amber-500/20"
+    )}>
+      {/* Header */}
+      <div className={cn(
+        "flex items-start justify-between gap-3 px-4 pt-4 pb-3 border-b border-border/40",
+        tip.tipster.isPremium && tip.isPremium && "bg-gradient-to-r from-amber-500/5 to-transparent"
+      )}>
+        <Link href={`/tipsters/${tip.tipster.id}`} className="flex items-center gap-3 hover:opacity-80 min-w-0 flex-1">
+          <Avatar className="h-10 w-10 shrink-0 border-2 border-primary/20">
+            <AvatarFallback className="text-xs font-bold bg-primary/10 text-primary">
+              {tip.tipster.displayName.slice(0, 2).toUpperCase()}
+            </AvatarFallback>
+          </Avatar>
+          <div className="min-w-0">
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="font-bold text-sm truncate">{tip.tipster.displayName}</span>
+              {tip.tipster.isPremium && (
+                <Badge className="h-4 shrink-0 gap-0.5 bg-amber-500/15 text-amber-600 border-amber-500/30 text-[9px]">
+                  <Star className="h-2.5 w-2.5 fill-current" />PRO
+                </Badge>
+              )}
+              {tip.tipster.verified && (
+                <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-primary" />
+              )}
+            </div>
+            <div className="flex items-center gap-2 mt-0.5 text-[11px] text-muted-foreground flex-wrap">
+              <span className="text-emerald-500 font-semibold">{tip.tipster.winRate}% win rate</span>
+              <span>•</span>
+              <span className={cn(tip.tipster.roi > 0 ? "text-emerald-500" : "text-rose-500", "font-semibold")}>
+                {tip.tipster.roi > 0 ? '+' : ''}{tip.tipster.roi}% ROI
+              </span>
+              <span>•</span>
+              <span>Rank #{tip.tipster.rank}</span>
+            </div>
+          </div>
+        </Link>
+        <div className="text-right shrink-0">
+          <div className="text-xs text-muted-foreground">Stake</div>
+          <div className="flex items-center gap-0.5 mt-0.5">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className={cn(
+                "h-2.5 w-2.5 rounded-sm",
+                i < tip.stake ? "bg-primary" : "bg-muted"
+              )} />
+            ))}
+          </div>
+          <div className="text-[10px] text-muted-foreground mt-0.5">{tip.stake}/5</div>
+        </div>
+      </div>
+
+      {/* Prediction */}
+      <div className="px-4 py-3">
+        <div className="flex items-stretch gap-3">
+          <div className="flex-1 rounded-xl bg-primary/6 border border-primary/15 p-3">
+            <div className="text-[10px] uppercase tracking-widest text-muted-foreground font-medium">{tip.market}</div>
+            <div className="mt-1 text-lg font-black text-primary leading-tight">{tip.prediction}</div>
+          </div>
+          <div className="rounded-xl bg-emerald-500/8 border border-emerald-500/20 p-3 text-center min-w-[70px]">
+            <div className="text-[10px] uppercase tracking-widest text-muted-foreground font-medium">Odds</div>
+            <div className="mt-1 text-lg font-black text-emerald-500">{tip.odds.toFixed(2)}</div>
+          </div>
+          <div className="rounded-xl bg-muted/50 p-3 text-center min-w-[60px]">
+            <div className="text-[10px] uppercase tracking-widest text-muted-foreground font-medium">Conf.</div>
+            <div className={cn("mt-1 text-lg font-black", confidenceColor)}>{tip.confidence}%</div>
+          </div>
+        </div>
+
+        {/* Analysis */}
+        <div className="mt-3">
+          {tip.isPremium && tip.tipster.isPremium ? (
+            <div className="flex items-center justify-between gap-3 rounded-xl bg-amber-500/8 border border-amber-500/20 px-4 py-3">
+              <div className="flex items-center gap-2 text-amber-600 text-sm">
+                <Lock className="h-4 w-4 shrink-0" />
+                <span>Premium analysis — Subscribe to unlock</span>
+              </div>
+              <Button size="sm" variant="outline" className="shrink-0 border-amber-500/40 text-amber-600 hover:bg-amber-500/10 text-xs h-7">
+                Unlock
+              </Button>
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground leading-relaxed">{tip.analysis}</p>
+          )}
+        </div>
+      </div>
+
+      {/* Footer */}
+      <div className="flex items-center justify-between gap-3 border-t border-border/40 px-4 py-2.5">
+        <div className="flex items-center gap-1">
+          <Button
+            variant="ghost" size="sm"
+            className={cn("h-7 gap-1 px-2 text-xs", userVote === 'like' && "text-emerald-500")}
+            onClick={handleLike}
+          >
+            <ThumbsUp className="h-3.5 w-3.5" />{likes}
+          </Button>
+          <Button variant="ghost" size="sm" className="h-7 gap-1 px-2 text-xs">
+            <MessageCircle className="h-3.5 w-3.5" />{tip.comments}
+          </Button>
+        </div>
+        <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
+          <span>{new Date(tip.createdAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</span>
+          <span>•</span>
+          <span>{tip.tipster.followers.toLocaleString()} followers</span>
+        </div>
+      </div>
+    </Card>
+  )
 }

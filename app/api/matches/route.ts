@@ -6,6 +6,7 @@ import {
   getLiveMatches as getApiLiveMatches,
   getUpcomingMatches as getApiUpcomingMatches,
   getMatchById,
+  generateRealisticOdds,
   type UnifiedMatch,
 } from '@/lib/api/unified-sports-api';
 
@@ -124,12 +125,28 @@ function convertToMatchData(match: UnifiedMatch): MatchData {
     minute: match.minute,
     league: match.league,
     sport: match.sport,
-    odds: match.odds ? {
-      home: match.odds.home,
-      draw: match.odds.draw,
-      away: match.odds.away,
-      bookmaker: match.odds.bookmaker,
-    } : undefined,
+    odds: (() => {
+      if (match.odds) {
+        return { home: match.odds.home, draw: match.odds.draw, away: match.odds.away, bookmaker: match.odds.bookmaker };
+      }
+      // Always generate computed odds so match cards always show them
+      const sportSlug = match.sport.slug
+      const sportType: Parameters<typeof generateRealisticOdds>[2] =
+        (sportSlug === 'soccer' || sportSlug === 'football') ? 'soccer'
+        : sportSlug === 'basketball' ? 'basketball'
+        : sportSlug === 'americanfootball' ? 'football'
+        : sportSlug === 'baseball' ? 'baseball'
+        : (sportSlug === 'hockey' || sportSlug === 'icehockey') ? 'hockey'
+        : sportSlug === 'mma' ? 'mma'
+        : sportSlug === 'tennis' ? 'tennis'
+        : sportSlug === 'cricket' ? 'cricket'
+        : sportSlug === 'rugby' ? 'rugby'
+        : sportSlug === 'golf' ? 'golf'
+        : sportSlug === 'racing' ? 'racing'
+        : 'soccer';
+      const computed = generateRealisticOdds(match.homeTeam.name, match.awayTeam.name, sportType);
+      return { home: computed.home, draw: computed.draw, away: computed.away, bookmaker: 'Computed' };
+    })(),
     markets: match.markets,
     tipsCount: match.tipsCount,
     source: match.source,

@@ -35,14 +35,39 @@ Wired in `lib/api/unified-sports-api.ts`:
 - Used on match list cards, match detail page header/body, tip timestamps, H2H meeting dates.
 
 ## Key Files
-- `app/api/matches/route.ts` — main matches endpoint with sort + geo logic
-- `lib/api/unified-sports-api.ts` — ESPN + The Odds API integration
+- `app/api/matches/route.ts` — main matches endpoint with sort + geo logic; always includes computed odds fallback
+- `app/api/matches/[id]/details/route.ts` — match detail including events, lineups (with hasLineups flag), odds
+- `app/api/matches/[id]/tips/route.ts` — per-match tipster tips API (seeded mock data, deterministic per matchId)
+- `lib/api/unified-sports-api.ts` — ESPN + The Odds API integration; exports `generateRealisticOdds()`
 - `lib/hooks/use-matches.ts` — client hook with timezone-based country detection
 - `app/(main)/matches/page.tsx` — list page with sport filter tabs
-- `app/(main)/matches/[id]/page.tsx` — Oddspedia-style detail page
-- `components/matches/match-card-new.tsx` — card UI
+- `app/(main)/matches/[id]/page.tsx` — Oddspedia-style detail page with 8 tabs including Tips
+- `components/matches/match-card-new.tsx` — card UI with always-visible odds
 - `components/ui/team-logo.tsx` — team logos, sport icons, country flags
+- `scripts/setup-database.sql` — MySQL schema (includes lineup_type, tip confidence, is_premium, etc.)
+
+## Match Detail Page Features (app/(main)/matches/[id]/page.tsx)
+8-tab layout:
+1. **Overview** — tip preview cards, match events, top performers, form, H2H summary
+2. **Tips** ⭐ — full TipCard components with tipster stats, prediction, odds, confidence, like buttons; stats header (total/avg confidence/avg odds); add-tip CTA
+3. **Events** — chronological match timeline with goals, cards, subs
+4. **Odds** — 1X2 cards + probability bar + bookmaker comparison table + spreads/totals
+5. **Lineups** — "Confirmed Lineup" badge (when ESPN rosters available) or "Predicted Lineup"; formation pitch SVG; RosterCard with Confirmed/Predicted per team
+6. **H2H** — summary win/draw/loss bar + full meeting list
+7. **Table** — live league standings (current teams highlighted)
+8. **News** — ESPN match articles
+
+## Odds Fallback Strategy
+- Real odds: ESPN bookmaker odds or The Odds API results
+- If none available: `generateRealisticOdds()` generates sport-specific computed odds seeded by team names
+- Applies to: match list cards AND match detail hero
+- All matches always display 1 / X / 2 odds
+
+## Lineup Status Labels
+- `hasLineups: true` in details API → "Confirmed Lineup" (green badge)
+- `hasLineups: false` → "Predicted Lineup" (amber badge with warning)
+- Also shown per-team in RosterCard header
 
 ## Known Issues
-- Several pre-existing TypeScript strict-mode warnings in TeamLogo prop usage and a stale `match-tips.tsx` file referencing fields that no longer exist on the Tip type. They don't block runtime.
+- Some team logo URLs are empty strings from ESPN — shows initials fallback correctly but triggers Next.js Image warnings in console.
 - No DATABASE_URL set; database calls in `lib/db.ts` no-op gracefully.

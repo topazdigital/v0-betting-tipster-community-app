@@ -666,7 +666,7 @@ function mapESPNStatus(status: ESPNEvent['status']): UnifiedMatch['status'] {
 }
 
 // Generate realistic odds based on team factors
-function generateRealisticOdds(
+export function generateRealisticOdds(
   homeTeamName: string,
   awayTeamName: string,
   sportType: ESPNLeagueConfig['sportType'] = 'soccer'

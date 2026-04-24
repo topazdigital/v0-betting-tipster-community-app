@@ -173,9 +173,12 @@ CREATE TABLE IF NOT EXISTS lineups (
   position VARCHAR(20),
   shirt_number TINYINT,
   is_starter BOOLEAN DEFAULT TRUE,
+  lineup_type ENUM('confirmed', 'possible', 'predicted') DEFAULT 'possible',
+  player_headshot VARCHAR(500),
   FOREIGN KEY (match_id) REFERENCES matches(id) ON DELETE CASCADE,
   FOREIGN KEY (team_id) REFERENCES teams(id) ON DELETE CASCADE,
-  INDEX idx_lineup_match (match_id)
+  INDEX idx_lineup_match (match_id),
+  INDEX idx_lineup_type (lineup_type)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS match_stats (
@@ -213,11 +216,15 @@ CREATE TABLE IF NOT EXISTS tips (
   selection VARCHAR(50) NOT NULL,
   odds_value DECIMAL(6, 2) NOT NULL,
   stake TINYINT DEFAULT 1,
+  confidence TINYINT DEFAULT 50,
   analysis TEXT,
   ai_analysis TEXT,
+  is_premium BOOLEAN DEFAULT FALSE,
   status ENUM('pending', 'won', 'lost', 'void', 'cashout') DEFAULT 'pending',
   result VARCHAR(50),
   likes_count INT DEFAULT 0,
+  dislikes_count INT DEFAULT 0,
+  comments_count INT DEFAULT 0,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   settled_at TIMESTAMP,
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
@@ -226,7 +233,8 @@ CREATE TABLE IF NOT EXISTS tips (
   INDEX idx_tip_user (user_id),
   INDEX idx_tip_match (match_id),
   INDEX idx_tip_status (status),
-  INDEX idx_tip_created (created_at)
+  INDEX idx_tip_created (created_at),
+  INDEX idx_tip_premium (is_premium)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS ai_predictions (
