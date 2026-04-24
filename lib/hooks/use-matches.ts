@@ -231,11 +231,12 @@ export interface MatchFilters {
 export function useMatches(filters?: MatchFilters) {
   const countryCode = useUserCountry();
   
-  // Build query params
+  // Build query params (pass countryCode so server can prioritize local leagues)
   const params = new URLSearchParams();
   if (filters?.sportId) params.set('sportId', filters.sportId.toString());
   if (filters?.leagueId) params.set('leagueId', filters.leagueId.toString());
   if (filters?.status) params.set('status', filters.status);
+  if (countryCode) params.set('countryCode', countryCode);
   
   const queryString = params.toString();
   const url = `/api/matches${queryString ? `?${queryString}` : ''}`;
@@ -250,11 +251,12 @@ export function useMatches(filters?: MatchFilters) {
     }
   );
 
+  // Server already sorts by sport priority -> league priority -> status -> time
+  // (we trust the server-side sort which is country-aware)
   const matches = data || [];
-  const sortedMatches = sortMatchesWithPriority(matches, countryCode);
 
   return {
-    matches: sortedMatches,
+    matches,
     allMatches: matches,
     userCountryCode: countryCode,
     isLoading,

@@ -16,6 +16,7 @@ import { Badge } from '@/components/ui/badge';
 import { SidebarNew } from '@/components/layout/sidebar-new';
 import { SportsFilter } from '@/components/sports/sports-filter';
 import { MatchCardNew } from '@/components/matches/match-card-new';
+import { SportIcon, LeagueFlag } from '@/components/ui/team-logo';
 import { Spinner } from '@/components/ui/spinner';
 import { useMatches, useMatchStats } from '@/lib/hooks/use-matches';
 import { ALL_SPORTS, ALL_LEAGUES } from '@/lib/sports-data';
@@ -90,19 +91,28 @@ function MatchesContent() {
     return result;
   }, [matches, leagueFilter, search]);
 
-  // Group matches by league
+  // Group matches by league — preserves the API's sport priority → league priority → time order
+  // (filteredMatches is already sorted by sportPriority -> leaguePriority -> status -> kickoff)
   const groupedMatches = useMemo(() => {
-    const groups: Record<string, Match[]> = {};
-    
+    const groups = new Map<string, { sport: Match['sport']; league: Match['league']; matches: Match[] }>();
+
     filteredMatches.forEach(match => {
-      const key = `${match.sport.icon} ${match.league.name}`;
-      if (!groups[key]) groups[key] = [];
-      groups[key].push(match);
+      const key = `${match.sport.id}-${match.league.id}-${match.league.name}`;
+      const existing = groups.get(key);
+      if (existing) {
+        existing.matches.push(match);
+      } else {
+        groups.set(key, { sport: match.sport, league: match.league, matches: [match] });
+      }
     });
 
-    // Sort groups by number of matches
-    return Object.entries(groups)
-      .sort((a, b) => b[1].length - a[1].length);
+    // Map preserves insertion order — that's exactly what we want
+    return Array.from(groups.entries()).map(([key, group]) => ({
+      key,
+      sport: group.sport,
+      league: group.league,
+      matches: group.matches,
+    }));
   }, [filteredMatches]);
 
   return (
@@ -224,18 +234,21 @@ function MatchesContent() {
             </div>
           ) : filteredMatches.length > 0 ? (
             /* Match Lists Grouped by League */
-            <div className="space-y-8">
-              {groupedMatches.map(([leagueName, leagueMatches]) => (
-                <div key={leagueName}>
-                  <div className="mb-3 flex items-center justify-between">
-                    <h2 className="flex items-center gap-2 text-lg font-semibold text-foreground">
-                      {leagueName}
-                      <Badge variant="secondary">{leagueMatches.length}</Badge>
+            <div className="space-y-6">
+              {groupedMatches.map(({ key, sport, league, matches: leagueMatches }) => (
+                <div key={key}>
+                  <div className="mb-2 flex items-center justify-between border-b border-border/60 pb-2">
+                    <h2 className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                      <SportIcon sportSlug={sport.slug} size="sm" />
+                      <LeagueFlag countryCode={league.countryCode} size="xs" />
+                      <span className="text-muted-foreground text-xs uppercase tracking-wide">{league.country}</span>
+                      <span>{league.name}</span>
+                      <Badge variant="secondary" className="ml-1 text-xs">{leagueMatches.length}</Badge>
                     </h2>
                   </div>
-                  <div className="space-y-2">
+                  <div className="space-y-1.5">
                     {leagueMatches.map(match => (
-                      <MatchCardNew key={match.id} match={match} variant="compact" />
+                      <MatchCardNew key={match.id} match={match} variant="compact" showLeague={false} />
                     ))}
                   </div>
                 </div>

@@ -892,12 +892,21 @@ const THE_ODDS_API_SPORTS: Record<string, { sportId: number; leagueId: number }>
   'mma_mixed_martial_arts': { sportId: 27, leagueId: 2701 },
 };
 
+// Track quota exhaustion so we don't keep hammering the API
+let theOddsApiOutOfCredits = 0; // timestamp when last 401/429 happened
+const QUOTA_BACKOFF_MS = 60 * 60 * 1000; // 1 hour back-off
+
 export async function fetchTheOddsAPI(
   endpoint: string,
   params: Record<string, string> = {}
 ): Promise<unknown> {
   const apiKey = process.env.THE_ODDS_API_KEY;
   if (!apiKey || apiKey === 'your_api_key_here') {
+    return null;
+  }
+
+  // If out of credits, skip until back-off expires
+  if (theOddsApiOutOfCredits > 0 && Date.now() - theOddsApiOutOfCredits < QUOTA_BACKOFF_MS) {
     return null;
   }
 
@@ -917,11 +926,26 @@ export async function fetchTheOddsAPI(
       apiStatus.theOddsApi.working = false;
       apiStatus.theOddsApi.lastError = `HTTP ${response.status}`;
       apiStatus.theOddsApi.lastCheck = Date.now();
+      // Detect quota errors and back off
+      if (response.status === 401 || response.status === 429) {
+        try {
+          const body = await response.json();
+          if (body?.error_code === 'OUT_OF_USAGE_CREDITS' || body?.error_code === 'INVALID_API_KEY' || response.status === 429) {
+            theOddsApiOutOfCredits = Date.now();
+            apiStatus.theOddsApi.lastError = `${body?.error_code || 'QUOTA_EXCEEDED'}`;
+            console.warn('[TheOddsAPI] Quota exhausted or invalid key — backing off for 1 hour. Falling back to computed odds.');
+          }
+        } catch {
+          theOddsApiOutOfCredits = Date.now();
+        }
+      }
       return null;
     }
 
     apiStatus.theOddsApi.working = true;
     apiStatus.theOddsApi.lastCheck = Date.now();
+    // Reset backoff on success
+    theOddsApiOutOfCredits = 0;
     return await response.json();
   } catch (error) {
     apiStatus.theOddsApi.working = false;
@@ -930,9 +954,159 @@ export async function fetchTheOddsAPI(
   }
 }
 
+export function isTheOddsApiQuotaExhausted(): boolean {
+  return theOddsApiOutOfCredits > 0 && Date.now() - theOddsApiOutOfCredits < QUOTA_BACKOFF_MS;
+}
+
 // ============================================
 // Unified API - Combines All Sources
 // ============================================
+
+// ============================================
+// The Odds API event type
+// ============================================
+interface TheOddsApiEvent {
+  id: string;
+  sport_key: string;
+  sport_title: string;
+  commence_time: string;
+  home_team: string;
+  away_team: string;
+  bookmakers?: Array<{
+    key: string;
+    title: string;
+    last_update: string;
+    markets: Array<{
+      key: string;
+      outcomes: Array<{
+        name: string;
+        price: number;
+        point?: number;
+      }>;
+    }>;
+  }>;
+}
+
+// Normalize team name for fuzzy matching
+function normalizeTeamName(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/\b(fc|cf|sc|afc|cfc|club|the)\b/g, '')
+    .replace(/[^a-z0-9]/g, '')
+    .trim();
+}
+
+// Compute average odds across bookmakers (best of)
+function aggregateBookmakerOdds(event: TheOddsApiEvent): { odds?: MatchOdds; markets?: Market[] } {
+  if (!event.bookmakers || event.bookmakers.length === 0) return {};
+
+  const h2hPrices: { home: number[]; draw: number[]; away: number[] } = { home: [], draw: [], away: [] };
+  const marketsMap = new Map<string, Map<string, number[]>>();
+
+  for (const bm of event.bookmakers) {
+    for (const market of bm.markets) {
+      if (market.key === 'h2h') {
+        for (const o of market.outcomes) {
+          if (o.name === event.home_team) h2hPrices.home.push(o.price);
+          else if (o.name === event.away_team) h2hPrices.away.push(o.price);
+          else if (o.name.toLowerCase() === 'draw') h2hPrices.draw.push(o.price);
+        }
+      } else {
+        if (!marketsMap.has(market.key)) marketsMap.set(market.key, new Map());
+        const outcomesMap = marketsMap.get(market.key)!;
+        for (const o of market.outcomes) {
+          const k = o.point !== undefined ? `${o.name}|${o.point}` : o.name;
+          if (!outcomesMap.has(k)) outcomesMap.set(k, []);
+          outcomesMap.get(k)!.push(o.price);
+        }
+      }
+    }
+  }
+
+  const avg = (arr: number[]) => arr.length ? Math.round((arr.reduce((s, p) => s + p, 0) / arr.length) * 100) / 100 : undefined;
+  const odds: MatchOdds | undefined = h2hPrices.home.length && h2hPrices.away.length ? {
+    home: avg(h2hPrices.home)!,
+    draw: avg(h2hPrices.draw),
+    away: avg(h2hPrices.away)!,
+    bookmaker: `${event.bookmakers.length} bookmakers`,
+    lastUpdate: new Date(),
+  } : undefined;
+
+  const markets: Market[] = [];
+  if (odds) {
+    markets.push({
+      key: 'h2h',
+      name: 'Match Result',
+      outcomes: [
+        { name: event.home_team, price: odds.home },
+        ...(odds.draw ? [{ name: 'Draw', price: odds.draw }] : []),
+        { name: event.away_team, price: odds.away },
+      ],
+    });
+  }
+  for (const [marketKey, outcomesMap] of marketsMap.entries()) {
+    const outs: Outcome[] = [];
+    for (const [k, prices] of outcomesMap.entries()) {
+      const [name, pointStr] = k.split('|');
+      outs.push({
+        name,
+        price: avg(prices)!,
+        ...(pointStr ? { point: parseFloat(pointStr) } : {}),
+      });
+    }
+    markets.push({
+      key: marketKey,
+      name: marketKey === 'spreads' ? 'Point Spread' : marketKey === 'totals' ? 'Totals' : marketKey,
+      outcomes: outs,
+    });
+  }
+
+  return { odds, markets };
+}
+
+// Fetch live odds from The Odds API for one sport key
+async function fetchOddsForSport(sportKey: string): Promise<TheOddsApiEvent[]> {
+  const cacheKey = `odds-${sportKey}`;
+  const cached = getCached<TheOddsApiEvent[]>(cacheKey, 10 * 60 * 1000); // 10 min cache
+  if (cached) return cached;
+
+  const data = await fetchTheOddsAPI(`sports/${sportKey}/odds`, {
+    regions: 'uk,eu,us',
+    markets: 'h2h,spreads,totals',
+    oddsFormat: 'decimal',
+    dateFormat: 'iso',
+  }) as TheOddsApiEvent[] | null;
+
+  if (!data || !Array.isArray(data)) return [];
+  setCache(cacheKey, data);
+  return data;
+}
+
+// Build a lookup of real odds keyed by normalized team pair
+async function buildRealOddsIndex(): Promise<Map<string, { odds: MatchOdds; markets: Market[] }>> {
+  const apiKey = process.env.THE_ODDS_API_KEY;
+  if (!apiKey || apiKey === 'your_api_key_here') return new Map();
+
+  const sportKeys = Object.keys(THE_ODDS_API_SPORTS);
+  // Fetch all in parallel
+  const results = await Promise.allSettled(sportKeys.map(sk => fetchOddsForSport(sk)));
+
+  const index = new Map<string, { odds: MatchOdds; markets: Market[] }>();
+  for (const result of results) {
+    if (result.status !== 'fulfilled') continue;
+    for (const ev of result.value) {
+      const { odds, markets } = aggregateBookmakerOdds(ev);
+      if (!odds) continue;
+      const home = normalizeTeamName(ev.home_team);
+      const away = normalizeTeamName(ev.away_team);
+      const dateKey = new Date(ev.commence_time).toISOString().split('T')[0];
+      // Index by both orderings — ESPN sometimes flips home/away
+      index.set(`${home}_${away}_${dateKey}`, { odds, markets: markets || [] });
+      index.set(`${away}_${home}_${dateKey}`, { odds, markets: markets || [] });
+    }
+  }
+  return index;
+}
 
 export async function getAllMatches(): Promise<UnifiedMatch[]> {
   const allMatches: UnifiedMatch[] = [];
@@ -953,13 +1127,30 @@ export async function getAllMatches(): Promise<UnifiedMatch[]> {
     }
   };
 
-  // Fetch from ALL ESPN leagues in parallel
-  const espnPromises = ESPN_LEAGUES.map(config => getESPNMatches(config));
-  const results = await Promise.allSettled(espnPromises);
+  // Fetch ESPN matches AND real odds index in parallel
+  const [espnResults, realOddsIndex] = await Promise.all([
+    Promise.allSettled(ESPN_LEAGUES.map(config => getESPNMatches(config))),
+    buildRealOddsIndex(),
+  ]);
 
-  for (const result of results) {
+  for (const result of espnResults) {
     if (result.status === 'fulfilled' && result.value) {
       for (const match of result.value) {
+        // Try to enrich with real bookmaker odds
+        if (realOddsIndex.size > 0) {
+          const homeNorm = normalizeTeamName(match.homeTeam.name);
+          const awayNorm = normalizeTeamName(match.awayTeam.name);
+          const dateKey = new Date(match.kickoffTime).toISOString().split('T')[0];
+          const real = realOddsIndex.get(`${homeNorm}_${awayNorm}_${dateKey}`);
+          if (real) {
+            match.odds = real.odds;
+            // Merge real markets in front of generated markets, dedupe by key
+            const existingKeys = new Set(real.markets.map(m => m.key));
+            const otherMarkets = (match.markets || []).filter(m => !existingKeys.has(m.key));
+            match.markets = [...real.markets, ...otherMarkets];
+            match.source = 'the-odds-api';
+          }
+        }
         addMatch(match);
       }
     }

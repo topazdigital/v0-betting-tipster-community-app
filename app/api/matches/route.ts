@@ -34,23 +34,37 @@ const SPORT_PRIORITY: Record<number, number> = {
 const EUROPEAN_TOP_5_LEAGUES = [1, 2, 3, 4, 5];
 
 // Country to local league mapping for geo-priority
+// Order: local leagues -> regional competitions -> European Top 5 (always shown for Football fans)
 const COUNTRY_LEAGUES: Record<string, number[]> = {
-  'KE': [22, 21, 24],
-  'NG': [21, 24],
-  'GH': [21, 24],
-  'EG': [23, 21, 24],
-  'ZA': [21, 24],
+  // Africa: AFCON + Top 5 European leagues + Champions/Europa League
+  'KE': [24, 9, 10, 1, 2, 3, 4, 5],   // AFCON, UCL, UEL, EPL, La Liga, Bundesliga, Serie A, Ligue 1
+  'NG': [24, 9, 10, ...EUROPEAN_TOP_5_LEAGUES],
+  'GH': [24, 9, 10, ...EUROPEAN_TOP_5_LEAGUES],
+  'EG': [24, 9, 10, ...EUROPEAN_TOP_5_LEAGUES],
+  'ZA': [24, 9, 10, ...EUROPEAN_TOP_5_LEAGUES],
+  'TZ': [24, 9, 10, ...EUROPEAN_TOP_5_LEAGUES],
+  'UG': [24, 9, 10, ...EUROPEAN_TOP_5_LEAGUES],
+  // Europe: home league first, then UCL/UEL, then other Top 5
   'GB': [1, 8, 9, 10, ...EUROPEAN_TOP_5_LEAGUES],
   'ES': [2, 9, 10, ...EUROPEAN_TOP_5_LEAGUES],
   'DE': [3, 9, 10, ...EUROPEAN_TOP_5_LEAGUES],
   'IT': [4, 9, 10, ...EUROPEAN_TOP_5_LEAGUES],
   'FR': [5, 9, 10, ...EUROPEAN_TOP_5_LEAGUES],
-  'US': [11, 401, 101, 501, 601],
-  'BR': [12, 25],
-  'AR': [13, 25],
-  'JP': [18, 502],
-  'AU': [20, 302, 103],
-  'IN': [301],
+  'NL': [6, 9, 10, ...EUROPEAN_TOP_5_LEAGUES],
+  'PT': [7, 9, 10, ...EUROPEAN_TOP_5_LEAGUES],
+  'BE': [16, 9, 10, ...EUROPEAN_TOP_5_LEAGUES],
+  'TR': [15, 9, 10, ...EUROPEAN_TOP_5_LEAGUES],
+  // Americas
+  'US': [11, 401, 101, 501, 601, 9, 10, ...EUROPEAN_TOP_5_LEAGUES],
+  'BR': [12, 25, 9, 10, ...EUROPEAN_TOP_5_LEAGUES],
+  'AR': [13, 25, 9, 10, ...EUROPEAN_TOP_5_LEAGUES],
+  'MX': [27, 11, 9, 10, ...EUROPEAN_TOP_5_LEAGUES],
+  // Asia
+  'JP': [18, 9, 10, ...EUROPEAN_TOP_5_LEAGUES],
+  'AU': [20, 9, 10, ...EUROPEAN_TOP_5_LEAGUES],
+  'IN': [301, 9, 10, ...EUROPEAN_TOP_5_LEAGUES],
+  'SA': [14, 9, 10, ...EUROPEAN_TOP_5_LEAGUES],
+  'CN': [28, 9, 10, ...EUROPEAN_TOP_5_LEAGUES],
 };
 
 export interface MatchData {

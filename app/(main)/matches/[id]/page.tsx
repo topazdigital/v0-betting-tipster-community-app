@@ -18,8 +18,8 @@ import { TeamLogo } from "@/components/ui/team-logo"
 import { AddTipForm } from "@/components/matches/add-tip-form"
 import { SportSpecificStats } from "@/components/matches/sport-specific-stats"
 import { cn } from "@/lib/utils"
-import { format } from "date-fns"
 import { useAuth } from "@/contexts/auth-context"
+import { formatTime, formatDate, getBrowserTimezone, getDayLabel } from "@/lib/utils/timezone"
 
 interface PageProps {
   params: Promise<{ id: string }>
@@ -69,6 +69,7 @@ const generateTips = (homeTeam: string, awayTeam: string, odds?: { home: number;
 export default function MatchDetailPage({ params }: PageProps) {
   const { id } = use(params)
   const { isAuthenticated } = useAuth()
+  const timezone = getBrowserTimezone()
   
   const { data, error, isLoading } = useSWR(
     `/api/matches/${encodeURIComponent(id)}`,
@@ -175,7 +176,7 @@ export default function MatchDetailPage({ params }: PageProps) {
                 {match.status === "scheduled" && (
                   <Badge variant="secondary" className="gap-1">
                     <Clock className="h-3 w-3" />
-                    {format(new Date(match.kickoffTime), "dd MMM HH:mm")}
+                    {getDayLabel(match.kickoffTime, timezone)} • {formatTime(match.kickoffTime, timezone)}
                   </Badge>
                 )}
 
@@ -233,10 +234,13 @@ export default function MatchDetailPage({ params }: PageProps) {
                 ) : (
                   <div>
                     <div className="text-2xl md:text-3xl font-bold">
-                      {format(new Date(match.kickoffTime), "HH:mm")}
+                      {formatTime(match.kickoffTime, timezone)}
                     </div>
                     <div className="text-xs md:text-sm text-muted-foreground">
-                      {format(new Date(match.kickoffTime), "dd MMMM yyyy")}
+                      {getDayLabel(match.kickoffTime, timezone)} · {formatDate(match.kickoffTime, timezone)}
+                    </div>
+                    <div className="text-[10px] text-muted-foreground/60 mt-0.5">
+                      Your timezone
                     </div>
                   </div>
                 )}
@@ -500,7 +504,7 @@ export default function MatchDetailPage({ params }: PageProps) {
                         <Star className="h-4 w-4" />
                         {tip.likes}
                       </button>
-                      <span>{format(tip.createdAt, "HH:mm")}</span>
+                      <span>{formatTime(tip.createdAt, timezone)}</span>
                     </div>
                   </div>
                 ))}
@@ -544,7 +548,7 @@ export default function MatchDetailPage({ params }: PageProps) {
                   {h2h?.recentMatches?.map((m: { date: string; homeTeam: string; homeScore: number; awayTeam: string; awayScore: number; competition: string }, idx: number) => (
                     <div key={idx} className="flex items-center justify-between rounded-lg border p-3 gap-2">
                       <div className="text-xs text-muted-foreground whitespace-nowrap">
-                        {format(new Date(m.date), "dd MMM yy")}
+                        {formatDate(m.date, timezone)}
                       </div>
                       <div className="flex items-center gap-2 flex-1 justify-center min-w-0">
                         <span className="font-medium text-sm truncate text-right flex-1">{m.homeTeam}</span>
