@@ -380,6 +380,120 @@ const ESPN_LEAGUES: ESPNLeagueConfig[] = [
   { sport: 'racing', league: 'f1', sportId: 29, leagueId: 2901, leagueName: 'Formula 1', country: 'World', countryCode: 'WO', sportType: 'racing' },
   { sport: 'racing', league: 'nascar-cup', sportId: 31, leagueId: 3101, leagueName: 'NASCAR Cup Series', country: 'USA', countryCode: 'US', sportType: 'racing' },
   { sport: 'racing', league: 'indycar', sportId: 32, leagueId: 3201, leagueName: 'IndyCar', country: 'USA', countryCode: 'US', sportType: 'racing' },
+
+  // SOCCER - Women's Top Leagues
+  { sport: 'soccer', league: 'eng.w.1', sportId: 1, leagueId: 200, leagueName: "Women's Super League", country: 'England', countryCode: 'GB', sportType: 'soccer' },
+  { sport: 'soccer', league: 'esp.w.1', sportId: 1, leagueId: 201, leagueName: "Liga F", country: 'Spain', countryCode: 'ES', sportType: 'soccer' },
+  { sport: 'soccer', league: 'ger.w.1', sportId: 1, leagueId: 202, leagueName: "Frauen Bundesliga", country: 'Germany', countryCode: 'DE', sportType: 'soccer' },
+  { sport: 'soccer', league: 'fra.w.1', sportId: 1, leagueId: 203, leagueName: "Première Ligue", country: 'France', countryCode: 'FR', sportType: 'soccer' },
+  { sport: 'soccer', league: 'ita.w.1', sportId: 1, leagueId: 204, leagueName: "Serie A Femminile", country: 'Italy', countryCode: 'IT', sportType: 'soccer' },
+  { sport: 'soccer', league: 'uefa.wchampions', sportId: 1, leagueId: 205, leagueName: "UEFA Women's Champions League", country: 'Europe', countryCode: 'EU', sportType: 'soccer' },
+  { sport: 'soccer', league: 'fifa.wwc', sportId: 1, leagueId: 206, leagueName: "FIFA Women's World Cup", country: 'World', countryCode: 'WO', sportType: 'soccer' },
+  { sport: 'soccer', league: 'uefa.weuro', sportId: 1, leagueId: 207, leagueName: "UEFA Women's Euro", country: 'Europe', countryCode: 'EU', sportType: 'soccer' },
+
+  // SOCCER - Youth & Academy
+  { sport: 'soccer', league: 'uefa.youth', sportId: 1, leagueId: 210, leagueName: 'UEFA Youth League', country: 'Europe', countryCode: 'EU', sportType: 'soccer' },
+  { sport: 'soccer', league: 'fifa.world.u17', sportId: 1, leagueId: 211, leagueName: 'FIFA U17 World Cup', country: 'World', countryCode: 'WO', sportType: 'soccer' },
+  { sport: 'soccer', league: 'uefa.euro.u21', sportId: 1, leagueId: 212, leagueName: 'UEFA Under 21 Championship', country: 'Europe', countryCode: 'EU', sportType: 'soccer' },
+
+  // SOCCER - More Cups
+  { sport: 'soccer', league: 'uefa.super_cup', sportId: 1, leagueId: 220, leagueName: 'UEFA Super Cup', country: 'Europe', countryCode: 'EU', sportType: 'soccer' },
+  { sport: 'soccer', league: 'eng.charity', sportId: 1, leagueId: 221, leagueName: 'FA Community Shield', country: 'England', countryCode: 'GB', sportType: 'soccer' },
+  { sport: 'soccer', league: 'esp.super_cup', sportId: 1, leagueId: 222, leagueName: 'Supercopa de España', country: 'Spain', countryCode: 'ES', sportType: 'soccer' },
+  { sport: 'soccer', league: 'ita.super_cup', sportId: 1, leagueId: 223, leagueName: 'Supercoppa Italiana', country: 'Italy', countryCode: 'IT', sportType: 'soccer' },
+  { sport: 'soccer', league: 'fra.super_cup', sportId: 1, leagueId: 224, leagueName: 'Trophée des Champions', country: 'France', countryCode: 'FR', sportType: 'soccer' },
+  { sport: 'soccer', league: 'ger.super_cup', sportId: 1, leagueId: 225, leagueName: 'DFL Supercup', country: 'Germany', countryCode: 'DE', sportType: 'soccer' },
+  { sport: 'soccer', league: 'ned.super_cup', sportId: 1, leagueId: 226, leagueName: 'Johan Cruijff Schaal', country: 'Netherlands', countryCode: 'NL', sportType: 'soccer' },
+  { sport: 'soccer', league: 'por.super_cup', sportId: 1, leagueId: 227, leagueName: 'Supertaça Cândido de Oliveira', country: 'Portugal', countryCode: 'PT', sportType: 'soccer' },
+
+  // SOCCER - Lower English & Scottish
+  { sport: 'soccer', league: 'eng.5', sportId: 1, leagueId: 230, leagueName: 'National League', country: 'England', countryCode: 'GB', sportType: 'soccer' },
+  { sport: 'soccer', league: 'sco.2', sportId: 1, leagueId: 231, leagueName: 'Scottish Championship', country: 'Scotland', countryCode: 'GB-SCT', sportType: 'soccer' },
+  { sport: 'soccer', league: 'sco.fa', sportId: 1, leagueId: 232, leagueName: 'Scottish Cup', country: 'Scotland', countryCode: 'GB-SCT', sportType: 'soccer' },
+
+  // SOCCER - More European Cups & Lower
+  { sport: 'soccer', league: 'bel.cup', sportId: 1, leagueId: 240, leagueName: 'Belgian Cup', country: 'Belgium', countryCode: 'BE', sportType: 'soccer' },
+  { sport: 'soccer', league: 'tur.cup', sportId: 1, leagueId: 241, leagueName: 'Turkish Cup', country: 'Turkey', countryCode: 'TR', sportType: 'soccer' },
+  { sport: 'soccer', league: 'sui.cup', sportId: 1, leagueId: 242, leagueName: 'Swiss Cup', country: 'Switzerland', countryCode: 'CH', sportType: 'soccer' },
+  { sport: 'soccer', league: 'aut.cup', sportId: 1, leagueId: 243, leagueName: 'Austrian Cup', country: 'Austria', countryCode: 'AT', sportType: 'soccer' },
+  { sport: 'soccer', league: 'gre.cup', sportId: 1, leagueId: 244, leagueName: 'Greek Cup', country: 'Greece', countryCode: 'GR', sportType: 'soccer' },
+  { sport: 'soccer', league: 'pol.cup', sportId: 1, leagueId: 245, leagueName: 'Polish Cup', country: 'Poland', countryCode: 'PL', sportType: 'soccer' },
+
+  // SOCCER - More Africa
+  { sport: 'soccer', league: 'ken.1', sportId: 1, leagueId: 250, leagueName: 'Kenyan Premier League', country: 'Kenya', countryCode: 'KE', sportType: 'soccer' },
+  { sport: 'soccer', league: 'nga.1', sportId: 1, leagueId: 251, leagueName: 'Nigerian Professional Football League', country: 'Nigeria', countryCode: 'NG', sportType: 'soccer' },
+  { sport: 'soccer', league: 'gha.1', sportId: 1, leagueId: 252, leagueName: 'Ghana Premier League', country: 'Ghana', countryCode: 'GH', sportType: 'soccer' },
+  { sport: 'soccer', league: 'civ.1', sportId: 1, leagueId: 253, leagueName: "Côte d'Ivoire Ligue 1", country: "Côte d'Ivoire", countryCode: 'CI', sportType: 'soccer' },
+  { sport: 'soccer', league: 'sen.1', sportId: 1, leagueId: 254, leagueName: 'Ligue 1 Senegal', country: 'Senegal', countryCode: 'SN', sportType: 'soccer' },
+  { sport: 'soccer', league: 'cmr.1', sportId: 1, leagueId: 255, leagueName: 'Elite One', country: 'Cameroon', countryCode: 'CM', sportType: 'soccer' },
+  { sport: 'soccer', league: 'tza.1', sportId: 1, leagueId: 256, leagueName: 'Ligi kuu Bara', country: 'Tanzania', countryCode: 'TZ', sportType: 'soccer' },
+  { sport: 'soccer', league: 'uga.1', sportId: 1, leagueId: 257, leagueName: 'Uganda Premier League', country: 'Uganda', countryCode: 'UG', sportType: 'soccer' },
+  { sport: 'soccer', league: 'zam.1', sportId: 1, leagueId: 258, leagueName: 'MTN Super League', country: 'Zambia', countryCode: 'ZM', sportType: 'soccer' },
+  { sport: 'soccer', league: 'zwe.1', sportId: 1, leagueId: 259, leagueName: 'Zimbabwe Premier Soccer League', country: 'Zimbabwe', countryCode: 'ZW', sportType: 'soccer' },
+
+  // SOCCER - More Americas / Caribbean
+  { sport: 'soccer', league: 'jam.1', sportId: 1, leagueId: 260, leagueName: 'Jamaica Premier League', country: 'Jamaica', countryCode: 'JM', sportType: 'soccer' },
+  { sport: 'soccer', league: 'tto.1', sportId: 1, leagueId: 261, leagueName: 'TT Premier Football League', country: 'Trinidad and Tobago', countryCode: 'TT', sportType: 'soccer' },
+  { sport: 'soccer', league: 'gua.1', sportId: 1, leagueId: 262, leagueName: 'Liga Nacional de Guatemala', country: 'Guatemala', countryCode: 'GT', sportType: 'soccer' },
+  { sport: 'soccer', league: 'hon.1', sportId: 1, leagueId: 263, leagueName: 'Liga Nacional de Honduras', country: 'Honduras', countryCode: 'HN', sportType: 'soccer' },
+  { sport: 'soccer', league: 'pan.1', sportId: 1, leagueId: 264, leagueName: 'Liga Panameña de Fútbol', country: 'Panama', countryCode: 'PA', sportType: 'soccer' },
+  { sport: 'soccer', league: 'slv.1', sportId: 1, leagueId: 265, leagueName: 'Salvadoran Primera División', country: 'El Salvador', countryCode: 'SV', sportType: 'soccer' },
+  { sport: 'soccer', league: 'can.1', sportId: 1, leagueId: 266, leagueName: 'Canadian Premier League', country: 'Canada', countryCode: 'CA', sportType: 'soccer' },
+
+  // SOCCER - More Asia
+  { sport: 'soccer', league: 'jpn.2', sportId: 1, leagueId: 270, leagueName: 'J2 League', country: 'Japan', countryCode: 'JP', sportType: 'soccer' },
+  { sport: 'soccer', league: 'jpn.cup', sportId: 1, leagueId: 271, leagueName: "Emperor's Cup", country: 'Japan', countryCode: 'JP', sportType: 'soccer' },
+  { sport: 'soccer', league: 'kor.2', sportId: 1, leagueId: 272, leagueName: 'K League 2', country: 'South Korea', countryCode: 'KR', sportType: 'soccer' },
+  { sport: 'soccer', league: 'sgp.1', sportId: 1, leagueId: 273, leagueName: 'Singapore Premier League', country: 'Singapore', countryCode: 'SG', sportType: 'soccer' },
+  { sport: 'soccer', league: 'vnm.1', sportId: 1, leagueId: 274, leagueName: 'V.League 1', country: 'Vietnam', countryCode: 'VN', sportType: 'soccer' },
+  { sport: 'soccer', league: 'phl.1', sportId: 1, leagueId: 275, leagueName: 'Philippines Football League', country: 'Philippines', countryCode: 'PH', sportType: 'soccer' },
+  { sport: 'soccer', league: 'hkg.1', sportId: 1, leagueId: 276, leagueName: 'Hong Kong Premier League', country: 'Hong Kong', countryCode: 'HK', sportType: 'soccer' },
+
+  // SOCCER - More Friendlies / Club International
+  { sport: 'soccer', league: 'club.friendly', sportId: 1, leagueId: 280, leagueName: 'Club Friendly', country: 'World', countryCode: 'WO', sportType: 'soccer' },
+  { sport: 'soccer', league: 'fifa.intercontinental', sportId: 1, leagueId: 281, leagueName: 'FIFA Intercontinental Cup', country: 'World', countryCode: 'WO', sportType: 'soccer' },
+
+  // BASKETBALL - Europe + International
+  { sport: 'basketball', league: 'fiba.euroleague', sportId: 2, leagueId: 130, leagueName: 'EuroLeague', country: 'Europe', countryCode: 'EU', sportType: 'basketball' },
+  { sport: 'basketball', league: 'fiba.eurocup', sportId: 2, leagueId: 131, leagueName: 'EuroCup', country: 'Europe', countryCode: 'EU', sportType: 'basketball' },
+  { sport: 'basketball', league: 'esp.acb', sportId: 2, leagueId: 132, leagueName: 'Liga ACB', country: 'Spain', countryCode: 'ES', sportType: 'basketball' },
+  { sport: 'basketball', league: 'ita.lega', sportId: 2, leagueId: 133, leagueName: 'Lega Basket Serie A', country: 'Italy', countryCode: 'IT', sportType: 'basketball' },
+  { sport: 'basketball', league: 'tur.bsl', sportId: 2, leagueId: 134, leagueName: 'Türkiye Sigorta BSL', country: 'Turkey', countryCode: 'TR', sportType: 'basketball' },
+  { sport: 'basketball', league: 'ger.bbl', sportId: 2, leagueId: 135, leagueName: 'Basketball Bundesliga', country: 'Germany', countryCode: 'DE', sportType: 'basketball' },
+  { sport: 'basketball', league: 'fra.lnb', sportId: 2, leagueId: 136, leagueName: 'LNB Pro A', country: 'France', countryCode: 'FR', sportType: 'basketball' },
+  { sport: 'basketball', league: 'aus.nbl', sportId: 2, leagueId: 137, leagueName: 'NBL Australia', country: 'Australia', countryCode: 'AU', sportType: 'basketball' },
+  { sport: 'basketball', league: 'fiba.world', sportId: 2, leagueId: 138, leagueName: 'FIBA World Cup', country: 'World', countryCode: 'WO', sportType: 'basketball' },
+  { sport: 'basketball', league: 'womens-college-basketball', sportId: 2, leagueId: 139, leagueName: 'NCAA Women\'s Basketball', country: 'USA', countryCode: 'US', sportType: 'basketball' },
+
+  // HOCKEY - More
+  { sport: 'hockey', league: 'mens-college-hockey', sportId: 7, leagueId: 610, leagueName: 'NCAA Hockey', country: 'USA', countryCode: 'US', sportType: 'hockey' },
+  { sport: 'hockey', league: 'iihf.world', sportId: 7, leagueId: 611, leagueName: 'IIHF World Championship', country: 'World', countryCode: 'WO', sportType: 'hockey' },
+
+  // BASEBALL - More
+  { sport: 'baseball', league: 'college-baseball', sportId: 6, leagueId: 510, leagueName: 'NCAA Baseball', country: 'USA', countryCode: 'US', sportType: 'baseball' },
+  { sport: 'baseball', league: 'jpn.npb', sportId: 6, leagueId: 511, leagueName: 'Nippon Professional Baseball', country: 'Japan', countryCode: 'JP', sportType: 'baseball' },
+  { sport: 'baseball', league: 'kor.kbo', sportId: 6, leagueId: 512, leagueName: 'KBO League', country: 'South Korea', countryCode: 'KR', sportType: 'baseball' },
+
+  // CRICKET - More
+  { sport: 'cricket', league: 'cpl', sportId: 4, leagueId: 310, leagueName: 'Caribbean Premier League', country: 'Caribbean', countryCode: 'CB', sportType: 'cricket' },
+  { sport: 'cricket', league: 't20.world', sportId: 4, leagueId: 311, leagueName: 'ICC T20 World Cup', country: 'World', countryCode: 'WO', sportType: 'cricket' },
+  { sport: 'cricket', league: 'odi.world', sportId: 4, leagueId: 312, leagueName: 'ICC Cricket World Cup', country: 'World', countryCode: 'WO', sportType: 'cricket' },
+  { sport: 'cricket', league: 'eng.t20.blast', sportId: 4, leagueId: 313, leagueName: 'T20 Blast', country: 'England', countryCode: 'GB', sportType: 'cricket' },
+
+  // RUGBY - More
+  { sport: 'rugby', league: 'top14', sportId: 8, leagueId: 710, leagueName: 'Top 14', country: 'France', countryCode: 'FR', sportType: 'rugby' },
+  { sport: 'rugby', league: 'rugby-championship', sportId: 8, leagueId: 711, leagueName: 'Rugby Championship', country: 'Southern Hemisphere', countryCode: 'SH', sportType: 'rugby' },
+  { sport: 'rugby', league: 'rwc', sportId: 8, leagueId: 712, leagueName: 'Rugby World Cup', country: 'World', countryCode: 'WO', sportType: 'rugby' },
+  { sport: 'rugby', league: 'urc', sportId: 8, leagueId: 713, leagueName: 'United Rugby Championship', country: 'Europe', countryCode: 'EU', sportType: 'rugby' },
+
+  // GOLF - More
+  { sport: 'golf', league: 'champions-tour', sportId: 17, leagueId: 1710, leagueName: 'PGA Champions Tour', country: 'USA', countryCode: 'US', sportType: 'golf' },
+  { sport: 'golf', league: 'liv', sportId: 17, leagueId: 1711, leagueName: 'LIV Golf', country: 'World', countryCode: 'WO', sportType: 'golf' },
+
+  // RACING - More
+  { sport: 'racing', league: 'f2', sportId: 29, leagueId: 2910, leagueName: 'Formula 2', country: 'World', countryCode: 'WO', sportType: 'racing' },
+  { sport: 'racing', league: 'motogp', sportId: 29, leagueId: 2911, leagueName: 'MotoGP', country: 'World', countryCode: 'WO', sportType: 'racing' },
+  { sport: 'racing', league: 'nascar-xfinity', sportId: 31, leagueId: 3110, leagueName: 'NASCAR Xfinity', country: 'USA', countryCode: 'US', sportType: 'racing' },
 ];
 
 // ============================================
@@ -440,9 +554,12 @@ interface ESPNEvent {
       state: string;
       completed: boolean;
       description: string;
+      detail?: string;
+      shortDetail?: string;
     };
     period?: number;
     displayClock?: string;
+    clock?: number;
   };
   competitions: Array<{
     id: string;
@@ -793,13 +910,71 @@ export async function fetchESPNSummary(sport: string, league: string, eventId: s
 function mapESPNStatus(status: ESPNEvent['status']): UnifiedMatch['status'] {
   const state = status.type.state?.toLowerCase() || '';
   const name = status.type.name?.toLowerCase() || '';
-  
-  if (state === 'in' || name === 'in progress' || name === 'in_progress') return 'live';
-  if (name === 'halftime' || name === 'half') return 'halftime';
+  const detail = (status.type.detail || status.type.shortDetail || '').toLowerCase();
+
+  if (name.includes('halftime') || name === 'half' || detail.includes('halftime') || detail.includes('half time')) return 'halftime';
+  if (name.includes('extra') || detail.includes('extra time') || detail.includes('et')) return 'extra_time';
+  if (name.includes('penalt') || detail.includes('penalt')) return 'penalties';
+  if (state === 'in' || name === 'in progress' || name === 'in_progress' || name.startsWith('status_in')) return 'live';
   if (state === 'post' || status.type.completed) return 'finished';
-  if (name === 'postponed') return 'postponed';
-  if (name === 'canceled' || name === 'cancelled') return 'cancelled';
+  if (name === 'postponed' || detail.includes('postpon')) return 'postponed';
+  if (name === 'canceled' || name === 'cancelled' || detail.includes('cancel')) return 'cancelled';
   return 'scheduled';
+}
+
+/**
+ * Extract the real live minute for a match from ESPN's status payload.
+ * - Soccer: displayClock is usually "75'" or "45+2'" (minutes elapsed).
+ *   In 2nd half ESPN may also send "MM:SS" elapsed in current half — add 45.
+ * - Basketball/Football/Hockey: displayClock is time REMAINING in the period.
+ *   We compute elapsed minutes inside that period and add prior periods.
+ * Returns the elapsed match minute as an integer, or null if it cannot be parsed.
+ */
+function extractLiveMinute(
+  status: ESPNEvent['status'],
+  sportType: ESPNLeagueConfig['sportType']
+): number | null {
+  const dc = (status.displayClock || '').trim();
+  const period = status.period || 0;
+  if (!dc && !period) return null;
+
+  if (sportType === 'soccer') {
+    // "75'" or "90+3'" or "45+2"
+    const m = dc.match(/^(\d+)(?:\+(\d+))?'?$/);
+    if (m) {
+      const base = parseInt(m[1], 10);
+      const extra = m[2] ? parseInt(m[2], 10) : 0;
+      return base + extra;
+    }
+    // "MM:SS" elapsed inside current half
+    const mmss = dc.match(/^(\d+):(\d+)$/);
+    if (mmss) {
+      const mins = parseInt(mmss[1], 10);
+      if (period >= 2) return Math.min(45 + mins, 130);
+      return mins;
+    }
+    // Halftime / pre-match — fall through to 45 / 0
+    if (status.type?.name?.toLowerCase().includes('half')) return 45;
+    return null;
+  }
+
+  // Period-based sports — remaining time in MM:SS in current period
+  const mmss = dc.match(/^(\d+):(\d+)$/);
+  if (mmss) {
+    // Determine period length per sport
+    const periodLen = sportType === 'basketball'
+      ? 12 // NBA quarter; college is 20 (handled below)
+      : sportType === 'football' ? 15
+      : sportType === 'hockey' ? 20
+      : sportType === 'rugby' ? 40
+      : 12;
+    const remainingMin = parseInt(mmss[1], 10);
+    const elapsedInPeriod = Math.max(0, periodLen - remainingMin - 1); // approx, treat seconds as part of current min
+    const completedPeriods = Math.max(0, period - 1);
+    return completedPeriods * periodLen + elapsedInPeriod;
+  }
+
+  return period || null;
 }
 
 // Generate realistic odds based on team factors
@@ -1231,7 +1406,7 @@ async function getESPNMatches(config: ESPNLeagueConfig): Promise<UnifiedMatch[]>
       status,
       homeScore: homeCompetitor?.score ? parseInt(homeCompetitor.score, 10) : null,
       awayScore: awayCompetitor?.score ? parseInt(awayCompetitor.score, 10) : null,
-      minute: event.status.period,
+      minute: extractLiveMinute(event.status, config.sportType) ?? undefined,
       period: event.status.displayClock,
       league: {
         id: config.leagueId,

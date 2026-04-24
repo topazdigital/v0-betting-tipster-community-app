@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { cn } from '@/lib/utils';
 import type { MatchWithDetails } from '@/lib/types';
 import { MatchCard } from './match-card';
+import { LeagueFlag } from '@/components/ui/team-logo';
 
 interface MatchListProps {
   title: string;
@@ -63,9 +64,13 @@ export function MatchList({ title, matches, defaultExpanded = true, showCount = 
             <div key={league.id}>
               {/* League Header */}
               <div className="flex items-center gap-2 border-b border-border bg-muted/30 px-4 py-2">
-                <div className="flex h-5 w-5 items-center justify-center rounded bg-muted text-xs font-semibold">
-                  {country?.code?.substring(0, 2) || league.name.charAt(0)}
-                </div>
+                {country?.code ? (
+                  <LeagueFlag countryCode={country.code} size="sm" />
+                ) : (
+                  <div className="flex h-5 w-5 items-center justify-center rounded bg-muted text-xs font-semibold">
+                    {league.name.charAt(0)}
+                  </div>
+                )}
                 <span className="text-sm font-medium text-foreground">{league.name}</span>
                 <span className="text-xs text-muted-foreground">({leagueMatches.length})</span>
               </div>

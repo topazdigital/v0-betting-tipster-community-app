@@ -8,6 +8,7 @@ import { formatTime, formatRelativeTime } from '@/lib/utils/timezone';
 import { formatOdds } from '@/lib/utils/odds-converter';
 import type { MatchWithDetails } from '@/lib/types';
 import { LiveIndicator } from './live-indicator';
+import { LeagueFlag } from '@/components/ui/team-logo';
 
 interface MatchCardProps {
   match: MatchWithDetails;
@@ -33,10 +34,15 @@ export function MatchCard({ match, odds, compact = false }: MatchCardProps) {
       >
         {/* Header */}
         <div className="mb-2 flex items-center justify-between text-xs text-muted-foreground">
-          <span className="truncate">{match.league.name}</span>
+          <div className="flex min-w-0 items-center gap-1.5">
+            {match.country?.code && (
+              <LeagueFlag countryCode={match.country.code} size="xs" />
+            )}
+            <span className="truncate">{match.league.name}</span>
+          </div>
           <div className="flex items-center gap-2">
             {isLive ? (
-              <LiveIndicator minute={45} />
+              <LiveIndicator minute={match.minute ?? 45} />
             ) : isFinished ? (
               <span className="font-medium text-foreground">FT</span>
             ) : (

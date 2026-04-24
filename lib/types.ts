@@ -101,6 +101,8 @@ export interface MatchWithDetails extends Match {
   away_team: Team;
   country?: Country;
   tips_count?: number;
+  minute?: number;
+  period?: string;
 }
 
 // Odds & Markets Types
