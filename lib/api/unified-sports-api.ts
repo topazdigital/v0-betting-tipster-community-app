@@ -52,6 +52,7 @@ export interface UnifiedMatch {
   odds?: MatchOdds;
   markets?: Market[];
   tipsCount: number;
+  venue?: string;
   // Sport-specific statistics
   sportSpecificData?: SportSpecificData;
 }
@@ -390,7 +391,22 @@ interface ESPNScoreboardResponse {
   }>;
 }
 
-async function fetchESPN(sport: string, league: string, endpoint: string = 'scoreboard'): Promise<ESPNScoreboardResponse | null> {
+// Build reverse lookup: slugified league key (e.g. "eng1") -> ESPNLeagueConfig
+const ESPN_LEAGUE_BY_SLUG = new Map<string, ESPNLeagueConfig>();
+for (const cfg of ESPN_LEAGUES) {
+  ESPN_LEAGUE_BY_SLUG.set(cfg.league.replace(/[^a-z0-9]/gi, ''), cfg);
+}
+export function getEspnLeagueConfigForId(matchId: string): ESPNLeagueConfig | null {
+  const m = matchId.match(/^espn_([a-z0-9]+)_(\d+)$/i);
+  if (!m) return null;
+  return ESPN_LEAGUE_BY_SLUG.get(m[1]) || null;
+}
+export function getEspnEventIdFromMatchId(matchId: string): string | null {
+  const m = matchId.match(/^espn_[a-z0-9]+_(\d+)$/i);
+  return m ? m[1] : null;
+}
+
+async function fetchESPN(sport: string, league: string, endpoint: string = 'scoreboard'): Promise<ESPNScoreboardResponseFull | null> {
   const url = `${ESPN_BASE_URL}/${sport}/${league}/${endpoint}`;
   
   try {
@@ -410,6 +426,198 @@ async function fetchESPN(sport: string, league: string, endpoint: string = 'scor
     return await response.json();
   } catch (error) {
     apiStatus.espn.lastError = String(error);
+    return null;
+  }
+}
+
+// ============================================
+// ESPN Odds extraction (real DraftKings/etc odds)
+// ============================================
+
+function americanToDecimal(american: number | string | undefined): number | undefined {
+  if (american === undefined || american === null || american === '') return undefined;
+  const n = typeof american === 'string' ? parseFloat(american.replace(/[^\d.\-+]/g, '')) : american;
+  if (!Number.isFinite(n) || n === 0) return undefined;
+  const decimal = n > 0 ? 1 + n / 100 : 1 + 100 / Math.abs(n);
+  return Math.round(decimal * 100) / 100;
+}
+
+interface ESPNOddsRaw {
+  provider?: { id?: string; name?: string; displayName?: string };
+  details?: string;
+  overUnder?: number;
+  spread?: number;
+  overOdds?: number | string;
+  underOdds?: number | string;
+  drawOdds?: { moneyLine?: number };
+  homeTeamOdds?: { moneyLine?: number; spreadOdds?: number; favorite?: boolean; team?: { id?: string } };
+  awayTeamOdds?: { moneyLine?: number; spreadOdds?: number; favorite?: boolean; team?: { id?: string } };
+  total?: {
+    over?: { close?: { odds?: string }, open?: { odds?: string } };
+    under?: { close?: { odds?: string }, open?: { odds?: string } };
+  };
+}
+
+interface ESPNScoreboardResponseFull extends ESPNScoreboardResponse {
+  events: Array<ESPNEvent & { competitions: Array<ESPNEvent['competitions'][number] & { odds?: ESPNOddsRaw[]; venue?: { fullName?: string; address?: { city?: string; country?: string } } }> }>;
+}
+
+export function extractEspnOdds(rawOddsList: ESPNOddsRaw[] | undefined, hasDraw: boolean = true): { odds?: MatchOdds; markets?: Market[] } {
+  if (!rawOddsList || rawOddsList.length === 0) return {};
+  // Pick first non-empty provider
+  const o = rawOddsList.find(x => x.homeTeamOdds?.moneyLine !== undefined || x.awayTeamOdds?.moneyLine !== undefined) || rawOddsList[0];
+  if (!o) return {};
+
+  const home = americanToDecimal(o.homeTeamOdds?.moneyLine);
+  const away = americanToDecimal(o.awayTeamOdds?.moneyLine);
+  const draw = hasDraw ? americanToDecimal(o.drawOdds?.moneyLine) : undefined;
+
+  if (!home || !away) return {};
+
+  const odds: MatchOdds = {
+    home,
+    away,
+    draw,
+    bookmaker: o.provider?.displayName || o.provider?.name || 'Bookmaker',
+    lastUpdate: new Date(),
+  };
+
+  const markets: Market[] = [{
+    key: 'h2h',
+    name: 'Match Result',
+    outcomes: [
+      { name: 'Home', price: home },
+      ...(draw ? [{ name: 'Draw', price: draw }] : []),
+      { name: 'Away', price: away },
+    ],
+  }];
+
+  // Spread / handicap
+  if (o.spread !== undefined && o.homeTeamOdds?.spreadOdds !== undefined) {
+    const homeSpread = americanToDecimal(o.homeTeamOdds.spreadOdds);
+    const awaySpread = americanToDecimal(o.awayTeamOdds?.spreadOdds);
+    if (homeSpread && awaySpread) {
+      markets.push({
+        key: 'spreads',
+        name: 'Handicap',
+        outcomes: [
+          { name: 'Home', price: homeSpread, point: -Math.abs(o.spread) },
+          { name: 'Away', price: awaySpread, point: Math.abs(o.spread) },
+        ],
+      });
+    }
+  }
+
+  // Totals (over/under)
+  if (o.overUnder !== undefined) {
+    const overOdds = americanToDecimal(o.total?.over?.close?.odds || o.overOdds);
+    const underOdds = americanToDecimal(o.total?.under?.close?.odds || o.underOdds);
+    if (overOdds && underOdds) {
+      markets.push({
+        key: 'totals',
+        name: 'Total Goals/Points',
+        outcomes: [
+          { name: 'Over', price: overOdds, point: o.overUnder },
+          { name: 'Under', price: underOdds, point: o.overUnder },
+        ],
+      });
+    }
+  }
+
+  return { odds, markets };
+}
+
+// ============================================
+// ESPN Summary endpoint - rich match details
+// ============================================
+
+export interface ESPNSummaryResponse {
+  header?: {
+    competitions?: Array<{
+      competitors?: Array<{
+        id?: string;
+        homeAway?: 'home' | 'away';
+        winner?: boolean;
+        team?: { id: string; displayName: string; abbreviation: string; logo?: string; color?: string };
+        score?: string;
+        record?: Array<{ summary?: string; type?: string }>;
+        form?: string; // "WWDLW"
+      }>;
+    }>;
+    season?: { year?: number; type?: number };
+    league?: { id?: string; name?: string };
+  };
+  gameInfo?: {
+    venue?: { fullName?: string; address?: { city?: string; country?: string }; capacity?: number; indoor?: boolean };
+    attendance?: number;
+    officials?: Array<{ displayName?: string; position?: { displayName?: string } }>;
+    weather?: { displayValue?: string; temperature?: number };
+  };
+  pickcenter?: ESPNOddsRaw[];
+  odds?: ESPNOddsRaw[];
+  hasOdds?: boolean;
+  rosters?: Array<{
+    team?: { id: string; displayName: string; logo?: string };
+    homeAway?: 'home' | 'away';
+    formation?: string;
+    roster?: Array<{
+      starter?: boolean;
+      position?: { abbreviation?: string; name?: string };
+      jersey?: string;
+      athlete?: { id: string; displayName: string; shortName?: string; headshot?: string };
+      stats?: Array<{ name?: string; displayValue?: string }>;
+    }>;
+    coach?: Array<{ firstName?: string; lastName?: string; displayName?: string }>;
+  }>;
+  headToHeadGames?: Array<{
+    team?: { id?: string; displayName?: string; abbreviation?: string; logo?: string };
+    games?: Array<{
+      gameDate?: string;
+      score?: string;
+      gameResult?: string;
+      homeTeam?: { displayName: string; abbreviation: string; logo?: string; score?: string };
+      awayTeam?: { displayName: string; abbreviation: string; logo?: string; score?: string };
+      league?: { abbreviation?: string };
+    }>;
+  }>;
+  standings?: {
+    fullViewLink?: { href?: string };
+    groups?: Array<{
+      header?: string;
+      standings?: {
+        entries?: Array<{
+          team?: { id?: string; displayName?: string; abbreviation?: string; logo?: string };
+          stats?: Array<{ name?: string; abbreviation?: string; value?: number; displayValue?: string }>;
+        }>;
+      };
+    }>;
+  };
+  news?: { articles?: Array<{ id?: number; headline?: string; description?: string; published?: string; images?: Array<{ url?: string }>; links?: { web?: { href?: string } } }> };
+  leaders?: Array<{
+    team?: { id?: string; displayName?: string };
+    leaders?: Array<{
+      name?: string;
+      displayName?: string;
+      leaders?: Array<{ displayValue?: string; athlete?: { displayName?: string; headshot?: string; shortName?: string } }>;
+    }>;
+  }>;
+  broadcasts?: Array<{ market?: string; media?: { shortName?: string } }>;
+}
+
+export async function fetchESPNSummary(sport: string, league: string, eventId: string): Promise<ESPNSummaryResponse | null> {
+  const cacheKey = `espn-summary-${sport}-${league}-${eventId}`;
+  const cached = getCached<ESPNSummaryResponse>(cacheKey, 60 * 1000); // 1 min
+  if (cached) return cached;
+
+  const url = `${ESPN_BASE_URL}/${sport}/${league}/summary?event=${eventId}`;
+  try {
+    const r = await fetch(url, { headers: { 'Accept': 'application/json' }, next: { revalidate: 60 } });
+    if (!r.ok) return null;
+    const j = await r.json() as ESPNSummaryResponse;
+    setCache(cacheKey, j);
+    return j;
+  } catch (e) {
+    console.error('[ESPN summary] fetch failed', e);
     return null;
   }
 }
@@ -809,6 +1017,10 @@ async function getESPNMatches(config: ESPNLeagueConfig): Promise<UnifiedMatch[]>
   const data = await fetchESPN(config.sport, config.league);
   if (!data?.events) return [];
 
+  // Sports without draws (basketball, baseball, mma, tennis etc.)
+  const noDrawSports: ESPNLeagueConfig['sportType'][] = ['basketball', 'baseball', 'mma', 'tennis', 'golf', 'racing'];
+  const hasDraw = !noDrawSports.includes(config.sportType);
+
   const matches: UnifiedMatch[] = data.events.map((event) => {
     const competition = event.competitions[0];
     const homeCompetitor = competition?.competitors.find(c => c.homeAway === 'home');
@@ -819,9 +1031,9 @@ async function getESPNMatches(config: ESPNLeagueConfig): Promise<UnifiedMatch[]>
     const awayTeamName = awayCompetitor?.team?.displayName || awayCompetitor?.team?.name || awayCompetitor?.athlete?.displayName || 'TBD';
     
     const status = mapESPNStatus(event.status);
-    const odds = generateRealisticOdds(homeTeamName, awayTeamName, config.sportType);
-    const markets = generateBettingMarkets(homeTeamName, awayTeamName, odds, config.sportType);
-    const sportSpecificData = generateSportSpecificData(config.sportType, status);
+    // Extract REAL odds from ESPN scoreboard (DraftKings/Caesars/etc) - NO computed fallback
+    const { odds, markets } = extractEspnOdds(competition?.odds, hasDraw);
+    const venue = competition?.venue?.fullName;
 
     return {
       id: `espn_${config.league.replace(/[^a-z0-9]/gi, '')}_${event.id}`,
@@ -866,12 +1078,18 @@ async function getESPNMatches(config: ESPNLeagueConfig): Promise<UnifiedMatch[]>
       odds,
       markets,
       tipsCount: 0,
-      sportSpecificData,
+      venue,
     };
   });
 
-  setCache(cacheKey, matches);
-  return matches;
+  // Filter out tournament-style events without a proper head-to-head matchup
+  const filtered = matches.filter(m => {
+    if (m.homeTeam.name === 'TBD' && m.awayTeam.name === 'TBD') return false;
+    return true;
+  });
+
+  setCache(cacheKey, filtered);
+  return filtered;
 }
 
 // ============================================

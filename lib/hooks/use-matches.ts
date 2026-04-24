@@ -227,6 +227,13 @@ export interface MatchFilters {
   status?: string;
 }
 
+// Browser timezone offset in minutes (e.g. UTC+3 -> +180)
+function getTzOffsetMin(): number {
+  // Date.getTimezoneOffset returns minutes WEST of UTC (positive for negative TZ)
+  // Invert sign so e.g. EAT (UTC+3) returns +180.
+  return -new Date().getTimezoneOffset();
+}
+
 // Main hook for all matches - FETCHES FROM REAL API
 export function useMatches(filters?: MatchFilters) {
   const countryCode = useUserCountry();
@@ -237,6 +244,7 @@ export function useMatches(filters?: MatchFilters) {
   if (filters?.leagueId) params.set('leagueId', filters.leagueId.toString());
   if (filters?.status) params.set('status', filters.status);
   if (countryCode) params.set('countryCode', countryCode);
+  if (typeof window !== 'undefined') params.set('tzOffsetMin', String(getTzOffsetMin()));
   
   const queryString = params.toString();
   const url = `/api/matches${queryString ? `?${queryString}` : ''}`;

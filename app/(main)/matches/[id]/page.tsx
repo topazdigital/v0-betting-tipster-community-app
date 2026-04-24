@@ -2,88 +2,159 @@
 
 import { useState, use } from "react"
 import Link from "next/link"
+import Image from "next/image"
 import useSWR from "swr"
-import { 
-  ArrowLeft, Clock, Radio, Users, TrendingUp, 
-  Share2, Bookmark, Star, CheckCircle2, Trophy, Target, BarChart3,
-  Shirt, PlusCircle
+import {
+  ArrowLeft, Clock, Radio, Share2, Bookmark, CheckCircle2,
+  Trophy, BarChart3, Shirt, Newspaper, MapPin, Tv,
+  TrendingUp, Award,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Progress } from "@/components/ui/progress"
+import { Card, CardContent } from "@/components/ui/card"
 import { Spinner } from "@/components/ui/spinner"
 import { TeamLogo } from "@/components/ui/team-logo"
-import { AddTipForm } from "@/components/matches/add-tip-form"
-import { SportSpecificStats } from "@/components/matches/sport-specific-stats"
 import { cn } from "@/lib/utils"
-import { useAuth } from "@/contexts/auth-context"
 import { formatTime, formatDate, getBrowserTimezone, getDayLabel } from "@/lib/utils/timezone"
 
-interface PageProps {
-  params: Promise<{ id: string }>
+interface PageProps { params: Promise<{ id: string }> }
+
+interface Player {
+  name: string
+  fullName?: string
+  position?: string
+  jersey?: string
+  starter: boolean
+  headshot?: string
+}
+interface TeamRoster {
+  teamId?: string
+  teamName?: string
+  teamLogo?: string
+  formation?: string
+  coach?: string
+  starting: Player[]
+  bench: Player[]
+}
+interface Lineups { home: TeamRoster | null; away: TeamRoster | null }
+interface BookmakerOdd {
+  bookmaker: string
+  home: number
+  draw?: number
+  away: number
+  spread?: { value: number; homePrice: number; awayPrice: number }
+  total?: { value: number; overPrice: number; underPrice: number }
+}
+interface H2HGame {
+  date: string
+  league?: string
+  home: { name: string; logo?: string; score?: number }
+  away: { name: string; logo?: string; score?: number }
+}
+interface StandingRow {
+  teamId?: string
+  teamName?: string
+  teamLogo?: string
+  played: number
+  won: number
+  drawn: number
+  lost: number
+  goalsFor?: number
+  goalsAgainst?: number
+  goalDifference?: number
+  points: number
+  position?: number
+}
+interface StandingsGroup { header?: string; rows: StandingRow[] }
+interface NewsItem {
+  headline?: string
+  description?: string
+  published?: string
+  image?: string
+  link?: string
+}
+interface LeaderItem {
+  team?: string
+  category?: string
+  athlete?: string
+  headshot?: string
+  value?: string
+}
+interface MatchDetails {
+  match: {
+    id: string
+    homeTeam: { name: string; logo?: string; form?: string; record?: string }
+    awayTeam: { name: string; logo?: string; form?: string; record?: string }
+    kickoffTime: string
+    status: string
+    homeScore: number | null
+    awayScore: number | null
+    minute?: number
+    league: { name: string; country: string; countryCode: string }
+    sport: { name: string; slug: string; icon: string }
+    odds?: { home: number; draw?: number; away: number; bookmaker?: string }
+    venue?: string
+    venueCity?: string
+    venueCountry?: string
+    attendance?: number
+    broadcasts?: string[]
+  }
+  bookmakerOdds: BookmakerOdd[]
+  lineups: Lineups | null
+  h2h: H2HGame[] | null
+  standings: StandingsGroup[] | null
+  news: NewsItem[]
+  leaders: LeaderItem[]
+  hasRealOdds: boolean
+  hasLineups: boolean
+  hasStandings: boolean
+  hasH2H: boolean
 }
 
-const matchFetcher = async (url: string) => {
+const fetcher = async (url: string): Promise<MatchDetails> => {
   const res = await fetch(url)
   if (!res.ok) throw new Error('Failed to fetch match')
   return res.json()
 }
 
-// Generate tips based on match data
-const generateTips = (homeTeam: string, awayTeam: string, odds?: { home: number; draw?: number; away: number }) => 
-  Array.from({ length: 8 }, (_, i) => ({
-    id: i + 1,
-    tipster: {
-      id: i + 100,
-      name: ["KingOfTips", "AcePredicts", "LuckyStriker", "EuroExpert", "ProBetter", "OddsWizard", "TipMaster", "BetKing"][i],
-      winRate: 55 + Math.floor(Math.random() * 30),
-      verified: i % 3 === 0,
-      roi: (5 + Math.random() * 15).toFixed(1)
-    },
-    prediction: [
-      `${homeTeam} Win`, 
-      `${awayTeam} Win`, 
-      "Draw", 
-      "Over 2.5 Goals", 
-      "Both Teams to Score", 
-      "Under 2.5 Goals", 
-      `${homeTeam} -1`, 
-      `${awayTeam} +1`
-    ][i],
-    market: ["1X2", "Over/Under", "BTTS", "Asian Handicap", "Double Chance"][i % 5],
-    odds: odds ? [odds.home, odds.away, odds.draw || 3.2, 1.85, 1.72, 2.05, 2.1, 1.75][i].toFixed(2) : (1.5 + Math.random() * 2).toFixed(2),
-    confidence: 60 + Math.floor(Math.random() * 35),
-    analysis: [
-      `Based on recent form - ${homeTeam} has won 4 of last 5 matches.`,
-      `Head-to-head record favors ${awayTeam} in this fixture.`,
-      "Both teams have scored in 8 of their last 10 games.",
-      `${homeTeam}'s defensive record suggests low-scoring game.`,
-      `${awayTeam} struggling on the road - 1 win in 6 away games.`
-    ][i % 5],
-    likes: Math.floor(Math.random() * 100),
-    createdAt: new Date(Date.now() - Math.random() * 24 * 60 * 60 * 1000)
-  }))
+const SportEmoji = ({ slug }: { slug?: string }) => {
+  const map: Record<string, string> = {
+    soccer: '⚽', football: '🏈', basketball: '🏀', tennis: '🎾',
+    baseball: '⚾', hockey: '🏒', mma: '🥊', cricket: '🏏',
+    rugby: '🏉', golf: '⛳', 'formula-1': '🏎️', racing: '🏎️',
+  }
+  return <span className="text-lg">{map[slug || ''] || '🏆'}</span>
+}
+
+const FormBadge = ({ result }: { result: string }) => {
+  const r = result.toUpperCase()
+  return (
+    <span className={cn(
+      "flex h-6 w-6 shrink-0 items-center justify-center rounded text-xs font-bold text-white",
+      r === 'W' && "bg-emerald-600",
+      r === 'D' && "bg-amber-500",
+      r === 'L' && "bg-rose-600",
+      !['W', 'D', 'L'].includes(r) && "bg-muted-foreground"
+    )}>{r}</span>
+  )
+}
 
 export default function MatchDetailPage({ params }: PageProps) {
   const { id } = use(params)
-  const { isAuthenticated } = useAuth()
   const timezone = getBrowserTimezone()
-  
-  const { data, error, isLoading } = useSWR(
-    `/api/matches/${encodeURIComponent(id)}`,
-    matchFetcher,
-    { refreshInterval: 10000 }
-  )
-  
   const [savedMatch, setSavedMatch] = useState(false)
-  const [activeTab, setActiveTab] = useState("odds")
-  const [showTipForm, setShowTipForm] = useState(false)
+  const [activeTab, setActiveTab] = useState('overview')
+
+  const { data, error, isLoading } = useSWR<MatchDetails>(
+    `/api/matches/${encodeURIComponent(id)}/details`,
+    fetcher,
+    { refreshInterval: 15000 }
+  )
 
   if (isLoading) {
     return (
-      <div className="flex-1 flex h-96 items-center justify-center">
+      <div className="flex h-96 flex-1 items-center justify-center">
         <div className="flex items-center gap-3">
           <Spinner className="h-8 w-8" />
           <span className="text-muted-foreground">Loading match details...</span>
@@ -96,630 +167,578 @@ export default function MatchDetailPage({ params }: PageProps) {
     return (
       <div className="flex-1 p-8 text-center">
         <h1 className="text-2xl font-bold">Match not found</h1>
-        <p className="text-muted-foreground mt-2">The match you&apos;re looking for doesn&apos;t exist or has been removed.</p>
-        <Button asChild className="mt-4">
-          <Link href="/matches">Back to Matches</Link>
-        </Button>
+        <p className="mt-2 text-muted-foreground">This match may no longer be available.</p>
+        <Button asChild className="mt-4"><Link href="/matches">Back to Matches</Link></Button>
       </div>
     )
   }
 
-  const { match, bookmakerOdds, h2h, stats, lineups, teamForm } = data
-  const tips = generateTips(match.homeTeam.name, match.awayTeam.name, match.odds)
-
-  // Form display helper
-  const FormBadge = ({ result }: { result: 'W' | 'D' | 'L' }) => (
-    <span className={cn(
-      "flex h-6 w-6 items-center justify-center rounded text-xs font-bold text-white",
-      result === 'W' && "bg-success",
-      result === 'D' && "bg-muted-foreground",
-      result === 'L' && "bg-destructive"
-    )}>
-      {result}
-    </span>
-  )
+  const { match, bookmakerOdds, lineups, h2h, standings, news, leaders, hasRealOdds } = data
+  const isLive = match.status === 'live' || match.status === 'halftime' || match.status === 'extra_time' || match.status === 'penalties'
+  const isFinished = match.status === 'finished'
 
   return (
     <div className="flex-1 overflow-hidden">
-      <div className="mx-auto max-w-5xl px-4 py-6 pb-24 md:pb-6">
-        {/* Back Button */}
-        <Button variant="ghost" size="sm" className="mb-4" asChild>
-          <Link href="/matches">
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Back to Matches
-          </Link>
+      <div className="mx-auto max-w-6xl px-3 py-4 pb-24 md:px-6 md:py-6 md:pb-8">
+        {/* Back */}
+        <Button variant="ghost" size="sm" className="mb-3" asChild>
+          <Link href="/matches"><ArrowLeft className="mr-2 h-4 w-4" />Back to Matches</Link>
         </Button>
 
-        {/* Match Header Card */}
-        <Card className="mb-6 overflow-hidden">
-          <div className="bg-gradient-to-r from-primary/10 to-transparent p-4 md:p-6">
-            {/* Top Info */}
-            <div className="flex items-center justify-between flex-wrap gap-2">
+        {/* HERO HEADER */}
+        <Card className="mb-4 overflow-hidden border-0 bg-gradient-to-br from-primary/15 via-primary/5 to-background shadow-lg">
+          <div className="border-b border-border/40 px-4 py-3 md:px-6">
+            <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center gap-2">
-                <span className="text-2xl">{
-                  match.sport?.icon === 'soccer' ? '⚽' : 
-                  match.sport?.icon === 'basketball' ? '🏀' : 
-                  match.sport?.icon === 'football' ? '🏈' :
-                  match.sport?.icon === 'tennis' ? '🎾' :
-                  match.sport?.icon === 'baseball' ? '⚾' :
-                  match.sport?.icon === 'hockey' ? '🏒' :
-                  match.sport?.icon === 'mma' ? '🥊' :
-                  match.sport?.icon === 'cricket' ? '🏏' :
-                  match.sport?.icon === 'rugby' ? '🏉' :
-                  match.sport?.icon === 'golf' ? '⛳' :
-                  match.sport?.icon === 'formula-1' ? '🏎️' :
-                  '🏆'
-                }</span>
-                <div>
-                  <p className="font-semibold">{match.league?.name || 'Unknown League'}</p>
-                  <p className="text-sm text-muted-foreground">
-                    {match.league?.country || 'Unknown'} 
-                    {match.venue && ` • ${match.venue}`}
-                  </p>
-                </div>
+                <SportEmoji slug={match.sport.slug} />
+                <Link href={`/leagues/${match.league.country}`} className="text-sm font-semibold hover:underline">
+                  {match.league.name}
+                </Link>
+                <span className="text-xs text-muted-foreground">• {match.league.country}</span>
               </div>
-
-              <div className="flex items-center gap-2">
-                {match.status === "live" && (
-                  <Badge variant="destructive" className="gap-1 animate-pulse">
-                    <Radio className="h-3 w-3" />
-                    LIVE {match.minute}&apos;
+              <div className="flex items-center gap-1.5">
+                {isLive && (
+                  <Badge variant="destructive" className="animate-pulse gap-1">
+                    <Radio className="h-3 w-3" />LIVE {match.minute ? `${match.minute}'` : ''}
                   </Badge>
                 )}
-
-                {match.status === "halftime" && (
-                  <Badge variant="secondary" className="gap-1">
-                    HT
-                  </Badge>
-                )}
-
-                {match.status === "scheduled" && (
+                {match.status === 'scheduled' && (
                   <Badge variant="secondary" className="gap-1">
                     <Clock className="h-3 w-3" />
                     {getDayLabel(match.kickoffTime, timezone)} • {formatTime(match.kickoffTime, timezone)}
                   </Badge>
                 )}
-
-                {match.status === "finished" && (
+                {isFinished && (
                   <Badge className="gap-1 bg-emerald-600 text-white">
-                    <CheckCircle2 className="h-3 w-3" />
-                    FT
+                    <CheckCircle2 className="h-3 w-3" />FT
                   </Badge>
                 )}
-
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => setSavedMatch(!savedMatch)}
-                >
-                  <Bookmark className={cn("h-5 w-5", savedMatch && "fill-current")} />
+                <Button variant="ghost" size="icon" onClick={() => setSavedMatch(!savedMatch)}>
+                  <Bookmark className={cn("h-4 w-4", savedMatch && "fill-current")} />
                 </Button>
-
-                <Button variant="ghost" size="icon">
-                  <Share2 className="h-5 w-5" />
-                </Button>
+                <Button variant="ghost" size="icon"><Share2 className="h-4 w-4" /></Button>
               </div>
             </div>
+          </div>
 
-            {/* Teams & Score */}
-            <div className="mt-6 grid grid-cols-3 items-center gap-2 md:gap-4">
-              <div className="text-center">
-                <TeamLogo 
-                  teamName={match.homeTeam.name} 
-                  logoUrl={match.homeTeam.logo} 
-                  size="lg"
-                  className="mx-auto mb-2"
-                />
-                <h2 className="font-bold text-sm md:text-lg line-clamp-2">{match.homeTeam.name}</h2>
-                {teamForm?.home && (
-                  <div className="flex justify-center gap-1 mt-2">
-                    {teamForm.home.map((r: 'W' | 'D' | 'L', i: number) => (
-                      <FormBadge key={i} result={r} />
-                    ))}
+          {/* Teams + Score */}
+          <div className="px-4 py-6 md:px-6 md:py-8">
+            <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 md:gap-6">
+              {/* Home */}
+              <div className="flex flex-col items-center text-center">
+                <TeamLogo teamName={match.homeTeam.name} logoUrl={match.homeTeam.logo} size="lg" />
+                <p className="mt-3 line-clamp-2 text-base font-bold md:text-lg">{match.homeTeam.name}</p>
+                {match.homeTeam.record && (
+                  <p className="mt-0.5 text-xs text-muted-foreground">{match.homeTeam.record}</p>
+                )}
+                {match.homeTeam.form && (
+                  <div className="mt-2 flex gap-1">
+                    {match.homeTeam.form.split('').slice(0, 5).map((r, i) => <FormBadge key={i} result={r} />)}
                   </div>
                 )}
               </div>
 
-              <div className="text-center">
-                {match.status !== "scheduled" ? (
-                  <div className="text-4xl md:text-5xl font-bold">
-                    <span className={cn(
-                      match.homeScore > match.awayScore && "text-emerald-500"
-                    )}>{match.homeScore}</span>
-                    <span className="mx-2 text-muted-foreground">-</span>
-                    <span className={cn(
-                      match.awayScore > match.homeScore && "text-emerald-500"
-                    )}>{match.awayScore}</span>
-                  </div>
-                ) : (
-                  <div>
-                    <div className="text-2xl md:text-3xl font-bold">
-                      {formatTime(match.kickoffTime, timezone)}
+              {/* Score / Time */}
+              <div className="flex flex-col items-center justify-center px-2">
+                {(isLive || isFinished) ? (
+                  <>
+                    <div className="flex items-center gap-3 text-4xl font-bold tabular-nums md:text-6xl">
+                      <span className={cn(isLive && "text-primary")}>{match.homeScore ?? 0}</span>
+                      <span className="text-muted-foreground">:</span>
+                      <span className={cn(isLive && "text-primary")}>{match.awayScore ?? 0}</span>
                     </div>
-                    <div className="text-xs md:text-sm text-muted-foreground">
-                      {getDayLabel(match.kickoffTime, timezone)} · {formatDate(match.kickoffTime, timezone)}
-                    </div>
-                    <div className="text-[10px] text-muted-foreground/60 mt-0.5">
-                      Your timezone
-                    </div>
-                  </div>
-                )}
-                {match.status === "live" && match.minute && (
-                  <Badge variant="outline" className="mt-2 bg-red-500/10 text-red-500 border-red-500/30">
-                    <Clock className="mr-1 h-3 w-3" />
-                    {match.minute}&apos;
-                  </Badge>
-                )}
-                
-                {/* Quick Odds Display */}
-                {match.odds && match.status === "scheduled" && (
-                  <div className="mt-4 flex justify-center gap-2">
-                    <div className="rounded bg-muted px-2 py-1 text-xs">
-                      <div className="text-muted-foreground">1</div>
-                      <div className="font-bold">{match.odds.home}</div>
-                    </div>
-                    {match.odds.draw && (
-                      <div className="rounded bg-muted px-2 py-1 text-xs">
-                        <div className="text-muted-foreground">X</div>
-                        <div className="font-bold">{match.odds.draw}</div>
-                      </div>
+                    {isLive && match.minute !== undefined && (
+                      <p className="mt-2 font-mono text-sm text-rose-600">{match.minute}&apos;</p>
                     )}
-                    <div className="rounded bg-muted px-2 py-1 text-xs">
-                      <div className="text-muted-foreground">2</div>
-                      <div className="font-bold">{match.odds.away}</div>
-                    </div>
-                  </div>
+                    {isFinished && <p className="mt-2 text-sm text-muted-foreground">Full Time</p>}
+                  </>
+                ) : (
+                  <>
+                    <p className="text-2xl font-bold tabular-nums md:text-4xl">{formatTime(match.kickoffTime, timezone)}</p>
+                    <p className="mt-1 text-xs text-muted-foreground md:text-sm">
+                      {getDayLabel(match.kickoffTime, timezone)} • {formatDate(match.kickoffTime, timezone)}
+                    </p>
+                  </>
                 )}
               </div>
 
-              <div className="text-center">
-                <TeamLogo 
-                  teamName={match.awayTeam.name} 
-                  logoUrl={match.awayTeam.logo} 
-                  size="lg"
-                  className="mx-auto mb-2"
-                />
-                <h2 className="font-bold text-sm md:text-lg line-clamp-2">{match.awayTeam.name}</h2>
-                {teamForm?.away && (
-                  <div className="flex justify-center gap-1 mt-2">
-                    {teamForm.away.map((r: 'W' | 'D' | 'L', i: number) => (
-                      <FormBadge key={i} result={r} />
-                    ))}
+              {/* Away */}
+              <div className="flex flex-col items-center text-center">
+                <TeamLogo teamName={match.awayTeam.name} logoUrl={match.awayTeam.logo} size="lg" />
+                <p className="mt-3 line-clamp-2 text-base font-bold md:text-lg">{match.awayTeam.name}</p>
+                {match.awayTeam.record && (
+                  <p className="mt-0.5 text-xs text-muted-foreground">{match.awayTeam.record}</p>
+                )}
+                {match.awayTeam.form && (
+                  <div className="mt-2 flex gap-1">
+                    {match.awayTeam.form.split('').slice(0, 5).map((r, i) => <FormBadge key={i} result={r} />)}
                   </div>
                 )}
               </div>
             </div>
 
-            {/* Quick Stats */}
-            <div className="mt-6 flex items-center justify-center gap-4 md:gap-6 text-sm flex-wrap">
-              <div className="flex items-center gap-1 text-muted-foreground">
-                <Users className="h-4 w-4" />
-                {(h2h?.played || 10) * 500 + Math.floor(Math.random() * 1000)} watching
+            {/* Quick odds bar */}
+            {match.odds && (
+              <div className="mt-6 grid grid-cols-3 gap-2 md:mx-auto md:max-w-xl">
+                <div className="rounded-lg bg-muted/60 p-3 text-center transition-colors hover:bg-primary/10">
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground">Home</p>
+                  <p className="text-xl font-bold text-primary">{match.odds.home.toFixed(2)}</p>
+                </div>
+                {match.odds.draw !== undefined ? (
+                  <div className="rounded-lg bg-muted/60 p-3 text-center transition-colors hover:bg-primary/10">
+                    <p className="text-xs uppercase tracking-wide text-muted-foreground">Draw</p>
+                    <p className="text-xl font-bold text-primary">{match.odds.draw.toFixed(2)}</p>
+                  </div>
+                ) : <div />}
+                <div className="rounded-lg bg-muted/60 p-3 text-center transition-colors hover:bg-primary/10">
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground">Away</p>
+                  <p className="text-xl font-bold text-primary">{match.odds.away.toFixed(2)}</p>
+                </div>
+                {match.odds.bookmaker && (
+                  <p className="col-span-3 text-center text-[10px] text-muted-foreground">
+                    Odds by {match.odds.bookmaker}
+                  </p>
+                )}
               </div>
-              <div className="flex items-center gap-1 text-muted-foreground">
-                <TrendingUp className="h-4 w-4" />
-                {match.tipsCount || tips.length} predictions
+            )}
+
+            {/* Venue/broadcast strip */}
+            {(match.venue || match.broadcasts?.length || match.attendance) && (
+              <div className="mt-4 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                {match.venue && (
+                  <span className="flex items-center gap-1">
+                    <MapPin className="h-3 w-3" />{match.venue}
+                    {match.venueCity ? `, ${match.venueCity}` : ''}
+                  </span>
+                )}
+                {match.attendance ? (
+                  <span>👥 {match.attendance.toLocaleString()} attendance</span>
+                ) : null}
+                {match.broadcasts && match.broadcasts.length > 0 && (
+                  <span className="flex items-center gap-1">
+                    <Tv className="h-3 w-3" />{match.broadcasts.slice(0, 3).join(', ')}
+                  </span>
+                )}
               </div>
-              {isAuthenticated && match.status === "scheduled" && (
-                <Button 
-                  size="sm" 
-                  variant="outline" 
-                  onClick={() => setShowTipForm(!showTipForm)}
-                  className="gap-1"
-                >
-                  <PlusCircle className="h-4 w-4" />
-                  Add Tip
-                </Button>
-              )}
-            </div>
+            )}
           </div>
         </Card>
 
-        {/* Add Tip Form (Collapsible) */}
-        {showTipForm && isAuthenticated && match.status === "scheduled" && (
-          <div className="mb-6">
-            <AddTipForm
-              matchId={match.id}
-              homeTeam={match.homeTeam.name}
-              awayTeam={match.awayTeam.name}
-              odds={match.odds}
-              markets={match.markets}
-              onSubmit={(data) => {
-                console.log('[v0] Tip submitted:', data)
-                setShowTipForm(false)
-              }}
-            />
-          </div>
-        )}
-
-        {/* Tabs */}
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-5">
-            <TabsTrigger value="odds">Odds</TabsTrigger>
-            <TabsTrigger value="tips">Tips</TabsTrigger>
-            <TabsTrigger value="h2h">H2H</TabsTrigger>
-            <TabsTrigger value="stats">Stats</TabsTrigger>
-            <TabsTrigger value="lineups">Lineups</TabsTrigger>
+        {/* TABS */}
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="grid w-full grid-cols-3 md:grid-cols-6">
+            <TabsTrigger value="overview"><BarChart3 className="mr-1 h-4 w-4 hidden md:inline" />Overview</TabsTrigger>
+            <TabsTrigger value="odds"><TrendingUp className="mr-1 h-4 w-4 hidden md:inline" />Odds</TabsTrigger>
+            <TabsTrigger value="lineups"><Shirt className="mr-1 h-4 w-4 hidden md:inline" />Lineups</TabsTrigger>
+            <TabsTrigger value="h2h"><Award className="mr-1 h-4 w-4 hidden md:inline" />H2H</TabsTrigger>
+            <TabsTrigger value="standings"><Trophy className="mr-1 h-4 w-4 hidden md:inline" />Standings</TabsTrigger>
+            <TabsTrigger value="news"><Newspaper className="mr-1 h-4 w-4 hidden md:inline" />News</TabsTrigger>
           </TabsList>
 
-          {/* Odds Tab */}
-          <TabsContent value="odds" className="space-y-4">
+          {/* ============ OVERVIEW ============ */}
+          <TabsContent value="overview" className="mt-4 space-y-4">
+            {/* Top Performers */}
+            {leaders.length > 0 && (
+              <Card>
+                <CardContent className="p-4">
+                  <h3 className="mb-3 flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-muted-foreground">
+                    <Award className="h-4 w-4" />Top Performers
+                  </h3>
+                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                    {leaders.slice(0, 6).map((l, i) => (
+                      <div key={i} className="flex items-center gap-3 rounded-lg border border-border/50 bg-muted/30 p-3">
+                        {l.headshot ? (
+                          <Image src={l.headshot} alt={l.athlete || ''} width={40} height={40} className="rounded-full" unoptimized />
+                        ) : (
+                          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-muted text-xs font-bold">
+                            {l.athlete?.slice(0, 2)}
+                          </div>
+                        )}
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-semibold">{l.athlete}</p>
+                          <p className="truncate text-xs text-muted-foreground">{l.category} • {l.team}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-sm font-bold text-primary">{l.value}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Quick form summary */}
             <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="flex items-center gap-2 text-base">
-                  <Trophy className="h-5 w-5 text-amber-500" />
-                  Odds Comparison
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="overflow-x-auto -mx-4 px-4">
-                  <table className="w-full min-w-[400px]">
-                    <thead>
-                      <tr className="border-b">
-                        <th className="pb-3 text-left font-medium text-muted-foreground text-sm">Bookmaker</th>
-                        <th className="pb-3 text-center font-medium text-muted-foreground text-sm">1</th>
-                        <th className="pb-3 text-center font-medium text-muted-foreground text-sm">X</th>
-                        <th className="pb-3 text-center font-medium text-muted-foreground text-sm">2</th>
-                        <th className="pb-3 text-right font-medium text-muted-foreground text-sm"></th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {bookmakerOdds?.map((b: { 
-                        slug: string; 
-                        name: string; 
-                        homeOdds: number; 
-                        drawOdds?: number; 
-                        awayOdds: number; 
-                        affiliateUrl: string;
-                        isBestHome?: boolean;
-                        isBestAway?: boolean;
-                      }) => (
-                        <tr key={b.slug} className="border-b last:border-0 hover:bg-muted/50">
-                          <td className="py-3">
-                            <div className="flex items-center gap-2">
-                              <div className="flex h-8 w-8 items-center justify-center rounded bg-gradient-to-br from-primary/20 to-primary/5 font-bold text-xs text-primary">
-                                {b.name.charAt(0)}
-                              </div>
-                              <span className="font-medium text-sm">{b.name}</span>
+              <CardContent className="p-4">
+                <h3 className="mb-3 text-sm font-bold uppercase tracking-wide text-muted-foreground">Recent Form</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <div className="mb-2 flex items-center gap-2">
+                      <TeamLogo teamName={match.homeTeam.name} logoUrl={match.homeTeam.logo} size="sm" />
+                      <span className="truncate text-sm font-semibold">{match.homeTeam.name}</span>
+                    </div>
+                    {match.homeTeam.form ? (
+                      <div className="flex flex-wrap gap-1">
+                        {match.homeTeam.form.split('').map((r, i) => <FormBadge key={i} result={r} />)}
+                      </div>
+                    ) : <p className="text-xs text-muted-foreground">No form data available</p>}
+                  </div>
+                  <div>
+                    <div className="mb-2 flex items-center gap-2">
+                      <TeamLogo teamName={match.awayTeam.name} logoUrl={match.awayTeam.logo} size="sm" />
+                      <span className="truncate text-sm font-semibold">{match.awayTeam.name}</span>
+                    </div>
+                    {match.awayTeam.form ? (
+                      <div className="flex flex-wrap gap-1">
+                        {match.awayTeam.form.split('').map((r, i) => <FormBadge key={i} result={r} />)}
+                      </div>
+                    ) : <p className="text-xs text-muted-foreground">No form data available</p>}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* H2H quick view */}
+            {h2h && h2h.length > 0 && (
+              <Card>
+                <CardContent className="p-4">
+                  <div className="mb-3 flex items-center justify-between">
+                    <h3 className="text-sm font-bold uppercase tracking-wide text-muted-foreground">Recent Head-to-Head</h3>
+                    <Button variant="link" size="sm" onClick={() => setActiveTab('h2h')}>View all</Button>
+                  </div>
+                  <div className="space-y-2">
+                    {h2h.slice(0, 3).map((g, i) => (
+                      <H2HRow key={i} game={g} timezone={timezone} />
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* News strip */}
+            {news.length > 0 && (
+              <Card>
+                <CardContent className="p-4">
+                  <div className="mb-3 flex items-center justify-between">
+                    <h3 className="text-sm font-bold uppercase tracking-wide text-muted-foreground">Latest News</h3>
+                    <Button variant="link" size="sm" onClick={() => setActiveTab('news')}>View all</Button>
+                  </div>
+                  <div className="space-y-2">
+                    {news.slice(0, 3).map((n, i) => <NewsRow key={i} item={n} />)}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
+
+          {/* ============ ODDS ============ */}
+          <TabsContent value="odds" className="mt-4">
+            <Card>
+              <CardContent className="p-4">
+                {!hasRealOdds && bookmakerOdds.length === 0 ? (
+                  <EmptyState icon={<TrendingUp className="h-8 w-8" />} title="No odds available" description="Odds for this match aren't published yet." />
+                ) : bookmakerOdds.length > 0 ? (
+                  <>
+                    <h3 className="mb-3 text-sm font-bold uppercase tracking-wide text-muted-foreground">Match Result Odds</h3>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="border-b border-border/50 text-xs uppercase text-muted-foreground">
+                            <th className="px-3 py-2 text-left">Bookmaker</th>
+                            <th className="px-3 py-2 text-center">1</th>
+                            {bookmakerOdds.some(o => o.draw !== undefined) && <th className="px-3 py-2 text-center">X</th>}
+                            <th className="px-3 py-2 text-center">2</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {bookmakerOdds.map((o, i) => (
+                            <tr key={i} className="border-b border-border/30 hover:bg-muted/40">
+                              <td className="px-3 py-3 font-semibold">{o.bookmaker}</td>
+                              <td className="px-3 py-3 text-center font-mono font-bold text-primary">{o.home.toFixed(2)}</td>
+                              {bookmakerOdds.some(x => x.draw !== undefined) && (
+                                <td className="px-3 py-3 text-center font-mono font-bold text-primary">
+                                  {o.draw !== undefined ? o.draw.toFixed(2) : '—'}
+                                </td>
+                              )}
+                              <td className="px-3 py-3 text-center font-mono font-bold text-primary">{o.away.toFixed(2)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {/* Spreads & Totals */}
+                    {bookmakerOdds.some(o => o.spread || o.total) && (
+                      <div className="mt-6 grid gap-4 md:grid-cols-2">
+                        {bookmakerOdds.some(o => o.spread) && (
+                          <div>
+                            <h4 className="mb-2 text-xs font-bold uppercase tracking-wide text-muted-foreground">Handicap</h4>
+                            <div className="space-y-1.5">
+                              {bookmakerOdds.filter(o => o.spread).map((o, i) => (
+                                <div key={i} className="flex items-center justify-between rounded bg-muted/40 px-3 py-2 text-sm">
+                                  <span className="font-medium">{o.bookmaker}</span>
+                                  <div className="flex gap-2 font-mono">
+                                    <span>{o.spread!.value > 0 ? '+' : ''}{o.spread!.value} → <b className="text-primary">{o.spread!.homePrice.toFixed(2)}</b></span>
+                                    <span>/</span>
+                                    <span><b className="text-primary">{o.spread!.awayPrice.toFixed(2)}</b></span>
+                                  </div>
+                                </div>
+                              ))}
                             </div>
-                          </td>
-                          <td className="py-3 text-center">
-                            <span className={cn(
-                              "rounded-lg px-2 py-1 font-mono font-bold text-sm",
-                              b.isBestHome && "bg-emerald-500/10 text-emerald-600"
-                            )}>
-                              {b.homeOdds?.toFixed(2)}
-                            </span>
-                          </td>
-                          <td className="py-3 text-center">
-                            <span className="rounded-lg px-2 py-1 font-mono font-bold text-sm">
-                              {b.drawOdds?.toFixed(2) || '-'}
-                            </span>
-                          </td>
-                          <td className="py-3 text-center">
-                            <span className={cn(
-                              "rounded-lg px-2 py-1 font-mono font-bold text-sm",
-                              b.isBestAway && "bg-emerald-500/10 text-emerald-600"
-                            )}>
-                              {b.awayOdds?.toFixed(2)}
-                            </span>
-                          </td>
-                          <td className="py-3 text-right">
-                            <Button size="sm" variant="outline" className="h-7 text-xs" asChild>
-                              <a href={b.affiliateUrl} target="_blank" rel="noopener noreferrer">
-                                Bet
-                              </a>
-                            </Button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </CardContent>
-            </Card>
-            
-            {/* Markets */}
-            {match.markets && match.markets.length > 0 && (
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-base">Other Markets</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {match.markets.slice(0, 5).map((market: { key: string; name: string; outcomes: Array<{ name: string; price: number }> }) => (
-                    <div key={market.key}>
-                      <p className="text-sm font-medium text-muted-foreground mb-2">{market.name}</p>
-                      <div className="flex flex-wrap gap-2">
-                        {market.outcomes.map((outcome) => (
-                          <div 
-                            key={outcome.name} 
-                            className="flex items-center justify-between rounded-lg border px-3 py-2 min-w-[100px] hover:border-primary/50 cursor-pointer transition-colors"
-                          >
-                            <span className="text-sm font-medium mr-2">{outcome.name}</span>
-                            <span className="font-mono font-bold text-primary">{outcome.price.toFixed(2)}</span>
                           </div>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </CardContent>
-              </Card>
-            )}
-          </TabsContent>
-
-          {/* Tips Tab */}
-          <TabsContent value="tips" className="space-y-4">
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="flex items-center gap-2 text-base">
-                  <Target className="h-5 w-5 text-primary" />
-                  Expert Predictions ({tips.length})
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {tips.map((tip) => (
-                  <div key={tip.id} className="rounded-lg border p-4 transition-colors hover:bg-muted/50">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex items-center gap-3">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary text-primary-foreground font-bold">
-                          {tip.tipster.name.charAt(0)}
-                        </div>
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <span className="font-semibold text-sm">{tip.tipster.name}</span>
-                            {tip.tipster.verified && (
-                              <CheckCircle2 className="h-4 w-4 text-primary" />
-                            )}
+                        )}
+                        {bookmakerOdds.some(o => o.total) && (
+                          <div>
+                            <h4 className="mb-2 text-xs font-bold uppercase tracking-wide text-muted-foreground">Over / Under</h4>
+                            <div className="space-y-1.5">
+                              {bookmakerOdds.filter(o => o.total).map((o, i) => (
+                                <div key={i} className="flex items-center justify-between rounded bg-muted/40 px-3 py-2 text-sm">
+                                  <span className="font-medium">{o.bookmaker} ({o.total!.value})</span>
+                                  <div className="flex gap-2 font-mono">
+                                    <span>O <b className="text-primary">{o.total!.overPrice.toFixed(2)}</b></span>
+                                    <span>U <b className="text-primary">{o.total!.underPrice.toFixed(2)}</b></span>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
                           </div>
-                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                            <span className="text-emerald-500">{tip.tipster.winRate}%</span>
-                            <span>•</span>
-                            <span>+{tip.tipster.roi}% ROI</span>
-                          </div>
-                        </div>
+                        )}
                       </div>
-                      <div className="text-right">
-                        <Badge variant="outline" className="mb-1 text-xs">
-                          {tip.market}
-                        </Badge>
-                        <div className="font-mono text-lg font-bold text-primary">
-                          @{tip.odds}
-                        </div>
-                      </div>
-                    </div>
-                    
-                    <div className="mt-3">
-                      <div className="flex items-center gap-2 mb-2">
-                        <Badge>{tip.prediction}</Badge>
-                        <span className="text-xs text-muted-foreground">
-                          {tip.confidence}% confidence
-                        </span>
-                      </div>
-                      <Progress value={tip.confidence} className="h-1.5 mb-2" />
-                      <p className="text-sm text-muted-foreground">{tip.analysis}</p>
-                    </div>
-                    
-                    <div className="mt-3 flex items-center gap-4 text-sm text-muted-foreground">
-                      <button className="flex items-center gap-1 hover:text-primary">
-                        <Star className="h-4 w-4" />
-                        {tip.likes}
-                      </button>
-                      <span>{formatTime(tip.createdAt, timezone)}</span>
-                    </div>
+                    )}
+                  </>
+                ) : match.odds ? (
+                  <div className="grid grid-cols-3 gap-3">
+                    <OddsCell label="Home Win" value={match.odds.home} />
+                    {match.odds.draw !== undefined && <OddsCell label="Draw" value={match.odds.draw} />}
+                    <OddsCell label="Away Win" value={match.odds.away} />
                   </div>
-                ))}
+                ) : null}
               </CardContent>
             </Card>
           </TabsContent>
 
-          {/* H2H Tab */}
-          <TabsContent value="h2h" className="space-y-4">
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="flex items-center gap-2 text-base">
-                  <BarChart3 className="h-5 w-5 text-primary" />
-                  Head to Head ({h2h?.played || 0} matches)
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="mb-6 grid grid-cols-3 gap-3 text-center">
-                  <div className="rounded-lg bg-emerald-500/10 p-4">
-                    <div className="text-3xl font-bold text-emerald-500">{h2h?.homeWins || 0}</div>
-                    <div className="text-xs text-muted-foreground mt-1 line-clamp-1">{match.homeTeam.name}</div>
-                  </div>
-                  <div className="rounded-lg bg-muted p-4">
-                    <div className="text-3xl font-bold">{h2h?.draws || 0}</div>
-                    <div className="text-xs text-muted-foreground mt-1">Draws</div>
-                  </div>
-                  <div className="rounded-lg bg-primary/10 p-4">
-                    <div className="text-3xl font-bold text-primary">{h2h?.awayWins || 0}</div>
-                    <div className="text-xs text-muted-foreground mt-1 line-clamp-1">{match.awayTeam.name}</div>
-                  </div>
-                </div>
-                
-                {h2h?.avgGoalsPerMatch && (
-                  <div className="mb-4 text-center text-sm text-muted-foreground">
-                    Avg. {h2h.avgGoalsPerMatch.toFixed(1)} goals per match
-                  </div>
-                )}
-                
-                <h4 className="mb-3 font-semibold">Recent Meetings</h4>
-                <div className="space-y-2">
-                  {h2h?.recentMatches?.map((m: { date: string; homeTeam: string; homeScore: number; awayTeam: string; awayScore: number; competition: string }, idx: number) => (
-                    <div key={idx} className="flex items-center justify-between rounded-lg border p-3 gap-2">
-                      <div className="text-xs text-muted-foreground whitespace-nowrap">
-                        {formatDate(m.date, timezone)}
-                      </div>
-                      <div className="flex items-center gap-2 flex-1 justify-center min-w-0">
-                        <span className="font-medium text-sm truncate text-right flex-1">{m.homeTeam}</span>
-                        <span className="font-bold text-lg whitespace-nowrap px-2">
-                          {m.homeScore} - {m.awayScore}
-                        </span>
-                        <span className="font-medium text-sm truncate flex-1">{m.awayTeam}</span>
-                      </div>
-                      <Badge variant="outline" className="text-xs whitespace-nowrap">{m.competition}</Badge>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* Stats Tab */}
-          <TabsContent value="stats" className="space-y-4">
-            {/* Sport-Specific Stats Component */}
-            <SportSpecificStats
-              sportId={match.sportId}
-              sportName={match.sport?.name || 'Sport'}
-              homeTeam={match.homeTeam.name}
-              awayTeam={match.awayTeam.name}
-              data={match.sportSpecificData}
-              status={match.status}
-            />
-            
-            {/* Fallback to generic stats if sport-specific data not available */}
-            {stats && stats.length > 0 && !match.sportSpecificData && (
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="flex items-center gap-2 text-base">
-                    <BarChart3 className="h-5 w-5 text-primary" />
-                    Match Statistics
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {stats?.map((stat: { name: string; home: number; away: number; unit?: string }) => {
-                    const total = stat.home + stat.away;
-                    const homePercent = total > 0 ? (stat.home / total) * 100 : 50;
-                    
-                    return (
-                      <div key={stat.name}>
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="font-bold text-sm">{stat.home}{stat.unit}</span>
-                          <span className="text-xs text-muted-foreground">{stat.name}</span>
-                          <span className="font-bold text-sm">{stat.away}{stat.unit}</span>
-                        </div>
-                        <div className="flex h-2 rounded-full overflow-hidden bg-muted">
-                          <div 
-                            className="bg-primary transition-all"
-                            style={{ width: `${homePercent}%` }}
-                          />
-                          <div 
-                            className="bg-muted-foreground/30"
-                            style={{ width: `${100 - homePercent}%` }}
-                          />
-                        </div>
-                      </div>
-                    )
-                  })}
-                </CardContent>
-              </Card>
-            )}
-          </TabsContent>
-
-          {/* Lineups Tab */}
-          <TabsContent value="lineups" className="space-y-4">
-            {lineups ? (
+          {/* ============ LINEUPS ============ */}
+          <TabsContent value="lineups" className="mt-4">
+            {lineups && (lineups.home || lineups.away) ? (
               <div className="grid gap-4 md:grid-cols-2">
-                {/* Home Team Lineup */}
-                <Card>
-                  <CardHeader className="pb-3">
-                    <CardTitle className="flex items-center gap-2 text-base">
-                      <Shirt className="h-5 w-5 text-primary" />
-                      {match.homeTeam.name}
-                      <Badge variant="outline" className="ml-auto">{lineups.home.formation}</Badge>
-                    </CardTitle>
-                    {!lineups.confirmed && (
-                      <p className="text-xs text-muted-foreground">Predicted lineup</p>
-                    )}
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-2">
-                      {lineups.home.starting.map((player: { number: number; name: string; position: string; isCaptain?: boolean }) => (
-                        <div key={player.number} className="flex items-center gap-3 rounded-lg border p-2">
-                          <span className="flex h-7 w-7 items-center justify-center rounded-full bg-primary text-primary-foreground text-xs font-bold">
-                            {player.number}
-                          </span>
-                          <div className="flex-1">
-                            <div className="flex items-center gap-1">
-                              <span className="font-medium text-sm">{player.name}</span>
-                              {player.isCaptain && <Badge variant="secondary" className="text-[10px] px-1">C</Badge>}
-                            </div>
-                            <span className="text-xs text-muted-foreground">{player.position}</span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                    
-                    <div className="mt-4">
-                      <p className="text-xs font-medium text-muted-foreground mb-2">Substitutes</p>
-                      <div className="flex flex-wrap gap-2">
-                        {lineups.home.substitutes.map((player: { number: number; name: string }) => (
-                          <Badge key={player.number} variant="outline" className="text-xs">
-                            {player.number}. {player.name}
-                          </Badge>
-                        ))}
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                {/* Away Team Lineup */}
-                <Card>
-                  <CardHeader className="pb-3">
-                    <CardTitle className="flex items-center gap-2 text-base">
-                      <Shirt className="h-5 w-5 text-muted-foreground" />
-                      {match.awayTeam.name}
-                      <Badge variant="outline" className="ml-auto">{lineups.away.formation}</Badge>
-                    </CardTitle>
-                    {!lineups.confirmed && (
-                      <p className="text-xs text-muted-foreground">Predicted lineup</p>
-                    )}
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-2">
-                      {lineups.away.starting.map((player: { number: number; name: string; position: string; isCaptain?: boolean }) => (
-                        <div key={player.number} className="flex items-center gap-3 rounded-lg border p-2">
-                          <span className="flex h-7 w-7 items-center justify-center rounded-full bg-muted text-muted-foreground text-xs font-bold">
-                            {player.number}
-                          </span>
-                          <div className="flex-1">
-                            <div className="flex items-center gap-1">
-                              <span className="font-medium text-sm">{player.name}</span>
-                              {player.isCaptain && <Badge variant="secondary" className="text-[10px] px-1">C</Badge>}
-                            </div>
-                            <span className="text-xs text-muted-foreground">{player.position}</span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                    
-                    <div className="mt-4">
-                      <p className="text-xs font-medium text-muted-foreground mb-2">Substitutes</p>
-                      <div className="flex flex-wrap gap-2">
-                        {lineups.away.substitutes.map((player: { number: number; name: string }) => (
-                          <Badge key={player.number} variant="outline" className="text-xs">
-                            {player.number}. {player.name}
-                          </Badge>
-                        ))}
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
+                {lineups.home && <RosterCard side="Home" roster={lineups.home} />}
+                {lineups.away && <RosterCard side="Away" roster={lineups.away} />}
               </div>
             ) : (
               <Card>
-                <CardContent className="py-12 text-center">
-                  <Shirt className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
-                  <h3 className="font-semibold mb-2">Lineups Not Available</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Lineups will be available closer to kick-off or this sport does not support lineups.
-                  </p>
+                <CardContent className="p-8">
+                  <EmptyState icon={<Shirt className="h-8 w-8" />} title="No lineups yet" description="Squad and lineups are usually published closer to kickoff." />
                 </CardContent>
               </Card>
             )}
           </TabsContent>
+
+          {/* ============ H2H ============ */}
+          <TabsContent value="h2h" className="mt-4">
+            <Card>
+              <CardContent className="p-4">
+                {h2h && h2h.length > 0 ? (
+                  <div className="space-y-2">
+                    {h2h.map((g, i) => <H2HRow key={i} game={g} timezone={timezone} />)}
+                  </div>
+                ) : (
+                  <EmptyState icon={<Award className="h-8 w-8" />} title="No previous meetings" description="No head-to-head history available between these teams." />
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* ============ STANDINGS ============ */}
+          <TabsContent value="standings" className="mt-4">
+            {standings && standings.length > 0 ? (
+              standings.map((g, i) => (
+                <Card key={i} className="mb-4">
+                  <CardContent className="p-4">
+                    {g.header && <h3 className="mb-3 text-sm font-bold">{g.header}</h3>}
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="border-b border-border/50 text-xs uppercase text-muted-foreground">
+                            <th className="px-2 py-2 text-left w-8">#</th>
+                            <th className="px-2 py-2 text-left">Team</th>
+                            <th className="px-2 py-2 text-center">P</th>
+                            <th className="px-2 py-2 text-center">W</th>
+                            <th className="px-2 py-2 text-center">D</th>
+                            <th className="px-2 py-2 text-center">L</th>
+                            {g.rows.some(r => r.goalsFor !== undefined) && <th className="px-2 py-2 text-center">GD</th>}
+                            <th className="px-2 py-2 text-center font-bold">Pts</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {g.rows.map((r, ri) => {
+                            const isCurrentTeam = r.teamName === match.homeTeam.name || r.teamName === match.awayTeam.name
+                            return (
+                              <tr key={ri} className={cn(
+                                "border-b border-border/30 hover:bg-muted/40",
+                                isCurrentTeam && "bg-primary/10 font-semibold"
+                              )}>
+                                <td className="px-2 py-2 text-muted-foreground">{r.position ?? ri + 1}</td>
+                                <td className="px-2 py-2">
+                                  <div className="flex items-center gap-2">
+                                    <TeamLogo teamName={r.teamName || ''} logoUrl={r.teamLogo} size="sm" />
+                                    <span className="truncate">{r.teamName}</span>
+                                  </div>
+                                </td>
+                                <td className="px-2 py-2 text-center">{r.played}</td>
+                                <td className="px-2 py-2 text-center">{r.won}</td>
+                                <td className="px-2 py-2 text-center">{r.drawn}</td>
+                                <td className="px-2 py-2 text-center">{r.lost}</td>
+                                {g.rows.some(x => x.goalsFor !== undefined) && (
+                                  <td className="px-2 py-2 text-center">{r.goalDifference !== undefined ? (r.goalDifference > 0 ? '+' : '') + r.goalDifference : '—'}</td>
+                                )}
+                                <td className="px-2 py-2 text-center font-bold text-primary">{r.points}</td>
+                              </tr>
+                            )
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))
+            ) : (
+              <Card>
+                <CardContent className="p-8">
+                  <EmptyState icon={<Trophy className="h-8 w-8" />} title="No standings available" description="Table data isn't published for this competition." />
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
+
+          {/* ============ NEWS ============ */}
+          <TabsContent value="news" className="mt-4">
+            <Card>
+              <CardContent className="p-4">
+                {news.length > 0 ? (
+                  <div className="space-y-3">
+                    {news.map((n, i) => <NewsRow key={i} item={n} />)}
+                  </div>
+                ) : (
+                  <EmptyState icon={<Newspaper className="h-8 w-8" />} title="No news yet" description="No articles available for this match." />
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
         </Tabs>
       </div>
+    </div>
+  )
+}
+
+// ===== Sub-components =====
+
+function OddsCell({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="rounded-lg border border-border/50 bg-muted/40 p-4 text-center transition-colors hover:bg-primary/10">
+      <p className="text-xs uppercase tracking-wide text-muted-foreground">{label}</p>
+      <p className="mt-1 text-2xl font-bold text-primary">{value.toFixed(2)}</p>
+    </div>
+  )
+}
+
+function H2HRow({ game, timezone }: { game: H2HGame; timezone: string }) {
+  return (
+    <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 rounded-lg border border-border/40 bg-muted/30 px-3 py-2 text-sm">
+      <div className="flex items-center gap-2 justify-end min-w-0">
+        <span className="truncate font-medium">{game.home.name}</span>
+        <TeamLogo teamName={game.home.name} logoUrl={game.home.logo} size="sm" />
+      </div>
+      <div className="flex flex-col items-center px-2">
+        <div className="font-mono font-bold tabular-nums">
+          {game.home.score ?? '-'} : {game.away.score ?? '-'}
+        </div>
+        <div className="text-[10px] text-muted-foreground">
+          {game.date ? formatDate(game.date, timezone) : ''}{game.league ? ` • ${game.league}` : ''}
+        </div>
+      </div>
+      <div className="flex items-center gap-2 min-w-0">
+        <TeamLogo teamName={game.away.name} logoUrl={game.away.logo} size="sm" />
+        <span className="truncate font-medium">{game.away.name}</span>
+      </div>
+    </div>
+  )
+}
+
+function RosterCard({ side, roster }: { side: string; roster: TeamRoster }) {
+  return (
+    <Card>
+      <CardContent className="p-4">
+        <div className="mb-3 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <TeamLogo teamName={roster.teamName || ''} logoUrl={roster.teamLogo} size="sm" />
+            <div>
+              <p className="text-sm font-bold">{roster.teamName}</p>
+              <p className="text-xs text-muted-foreground">{side}{roster.formation ? ` • ${roster.formation}` : ''}</p>
+            </div>
+          </div>
+        </div>
+        {roster.coach && (
+          <p className="mb-3 text-xs text-muted-foreground">Coach: <span className="font-medium text-foreground">{roster.coach}</span></p>
+        )}
+
+        {roster.starting.length > 0 && (
+          <>
+            <h4 className="mb-2 text-xs font-bold uppercase tracking-wide text-muted-foreground">Starting XI</h4>
+            <div className="mb-3 space-y-1">
+              {roster.starting.map((p, i) => <PlayerRow key={i} player={p} />)}
+            </div>
+          </>
+        )}
+        {roster.bench.length > 0 && (
+          <>
+            <h4 className="mb-2 text-xs font-bold uppercase tracking-wide text-muted-foreground">Bench</h4>
+            <div className="space-y-1">
+              {roster.bench.slice(0, 12).map((p, i) => <PlayerRow key={i} player={p} />)}
+            </div>
+          </>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
+
+function PlayerRow({ player }: { player: Player }) {
+  return (
+    <div className="flex items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-muted/40">
+      <span className="w-7 text-center font-mono text-xs text-muted-foreground">{player.jersey || '-'}</span>
+      {player.headshot ? (
+        <Image src={player.headshot} alt="" width={24} height={24} className="rounded-full" unoptimized />
+      ) : (
+        <div className="h-6 w-6 rounded-full bg-muted" />
+      )}
+      <span className="flex-1 truncate">{player.fullName || player.name}</span>
+      {player.position && <span className="text-xs text-muted-foreground">{player.position}</span>}
+    </div>
+  )
+}
+
+function NewsRow({ item }: { item: NewsItem }) {
+  const inner = (
+    <div className="flex gap-3 rounded-lg p-2 transition-colors hover:bg-muted/40">
+      {item.image && (
+        <Image src={item.image} alt="" width={80} height={60} className="h-16 w-20 rounded object-cover" unoptimized />
+      )}
+      <div className="min-w-0 flex-1">
+        <p className="line-clamp-2 text-sm font-semibold">{item.headline}</p>
+        {item.description && <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{item.description}</p>}
+      </div>
+    </div>
+  )
+  return item.link ? <a href={item.link} target="_blank" rel="noopener noreferrer">{inner}</a> : inner
+}
+
+function EmptyState({ icon, title, description }: { icon: React.ReactNode; title: string; description: string }) {
+  return (
+    <div className="flex flex-col items-center justify-center py-8 text-center text-muted-foreground">
+      <div className="mb-2 opacity-60">{icon}</div>
+      <p className="font-semibold">{title}</p>
+      <p className="mt-1 text-sm">{description}</p>
     </div>
   )
 }
