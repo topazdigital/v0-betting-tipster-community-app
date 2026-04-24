@@ -20,6 +20,8 @@ import { Spinner } from "@/components/ui/spinner"
 import { TeamLogo } from "@/components/ui/team-logo"
 import { cn } from "@/lib/utils"
 import { formatTime, formatDate, getBrowserTimezone, getDayLabel } from "@/lib/utils/timezone"
+import { countryCodeToFlag } from "@/lib/country-flags"
+import { AIMatchPrediction } from "@/components/ai/ai-match-prediction"
 
 interface PageProps { params: Promise<{ id: string }> }
 
@@ -203,10 +205,12 @@ function EventIcon({ type }: { type: MatchEvent['type'] }) {
 }
 
 // ---- Live Minute Timer ----
-function useLiveMinute(kickoffTime: string, storedMinute: number | undefined, status: string) {
+// For soccer: caps at 90 + injury time can push it. For other sports: counts elapsed minutes uncapped.
+function useLiveMinute(kickoffTime: string, storedMinute: number | undefined, status: string, sportSlug: string = 'soccer') {
   const [minute, setMinute] = useState(storedMinute ?? 0)
   const isLive = status === 'live' || status === 'halftime' || status === 'extra_time' || status === 'penalties'
   const isHalftime = status === 'halftime'
+  const isSoccer = sportSlug === 'soccer' || sportSlug === 'football'
 
   useEffect(() => {
     if (!isLive) { setMinute(storedMinute ?? 0); return }
@@ -214,12 +218,19 @@ function useLiveMinute(kickoffTime: string, storedMinute: number | undefined, st
     const compute = () => {
       const elapsed = Math.floor((Date.now() - kick) / 60000)
       if (isHalftime) { setMinute(45); return }
-      setMinute(Math.max(storedMinute ?? 0, Math.min(elapsed, 90)))
+      // Trust stored minute from API if it's higher (it often comes from real ESPN clock)
+      if (isSoccer) {
+        // Soccer: 90 + extra time (cap at 120 for full extra time)
+        setMinute(Math.max(storedMinute ?? 0, Math.min(elapsed, 120)))
+      } else {
+        // Other sports: prefer storedMinute (could be quarter/period elapsed)
+        setMinute(storedMinute ?? Math.min(elapsed, 999))
+      }
     }
     compute()
     const id = setInterval(compute, 15000)
     return () => clearInterval(id)
-  }, [isLive, isHalftime, kickoffTime, storedMinute])
+  }, [isLive, isHalftime, isSoccer, kickoffTime, storedMinute])
 
   return minute
 }
@@ -481,7 +492,8 @@ export default function MatchDetailPage({ params }: PageProps) {
   const liveMinute = useLiveMinute(
     match?.kickoffTime || new Date().toISOString(),
     match?.minute,
-    match?.status || ''
+    match?.status || '',
+    match?.sport.slug || 'soccer'
   )
 
   if (isLoading) {
@@ -523,10 +535,11 @@ export default function MatchDetailPage({ params }: PageProps) {
         }}>
           {/* League strip */}
           <div className="flex items-center justify-between px-5 py-3 border-b border-white/10">
-            <div className="flex items-center gap-2">
-              <span className="text-lg">{SPORT_EMOJI[sport] || '🏆'}</span>
-              <span className="text-sm font-semibold text-white/90">{match.league.name}</span>
-              <span className="text-xs text-white/40">• {match.league.country}</span>
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="text-lg shrink-0" aria-hidden>{SPORT_EMOJI[sport] || '🏆'}</span>
+              <span className="text-base shrink-0" aria-hidden title={match.league.country}>{countryCodeToFlag(match.league.countryCode)}</span>
+              <span className="text-sm font-semibold text-white/90 truncate">{match.league.name}</span>
+              <span className="text-xs text-white/40 shrink-0 hidden sm:inline">• {match.league.country}</span>
             </div>
             <div className="flex items-center gap-1.5">
               {isLive && !isHalftime && (
@@ -734,6 +747,17 @@ export default function MatchDetailPage({ params }: PageProps) {
 
           {/* ══ OVERVIEW ══ */}
           <TabsContent value="overview" className="mt-0 space-y-4">
+            {/* AI Auto-Prediction */}
+            <AIMatchPrediction
+              homeTeam={match.homeTeam.name}
+              awayTeam={match.awayTeam.name}
+              sportSlug={sport}
+              odds={match.odds || null}
+              homeForm={match.homeTeam.form}
+              awayForm={match.awayTeam.form}
+              h2h={data.h2h}
+            />
+
             {/* Tips Preview */}
             {tips.length > 0 && (
               <Card className="overflow-hidden border-amber-500/20">

@@ -4,6 +4,8 @@ import { Analytics } from '@vercel/analytics/next'
 import { ThemeProvider } from '@/components/theme-provider'
 import { UserSettingsProvider } from '@/contexts/user-settings-context'
 import { AuthProvider } from '@/contexts/auth-context'
+import { AIChatButton } from '@/components/ai/ai-chat-button'
+import { InstallPrompt } from '@/components/install-prompt'
 import './globals.css'
 
 const geist = Geist({ 
@@ -77,6 +79,8 @@ export default function RootLayout({
           <AuthProvider>
             <UserSettingsProvider>
               {children}
+              <AIChatButton />
+              <InstallPrompt />
             </UserSettingsProvider>
           </AuthProvider>
         </ThemeProvider>

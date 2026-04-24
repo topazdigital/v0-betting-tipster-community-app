@@ -479,6 +479,103 @@ CREATE TABLE IF NOT EXISTS sessions (
   INDEX idx_session_expires (expires_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- ============================================
+-- AI Predictions, Chat & PWA Install Tracking
+-- ============================================
+
+CREATE TABLE IF NOT EXISTS ai_predictions (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  match_external_id VARCHAR(120) NOT NULL,
+  sport_slug VARCHAR(50),
+  home_team VARCHAR(150),
+  away_team VARCHAR(150),
+  prediction VARCHAR(255) NOT NULL,
+  sub_prediction VARCHAR(255),
+  confidence TINYINT UNSIGNED NOT NULL,
+  reasoning JSON,
+  source ENUM('rules', 'groq', 'openai', 'manual') DEFAULT 'rules',
+  model VARCHAR(80),
+  outcome ENUM('pending', 'won', 'lost', 'void') DEFAULT 'pending',
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  resolved_at TIMESTAMP NULL,
+  UNIQUE KEY ux_ai_pred_match (match_external_id, source),
+  INDEX idx_ai_pred_match (match_external_id),
+  INDEX idx_ai_pred_outcome (outcome),
+  INDEX idx_ai_pred_created (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS ai_chat_sessions (
+  id VARCHAR(64) PRIMARY KEY,
+  user_id INT NULL,
+  context_type VARCHAR(40),
+  context_id VARCHAR(120),
+  message_count INT DEFAULT 0,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  last_active_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL,
+  INDEX idx_chat_session_user (user_id),
+  INDEX idx_chat_session_active (last_active_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS ai_chat_messages (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  session_id VARCHAR(64) NOT NULL,
+  role ENUM('user', 'assistant', 'system') NOT NULL,
+  content TEXT NOT NULL,
+  source ENUM('rules', 'groq', 'openai') DEFAULT 'rules',
+  tokens_in INT,
+  tokens_out INT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (session_id) REFERENCES ai_chat_sessions(id) ON DELETE CASCADE,
+  INDEX idx_chat_msg_session (session_id),
+  INDEX idx_chat_msg_created (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS app_install_events (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  user_id INT NULL,
+  event ENUM('prompt_shown', 'prompt_accepted', 'prompt_dismissed', 'installed', 'opened_pwa') NOT NULL,
+  platform ENUM('android', 'ios', 'desktop', 'unknown') DEFAULT 'unknown',
+  user_agent TEXT,
+  ip_address VARCHAR(45),
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL,
+  INDEX idx_install_event (event),
+  INDEX idx_install_user (user_id),
+  INDEX idx_install_created (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================
+-- Push Notifications & Live Activity
+-- ============================================
+
+CREATE TABLE IF NOT EXISTS push_subscriptions (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  user_id INT NOT NULL,
+  endpoint VARCHAR(500) NOT NULL UNIQUE,
+  p256dh_key VARCHAR(255) NOT NULL,
+  auth_key VARCHAR(255) NOT NULL,
+  user_agent TEXT,
+  is_active BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  last_used_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  INDEX idx_push_user (user_id),
+  INDEX idx_push_active (is_active)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS match_alerts (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  user_id INT NOT NULL,
+  match_external_id VARCHAR(120) NOT NULL,
+  alert_type ENUM('kickoff', 'goal', 'red_card', 'final', 'odds_drop') NOT NULL,
+  is_active BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  UNIQUE KEY ux_alert_user_match (user_id, match_external_id, alert_type),
+  INDEX idx_alert_match (match_external_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 SET FOREIGN_KEY_CHECKS = 1;
 
 -- End of schema
