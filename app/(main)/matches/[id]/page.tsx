@@ -10,6 +10,7 @@ import {
   TrendingUp, Award, ChevronUp, ChevronDown, Minus,
   Users, Zap, AlertTriangle, RotateCcw, Target,
   Star, ThumbsUp, ThumbsDown, MessageCircle, Lock, ChevronRight,
+  Calendar,
 } from "lucide-react"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
@@ -335,13 +336,36 @@ function FormationPitch({ home, away }: { home: TeamRoster | null; away: TeamRos
 }
 
 function PitchPlayer({ player, color }: { player: Player; color: string }) {
+  const [imgError, setImgError] = useState(false)
+  const showHeadshot = player.headshot && !imgError
   return (
     <div className="flex flex-col items-center gap-0.5 w-12">
       <div className={cn(
-        "flex h-8 w-8 items-center justify-center rounded-full text-white text-xs font-bold shadow-lg border-2 border-white/40",
-        color
+        "relative flex h-9 w-9 items-center justify-center rounded-full text-white text-[11px] font-bold shadow-lg border-2 border-white/50 overflow-hidden",
+        !showHeadshot && color
       )}>
-        {player.jersey || player.name.slice(0, 2)}
+        {showHeadshot ? (
+          <Image
+            src={player.headshot!}
+            alt={player.name}
+            fill
+            sizes="36px"
+            className="object-cover"
+            onError={() => setImgError(true)}
+            unoptimized
+          />
+        ) : (
+          <span>{player.jersey || player.name.slice(0, 2).toUpperCase()}</span>
+        )}
+        {/* jersey number chip on top of headshot */}
+        {showHeadshot && player.jersey && (
+          <span className={cn(
+            "absolute -bottom-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full text-[8px] font-black text-white border border-white/70",
+            color
+          )}>
+            {player.jersey}
+          </span>
+        )}
       </div>
       <span className="text-[9px] text-white/90 text-center leading-tight line-clamp-1 w-full text-center px-1">
         {player.name.split(' ').pop() || player.name}
@@ -523,11 +547,14 @@ export default function MatchDetailPage({ params }: PageProps) {
 
   return (
     <div className="flex-1 overflow-hidden">
-      <div className="mx-auto max-w-5xl px-3 py-4 pb-28 md:px-6 md:py-6 md:pb-10">
+      <div className="mx-auto max-w-7xl px-3 py-4 pb-28 md:px-6 md:py-6 md:pb-10">
         {/* Back */}
         <Button variant="ghost" size="sm" className="mb-4 -ml-2 text-muted-foreground hover:text-foreground" asChild>
           <Link href="/matches"><ArrowLeft className="mr-1.5 h-4 w-4" />Matches</Link>
         </Button>
+
+        <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
+          <div className="min-w-0">
 
         {/* ─── HERO CARD ─── */}
         <div className="mb-5 overflow-hidden rounded-2xl shadow-2xl" style={{
@@ -1333,8 +1360,184 @@ export default function MatchDetailPage({ params }: PageProps) {
             </Card>
           </TabsContent>
         </Tabs>
+          </div>
+
+          {/* ─── RIGHT RAIL (xl+) ─── */}
+          <aside className="hidden xl:block">
+            <div className="sticky top-4 space-y-4">
+              <MatchInfoRail
+                match={match!}
+                bookmakerOdds={bookmakerOdds}
+                hasRealOdds={hasRealOdds}
+                standings={standings ?? []}
+                h2h={h2h ?? []}
+                onJumpToTab={setActiveTab}
+              />
+            </div>
+          </aside>
+        </div>
       </div>
     </div>
+  )
+}
+
+// ===== Right rail =====
+
+function MatchInfoRail({
+  match,
+  bookmakerOdds,
+  hasRealOdds,
+  standings,
+  h2h,
+  onJumpToTab,
+}: {
+  match: MatchDetails['match']
+  bookmakerOdds: BookmakerOdd[]
+  hasRealOdds: boolean
+  standings: StandingsGroup[]
+  h2h: H2HGame[]
+  onJumpToTab: (tab: string) => void
+}) {
+  const NO_DRAW = new Set(['basketball', 'baseball', 'tennis', 'mma'])
+  const isTwoWay = NO_DRAW.has(match.sport.slug)
+  const consensus = bookmakerOdds.length > 0 ? bookmakerOdds[0] : null
+  const allRows = standings.flatMap(g => g.rows)
+  const homeStanding = allRows.find(r => r.teamName === match.homeTeam.name)
+  const awayStanding = allRows.find(r => r.teamName === match.awayTeam.name)
+  const last3H2H = h2h.slice(0, 3)
+
+  return (
+    <>
+      {/* Match info */}
+      <Card>
+        <CardContent className="p-4 space-y-3 text-sm">
+          <h3 className="font-semibold text-xs uppercase tracking-wider text-muted-foreground mb-2">Match Info</h3>
+          {match.venue && (
+            <div className="flex items-start gap-2">
+              <MapPin className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
+              <div className="min-w-0">
+                <p className="font-medium truncate">{match.venue}</p>
+                {match.venueCity && <p className="text-xs text-muted-foreground truncate">{match.venueCity}{match.venueCountry ? `, ${match.venueCountry}` : ''}</p>}
+              </div>
+            </div>
+          )}
+          {match.league && (
+            <div className="flex items-center gap-2">
+              <Trophy className="h-4 w-4 text-muted-foreground shrink-0" />
+              <span className="font-medium truncate">{match.league.name}</span>
+              {match.league.countryCode && (
+                <span className="text-base leading-none">{countryCodeToFlag(match.league.countryCode)}</span>
+              )}
+            </div>
+          )}
+          <div className="flex items-center gap-2">
+            <Calendar className="h-4 w-4 text-muted-foreground shrink-0" />
+            <span className="text-xs">{new Date(match.kickoffTime).toLocaleString()}</span>
+          </div>
+          {match.attendance && (
+            <div className="flex items-center gap-2">
+              <Users className="h-4 w-4 text-muted-foreground shrink-0" />
+              <span className="text-xs">{match.attendance.toLocaleString()} attendance</span>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Quick odds */}
+      {consensus && (
+        <Card>
+          <CardContent className="p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="font-semibold text-xs uppercase tracking-wider text-muted-foreground">
+                {hasRealOdds ? 'Best Odds' : 'Estimated Odds'}
+              </h3>
+              <button
+                onClick={() => onJumpToTab('odds')}
+                className="text-xs text-primary hover:underline"
+              >
+                All →
+              </button>
+            </div>
+            <div className={cn('grid gap-1.5', isTwoWay ? 'grid-cols-2' : 'grid-cols-3')}>
+              <div className="rounded-lg bg-muted/50 p-2 text-center">
+                <p className="text-[10px] text-muted-foreground uppercase">{isTwoWay ? 'Home' : '1'}</p>
+                <p className="font-bold">{consensus.home.toFixed(2)}</p>
+              </div>
+              {!isTwoWay && consensus.draw !== undefined && (
+                <div className="rounded-lg bg-muted/50 p-2 text-center">
+                  <p className="text-[10px] text-muted-foreground uppercase">X</p>
+                  <p className="font-bold">{consensus.draw.toFixed(2)}</p>
+                </div>
+              )}
+              <div className="rounded-lg bg-muted/50 p-2 text-center">
+                <p className="text-[10px] text-muted-foreground uppercase">{isTwoWay ? 'Away' : '2'}</p>
+                <p className="font-bold">{consensus.away.toFixed(2)}</p>
+              </div>
+            </div>
+            {consensus.bookmaker && (
+              <p className="text-[10px] text-muted-foreground text-center">via {consensus.bookmaker}</p>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Standings snapshot */}
+      {(homeStanding || awayStanding) && (
+        <Card>
+          <CardContent className="p-4 space-y-2">
+            <div className="flex items-center justify-between">
+              <h3 className="font-semibold text-xs uppercase tracking-wider text-muted-foreground">Form</h3>
+              <button
+                onClick={() => onJumpToTab('standings')}
+                className="text-xs text-primary hover:underline"
+              >
+                Table →
+              </button>
+            </div>
+            {[homeStanding, awayStanding].filter(Boolean).map((t, i) => (
+              <div key={i} className="flex items-center justify-between gap-2 rounded-lg bg-muted/30 px-2.5 py-1.5">
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="font-mono text-xs text-muted-foreground w-5 text-right">{t!.position ?? '-'}</span>
+                  <TeamLogo teamName={t!.teamName ?? ''} logoUrl={t!.teamLogo} size="sm" />
+                  <span className="font-medium text-xs truncate">{t!.teamName}</span>
+                </div>
+                <span className="font-bold text-xs tabular-nums">{t!.points} pts</span>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* H2H teaser */}
+      {last3H2H.length > 0 && (
+        <Card>
+          <CardContent className="p-4 space-y-2">
+            <div className="flex items-center justify-between">
+              <h3 className="font-semibold text-xs uppercase tracking-wider text-muted-foreground">Last Meetings</h3>
+              <button
+                onClick={() => onJumpToTab('h2h')}
+                className="text-xs text-primary hover:underline"
+              >
+                All →
+              </button>
+            </div>
+            {last3H2H.map((g, i) => {
+              const hs = g.home.score ?? 0
+              const as_ = g.away.score ?? 0
+              return (
+                <div key={i} className="flex items-center justify-between gap-2 text-xs">
+                  <span className="truncate flex-1 text-right font-medium">{g.home.name}</span>
+                  <span className="font-mono font-bold tabular-nums px-2 py-0.5 rounded bg-muted">
+                    {hs}-{as_}
+                  </span>
+                  <span className="truncate flex-1 font-medium">{g.away.name}</span>
+                </div>
+              )
+            })}
+          </CardContent>
+        </Card>
+      )}
+    </>
   )
 }
 
@@ -1395,33 +1598,75 @@ function H2HSummaryBar({ games, homeName }: { games: H2HGame[]; homeName: string
 }
 
 function H2HRow({ game, timezone, homeName }: { game: H2HGame; timezone: string; homeName?: string }) {
+  const [expanded, setExpanded] = useState(false)
   const hs = game.home.score ?? 0
   const as_ = game.away.score ?? 0
   const homeWon = hs > as_
   const awayWon = as_ > hs
-  const isHomeTeam = game.home.name === homeName
+  const isFromCurrent = game.home.name === homeName
 
   return (
-    <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 rounded-xl border border-border/40 bg-muted/20 px-3 py-2.5 hover:bg-muted/40 transition-colors text-sm">
-      <div className="flex items-center gap-2 justify-end min-w-0">
-        <span className={cn("truncate font-medium", homeWon && "font-bold text-emerald-600")}>{game.home.name}</span>
-        <TeamLogo teamName={game.home.name} logoUrl={game.home.logo} size="sm" />
-      </div>
-      <div className="flex flex-col items-center min-w-[60px]">
-        <div className="font-mono font-bold tabular-nums">
-          <span className={cn(homeWon && "text-emerald-600")}>{game.home.score ?? '?'}</span>
-          {' — '}
-          <span className={cn(awayWon && "text-emerald-600")}>{game.away.score ?? '?'}</span>
+    <div className="rounded-xl border border-border/40 bg-muted/20 hover:bg-muted/40 transition-colors text-sm overflow-hidden">
+      <button
+        type="button"
+        onClick={() => setExpanded(v => !v)}
+        className="grid w-full grid-cols-[1fr_auto_1fr] items-center gap-2 px-3 py-2.5 text-left"
+        aria-expanded={expanded}
+      >
+        <div className="flex items-center gap-2 justify-end min-w-0">
+          <span className={cn("truncate font-medium", homeWon && "font-bold text-emerald-600")}>{game.home.name}</span>
+          <TeamLogo teamName={game.home.name} logoUrl={game.home.logo} size="sm" />
         </div>
-        <div className="text-[10px] text-muted-foreground">
-          {game.date ? formatDate(game.date, timezone) : ''}
-          {game.league ? ` • ${game.league}` : ''}
+        <div className="flex flex-col items-center min-w-[60px]">
+          <div className="font-mono font-bold tabular-nums">
+            <span className={cn(homeWon && "text-emerald-600")}>{game.home.score ?? '?'}</span>
+            {' — '}
+            <span className={cn(awayWon && "text-emerald-600")}>{game.away.score ?? '?'}</span>
+          </div>
+          <div className="text-[10px] text-muted-foreground flex items-center gap-1">
+            {game.date ? formatDate(game.date, timezone) : ''}
+            {game.league ? ` • ${game.league}` : ''}
+            <ChevronDown className={cn("h-3 w-3 transition-transform", expanded && "rotate-180")} />
+          </div>
         </div>
-      </div>
-      <div className="flex items-center gap-2 min-w-0">
-        <TeamLogo teamName={game.away.name} logoUrl={game.away.logo} size="sm" />
-        <span className={cn("truncate font-medium", awayWon && "font-bold text-emerald-600")}>{game.away.name}</span>
-      </div>
+        <div className="flex items-center gap-2 min-w-0">
+          <TeamLogo teamName={game.away.name} logoUrl={game.away.logo} size="sm" />
+          <span className={cn("truncate font-medium", awayWon && "font-bold text-emerald-600")}>{game.away.name}</span>
+        </div>
+      </button>
+      {expanded && (
+        <div className="border-t border-border/40 bg-muted/30 px-3 py-2.5 text-[11px] text-muted-foreground space-y-1.5">
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <span className="text-muted-foreground/70">Result:</span>{' '}
+              <span className="font-semibold text-foreground">
+                {homeWon ? `${game.home.name} won` : awayWon ? `${game.away.name} won` : 'Draw'}
+              </span>
+            </div>
+            <div>
+              <span className="text-muted-foreground/70">Total goals:</span>{' '}
+              <span className="font-semibold text-foreground">{hs + as_}</span>
+            </div>
+            {game.league && (
+              <div className="col-span-2">
+                <span className="text-muted-foreground/70">Competition:</span>{' '}
+                <span className="font-medium text-foreground">{game.league}</span>
+              </div>
+            )}
+            {game.date && (
+              <div className="col-span-2">
+                <span className="text-muted-foreground/70">Played:</span>{' '}
+                <span className="font-medium text-foreground">{formatDate(game.date, timezone)}</span>
+              </div>
+            )}
+          </div>
+          {!isFromCurrent && (
+            <p className="pt-1 border-t border-border/30 text-[10px] italic text-muted-foreground/80">
+              Reverse fixture — home/away swapped from current matchup.
+            </p>
+          )}
+        </div>
+      )}
     </div>
   )
 }

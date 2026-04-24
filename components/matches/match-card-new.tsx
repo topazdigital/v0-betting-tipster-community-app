@@ -63,6 +63,13 @@ interface MatchCardNewProps {
   showSport?: boolean;
 }
 
+// Sports that don't have draws (use 2-way odds)
+const NO_DRAW_SPORTS = new Set([
+  'basketball', 'baseball', 'tennis', 'mma', 'boxing', 'golf',
+  'formula-1', 'racing', 'horse-racing', 'darts', 'snooker',
+  'american-football', 'ice-hockey', // OT means binary outcome for betting markets
+]);
+
 export function MatchCardNew({ 
   match, 
   variant = 'default',
@@ -71,7 +78,9 @@ export function MatchCardNew({
 }: MatchCardNewProps) {
   const { settings } = useUserSettings();
   const isLive = match.status === 'live' || match.status === 'halftime' || match.status === 'extra_time' || match.status === 'penalties';
+  const isHalftime = match.status === 'halftime';
   const isFinished = match.status === 'finished';
+  const isTwoWay = NO_DRAW_SPORTS.has(match.sport.slug);
 
   // Use browser timezone for display
   const timezone = getBrowserTimezone();
@@ -102,7 +111,9 @@ export function MatchCardNew({
                 <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-live opacity-75"></span>
                 <span className="relative inline-flex h-2 w-2 rounded-full bg-live"></span>
               </span>
-              <span className="mt-1 text-xs font-bold text-live">{match.minute}&apos;</span>
+              <span className="mt-1 text-[10px] font-bold text-live">
+                {isHalftime ? 'HT' : `${match.minute ?? 0}'`}
+              </span>
             </div>
           ) : isFinished ? (
             <span className="text-xs font-medium text-muted-foreground">FT</span>
@@ -163,12 +174,14 @@ export function MatchCardNew({
           </Link>
         )}
 
-        {/* Odds */}
+        {/* Odds — sport-aware */}
         {match.odds && !isFinished && (
           <div className="hidden shrink-0 gap-1 sm:flex">
-            <OddsButton value={match.odds.home} label="1" format={settings.oddsFormat} />
-            <OddsButton value={match.odds.draw || 3.5} label="X" format={settings.oddsFormat} />
-            <OddsButton value={match.odds.away} label="2" format={settings.oddsFormat} />
+            <OddsButton value={match.odds.home} label={isTwoWay ? 'H' : '1'} format={settings.oddsFormat} />
+            {!isTwoWay && match.odds.draw !== undefined && (
+              <OddsButton value={match.odds.draw} label="X" format={settings.oddsFormat} />
+            )}
+            <OddsButton value={match.odds.away} label={isTwoWay ? 'A' : '2'} format={settings.oddsFormat} />
           </div>
         )}
       </div>
@@ -207,7 +220,9 @@ export function MatchCardNew({
                 <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-live opacity-75"></span>
                 <span className="relative inline-flex h-2 w-2 rounded-full bg-live"></span>
               </span>
-              <span className="text-xs font-bold text-live">{match.minute}&apos;</span>
+              <span className="text-xs font-bold text-live">
+                {isHalftime ? 'HT' : `${match.minute ?? 0}'`}
+              </span>
             </div>
           ) : isFinished ? (
             <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium">FT</span>
@@ -279,12 +294,17 @@ export function MatchCardNew({
         </div>
       </Link>
 
-      {/* Odds */}
+      {/* Odds — sport-aware (no draw for basketball/tennis/MMA/etc) */}
       {match.odds && !isFinished && (
-        <div className="grid grid-cols-3 gap-1.5">
-          <OddsButton value={match.odds.home} label="1" format={settings.oddsFormat} size="lg" />
-          <OddsButton value={match.odds.draw || 3.5} label="X" format={settings.oddsFormat} size="lg" />
-          <OddsButton value={match.odds.away} label="2" format={settings.oddsFormat} size="lg" />
+        <div className={cn(
+          'grid gap-1.5',
+          isTwoWay || match.odds.draw === undefined ? 'grid-cols-2' : 'grid-cols-3'
+        )}>
+          <OddsButton value={match.odds.home} label={isTwoWay ? match.homeTeam.shortName || 'Home' : '1'} format={settings.oddsFormat} size="lg" />
+          {!isTwoWay && match.odds.draw !== undefined && (
+            <OddsButton value={match.odds.draw} label="X" format={settings.oddsFormat} size="lg" />
+          )}
+          <OddsButton value={match.odds.away} label={isTwoWay ? match.awayTeam.shortName || 'Away' : '2'} format={settings.oddsFormat} size="lg" />
         </div>
       )}
 

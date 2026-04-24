@@ -142,14 +142,14 @@ export async function POST(request: NextRequest) {
     }
     lastUserText = lastUser.content;
 
-    // Build live context only if we believe it's useful (cheap heuristic to keep latency low)
-    const wantsLive = /(live|today|tonight|now|upcoming|kick(\s|-)?off|fixtures?|match|game|score|odds|tip|pick|prediction|over|under|btts|handicap|spread)/i.test(lastUserText);
-    const liveContext = wantsLive ? await buildLiveContext() : '';
+    // Always attach live context — keeps replies grounded in real fixtures/odds.
+    // (Cached upstream by getLiveMatches/getUpcomingMatches.)
+    const liveContext = await buildLiveContext();
 
     const system = `${SYSTEM_BASE}\n\n${liveContext ? liveContext + '\n\n' : ''}${body.context ? `EXTRA CONTEXT FROM CURRENT PAGE:\n${body.context}\n\n` : ''}Answer the user now.`;
 
     const completion = await openai.chat.completions.create({
-      model: 'gpt-5.4',
+      model: 'gpt-5',
       messages: [
         { role: 'system', content: system },
         ...history.map((m) => ({ role: m.role, content: m.content })),

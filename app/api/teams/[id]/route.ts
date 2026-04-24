@@ -35,6 +35,24 @@ async function fetchTeamSchedule(sport: string, league: string, teamId: string) 
   } catch { return null; }
 }
 
+async function fetchTeamRoster(sport: string, league: string, teamId: string) {
+  const url = `${ESPN_BASE}/${sport}/${league}/teams/${teamId}/roster`;
+  try {
+    const r = await fetch(url, { headers: { Accept: 'application/json' }, next: { revalidate: 600 } });
+    if (!r.ok) return null;
+    return await r.json();
+  } catch { return null; }
+}
+
+async function fetchTeamInjuries(sport: string, league: string, teamId: string) {
+  const url = `${ESPN_BASE}/${sport}/${league}/teams/${teamId}/injuries`;
+  try {
+    const r = await fetch(url, { headers: { Accept: 'application/json' }, next: { revalidate: 600 } });
+    if (!r.ok) return null;
+    return await r.json();
+  } catch { return null; }
+}
+
 function mapStatus(state: string, completed: boolean): string {
   if (state === 'in') return 'live';
   if (completed || state === 'post') return 'finished';
@@ -53,9 +71,11 @@ export async function GET(
 
   const { sport, league, espnTeamId } = parsed;
 
-  const [teamData, scheduleData] = await Promise.all([
+  const [teamData, scheduleData, rosterData, injuriesData] = await Promise.all([
     fetchTeamInfo(sport, league, espnTeamId),
     fetchTeamSchedule(sport, league, espnTeamId),
+    fetchTeamRoster(sport, league, espnTeamId),
+    fetchTeamInjuries(sport, league, espnTeamId),
   ]);
 
   if (!teamData?.team) {
@@ -163,10 +183,91 @@ export async function GET(
   const past = events.filter((e: { status: string }) => e.status === 'finished').slice(-10).reverse();
   const upcoming = events.filter((e: { status: string }) => e.status === 'scheduled' || e.status === 'live').slice(0, 10);
 
+  // ----- Roster (multiple ESPN response shapes: athletes:[…] or athletes:[{position, items:[…]}]) -----
+  type RawAthlete = {
+    id?: string;
+    fullName?: string;
+    displayName?: string;
+    firstName?: string;
+    lastName?: string;
+    jersey?: string;
+    age?: number;
+    height?: number;
+    weight?: number;
+    headshot?: { href?: string } | string;
+    position?: { abbreviation?: string; name?: string; displayName?: string };
+    status?: { name?: string; type?: string };
+    flag?: { href?: string; alt?: string };
+    citizenship?: string;
+  };
+  const rawAthletes: RawAthlete[] = [];
+  const rosterAthletes = rosterData?.athletes;
+  if (Array.isArray(rosterAthletes)) {
+    for (const group of rosterAthletes) {
+      if (group?.items && Array.isArray(group.items)) {
+        for (const a of group.items) rawAthletes.push(a);
+      } else if (group?.id || group?.fullName || group?.displayName) {
+        rawAthletes.push(group);
+      }
+    }
+  }
+  const roster = rawAthletes.map(a => {
+    const headshotUrl = typeof a.headshot === 'string' ? a.headshot : a.headshot?.href;
+    return {
+      id: a.id,
+      name: a.fullName || a.displayName || `${a.firstName ?? ''} ${a.lastName ?? ''}`.trim(),
+      jersey: a.jersey,
+      position: a.position?.abbreviation || a.position?.displayName || a.position?.name,
+      age: a.age,
+      height: a.height,
+      weight: a.weight,
+      headshot: headshotUrl,
+      country: a.citizenship,
+      flag: a.flag?.href,
+      status: a.status?.name || a.status?.type,
+    };
+  });
+
+  // ----- Injuries -----
+  type RawInjury = {
+    athlete?: { id?: string; displayName?: string; headshot?: { href?: string } | string; position?: { abbreviation?: string } };
+    type?: { description?: string; abbreviation?: string };
+    status?: string;
+    details?: { type?: string; location?: string; detail?: string; returnDate?: string };
+    date?: string;
+    longComment?: string;
+    shortComment?: string;
+  };
+  const rawInjuries: RawInjury[] = [];
+  const injuryGroups = injuriesData?.injuries;
+  if (Array.isArray(injuryGroups)) {
+    for (const g of injuryGroups) {
+      if (Array.isArray(g?.injuries)) for (const i of g.injuries) rawInjuries.push(i);
+      else if (g?.athlete) rawInjuries.push(g);
+    }
+  }
+  const injuries = rawInjuries.map(i => {
+    const head = typeof i.athlete?.headshot === 'string' ? i.athlete.headshot : i.athlete?.headshot?.href;
+    return {
+      playerId: i.athlete?.id,
+      playerName: i.athlete?.displayName,
+      headshot: head,
+      position: i.athlete?.position?.abbreviation,
+      status: i.status,
+      type: i.type?.description || i.details?.type,
+      location: i.details?.location,
+      detail: i.details?.detail || i.shortComment,
+      returnDate: i.details?.returnDate,
+      reportedAt: i.date,
+    };
+  });
+
   return NextResponse.json({
     team,
     past,
     upcoming,
+    roster,
+    injuries,
     league: { sport, league },
     timestamp: new Date().toISOString(),
   });

@@ -3,10 +3,12 @@
 import { use } from 'react';
 import Link from 'next/link';
 import useSWR from 'swr';
+import Image from 'next/image';
 import {
   ArrowLeft, MapPin, Calendar, Trophy, TrendingUp,
   ChevronRight, Shield, Flame, Star, Award, Target,
-  BarChart3, Globe, ExternalLink, Sparkles, Zap, Activity
+  BarChart3, Globe, ExternalLink, Sparkles, Zap, Activity,
+  Users, AlertCircle,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Spinner } from '@/components/ui/spinner';
@@ -169,7 +171,7 @@ export default function TeamPage({ params }: PageProps) {
     );
   }
 
-  const { team, past, upcoming } = data || {};
+  const { team, past, upcoming, roster, injuries } = data || {};
   if (!team) return null;
 
   // Stats from past matches
@@ -267,7 +269,7 @@ export default function TeamPage({ params }: PageProps) {
 
       {/* Tabs */}
       <Tabs defaultValue="upcoming">
-        <TabsList className="w-full grid grid-cols-4">
+        <TabsList className="w-full grid grid-cols-6">
           <TabsTrigger value="upcoming" className="text-xs">
             <Flame className="mr-1 h-3.5 w-3.5" />
             <span className="hidden sm:inline">Upcoming</span>
@@ -281,6 +283,21 @@ export default function TeamPage({ params }: PageProps) {
             Results
             {past?.length > 0 && (
               <Badge variant="secondary" className="ml-1 px-1.5 py-0 text-[10px]">{past.length}</Badge>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="squad" className="text-xs">
+            <Users className="mr-1 h-3.5 w-3.5" />
+            Squad
+            {roster?.length > 0 && (
+              <Badge variant="secondary" className="ml-1 px-1.5 py-0 text-[10px]">{roster.length}</Badge>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="injuries" className="text-xs">
+            <Activity className="mr-1 h-3.5 w-3.5" />
+            <span className="hidden sm:inline">Injuries</span>
+            <span className="sm:hidden">Inj</span>
+            {injuries?.length > 0 && (
+              <Badge variant="destructive" className="ml-1 px-1.5 py-0 text-[10px]">{injuries.length}</Badge>
             )}
           </TabsTrigger>
           <TabsTrigger value="stats" className="text-xs">
@@ -319,6 +336,16 @@ export default function TeamPage({ params }: PageProps) {
               <p className="text-sm text-muted-foreground">No recent results</p>
             </div>
           )}
+        </TabsContent>
+
+        {/* Squad */}
+        <TabsContent value="squad" className="mt-4">
+          <SquadPanel roster={roster || []} accentColor={accentColor} />
+        </TabsContent>
+
+        {/* Injuries */}
+        <TabsContent value="injuries" className="mt-4">
+          <InjuryPanel injuries={injuries || []} />
         </TabsContent>
 
         {/* Stats */}
@@ -617,3 +644,182 @@ function AboutPanel({ team }: { team: TeamMeta }) {
     </>
   );
 }
+
+
+// ───────────────────────────────────────────────
+// Squad Panel
+// ───────────────────────────────────────────────
+interface Player {
+  id?: string;
+  name: string;
+  jersey?: string;
+  position?: string;
+  age?: number;
+  height?: number;
+  weight?: number;
+  headshot?: string;
+  country?: string;
+  flag?: string;
+  status?: string;
+}
+
+function SquadPanel({ roster, accentColor }: { roster: Player[]; accentColor: string }) {
+  if (roster.length === 0) {
+    return (
+      <div className="flex h-32 flex-col items-center justify-center gap-2 rounded-lg border border-dashed">
+        <Users className="h-8 w-8 text-muted-foreground/40" />
+        <p className="text-sm text-muted-foreground">Squad data not available for this team</p>
+      </div>
+    );
+  }
+
+  // Group by position
+  const groups = new Map<string, Player[]>();
+  for (const p of roster) {
+    const key = p.position || "Other";
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key)!.push(p);
+  }
+
+  return (
+    <div className="space-y-4">
+      {Array.from(groups.entries()).map(([pos, players]) => (
+        <div key={pos}>
+          <div className="mb-2 flex items-center gap-2">
+            <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{pos}</h4>
+            <span className="text-xs text-muted-foreground/70">({players.length})</span>
+          </div>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+            {players.map((p, i) => (
+              <PlayerCard key={p.id || i} player={p} accentColor={accentColor} />
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function PlayerCard({ player, accentColor }: { player: Player; accentColor: string }) {
+  return (
+    <div className="flex items-center gap-2.5 rounded-xl border border-border bg-card p-2.5 hover:border-primary/40 transition-colors">
+      <div
+        className="relative flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full"
+        style={{ background: `${accentColor}22` }}
+      >
+        {player.headshot ? (
+          <Image
+            src={player.headshot}
+            alt={player.name}
+            fill
+            sizes="44px"
+            className="object-cover"
+            unoptimized
+          />
+        ) : (
+          <span className="text-xs font-bold text-muted-foreground">
+            {player.jersey || player.name.slice(0, 2).toUpperCase()}
+          </span>
+        )}
+        {player.jersey && player.headshot && (
+          <span
+            className="absolute -bottom-0.5 -right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[9px] font-black text-white"
+            style={{ background: accentColor }}
+          >
+            {player.jersey}
+          </span>
+        )}
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-semibold">{player.name}</p>
+        <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+          {player.position && <span>{player.position}</span>}
+          {player.age && <span>· {player.age}y</span>}
+          {player.flag && (
+            <Image
+              src={player.flag}
+              alt={player.country || ""}
+              width={14}
+              height={10}
+              className="rounded-sm object-cover"
+              unoptimized
+            />
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ───────────────────────────────────────────────
+// Injury Panel
+// ───────────────────────────────────────────────
+interface InjuryItem {
+  playerId?: string;
+  playerName?: string;
+  headshot?: string;
+  position?: string;
+  status?: string;
+  type?: string;
+  location?: string;
+  detail?: string;
+  returnDate?: string;
+  reportedAt?: string;
+}
+
+function InjuryPanel({ injuries }: { injuries: InjuryItem[] }) {
+  if (injuries.length === 0) {
+    return (
+      <div className="flex h-32 flex-col items-center justify-center gap-2 rounded-lg border border-dashed">
+        <Activity className="h-8 w-8 text-emerald-500/40" />
+        <p className="text-sm font-medium text-emerald-600">Squad fully fit — no reported injuries</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      {injuries.map((inj, i) => (
+        <div key={i} className="flex items-start gap-3 rounded-xl border border-amber-500/30 bg-amber-500/5 p-3">
+          <div className="relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-muted">
+            {inj.headshot ? (
+              <Image
+                src={inj.headshot}
+                alt={inj.playerName || ""}
+                fill
+                sizes="40px"
+                className="object-cover"
+                unoptimized
+              />
+            ) : (
+              <AlertCircle className="h-5 w-5 text-amber-500" />
+            )}
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center justify-between gap-2">
+              <p className="truncate text-sm font-semibold">{inj.playerName || "Unknown player"}</p>
+              {inj.status && (
+                <Badge variant="outline" className="shrink-0 text-[10px] border-amber-500/40 text-amber-700 dark:text-amber-400">
+                  {inj.status}
+                </Badge>
+              )}
+            </div>
+            <div className="mt-0.5 text-xs text-muted-foreground">
+              {inj.position && <span>{inj.position} · </span>}
+              <span>{inj.type || inj.location || "Injury"}</span>
+            </div>
+            {inj.detail && (
+              <p className="mt-1 text-[11px] leading-snug text-muted-foreground line-clamp-2">{inj.detail}</p>
+            )}
+            {inj.returnDate && (
+              <p className="mt-1 text-[10px] font-medium text-amber-600">
+                Expected return: {new Date(inj.returnDate).toLocaleDateString()}
+              </p>
+            )}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+

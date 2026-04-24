@@ -8,6 +8,8 @@ interface TeamLogoProps {
   teamName: string
   teamId?: number
   leagueId?: number
+  /** Real logo URL (e.g. from ESPN). Takes precedence over the static map. */
+  logoUrl?: string
   size?: "xs" | "sm" | "md" | "lg" | "xl"
   className?: string
   showFallback?: boolean
@@ -248,12 +250,14 @@ export function TeamLogo({
   teamName, 
   teamId, 
   leagueId,
+  logoUrl: providedLogoUrl,
   size = 'md', 
   className,
   showFallback = true 
 }: TeamLogoProps) {
   const [hasError, setHasError] = useState(false)
-  const logoUrl = TEAM_LOGOS[teamName]
+  // Real provided URL (e.g. ESPN) wins; otherwise consult curated map.
+  const logoUrl = providedLogoUrl || TEAM_LOGOS[teamName]
   
   // Use image if available and no error
   if (logoUrl && !hasError) {

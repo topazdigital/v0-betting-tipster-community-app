@@ -18,6 +18,7 @@ import { cn } from '@/lib/utils';
 import { ALL_SPORTS, ALL_LEAGUES, BOOKMAKERS, getSportIcon } from '@/lib/sports-data';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useMatchStats } from '@/lib/hooks/use-matches';
+import { countryCodeToFlag } from '@/lib/country-flags';
 
 interface SidebarNewProps {
   selectedSportId?: number | null;
@@ -312,30 +313,7 @@ export function SidebarNew({ selectedSportId, onSelectSport }: SidebarNewProps) 
   );
 }
 
-// Country flag helper
+// Country flag helper — wraps the centralised countryCodeToFlag utility.
 function getCountryFlag(countryCode: string): string {
-  const codeMap: Record<string, string> = {
-    'GB-ENG': '🏴󠁧󠁢󠁥󠁮󠁧󠁿',
-    'GB-SCT': '🏴󠁧󠁢󠁳󠁣󠁴󠁿',
-    'EU': '🇪🇺',
-    'WO': '🌍',
-    'AF': '🌍',
-    'AS': '🌏',
-    'SA': '🇸🇦',
-    'SH': '🌍',
-    'CB': '🌴',
-  };
-
-  const mapped = codeMap[countryCode];
-  if (mapped) return mapped;
-  
-  try {
-    const codePoints = countryCode.substring(0, 2)
-      .toUpperCase()
-      .split('')
-      .map(char => 127397 + char.charCodeAt(0));
-    return String.fromCodePoint(...codePoints);
-  } catch {
-    return '🏳️';
-  }
+  return countryCodeToFlag(countryCode);
 }

@@ -21,14 +21,15 @@ import { cn } from "@/lib/utils"
 import { useAuth } from "@/contexts/auth-context"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { BottomNav } from "@/components/layout/bottom-nav"
+import { useMatchStats } from "@/lib/hooks/use-matches"
 
 // ✅ FIX: import correct export and alias it
 import { ALL_SPORTS as SPORTS_LIST, getSportIcon } from "@/lib/sports-data"
 
-const mainNavItems = [
+const mainNavItems: Array<{ href: string; label: string; icon: typeof Home; badgeKey?: 'live' | 'today' }> = [
   { href: "/", label: "Home", icon: Home },
-  { href: "/live", label: "Live", icon: Radio, badge: "12" },
-  { href: "/matches", label: "Matches", icon: Calendar },
+  { href: "/live", label: "Live", icon: Radio, badgeKey: 'live' },
+  { href: "/matches", label: "Matches", icon: Calendar, badgeKey: 'today' },
   { href: "/tipsters", label: "Tipsters", icon: Users },
   { href: "/leaderboard", label: "Leaderboard", icon: Trophy },
   { href: "/competitions", label: "Competitions", icon: Star },
@@ -41,6 +42,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
   const { user, isAuthenticated, logout, isLoading } = useAuth()
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [showSports, setShowSports] = useState(true)
+  const stats = useMatchStats()
 
   return (
     <div className="min-h-screen bg-background">
@@ -89,14 +91,18 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
                   <item.icon className="h-5 w-5" />
                   {item.label}
                 </div>
-                {item.badge && (
-                  <span className={cn(
-                    "flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-xs font-bold",
-                    isActive ? "bg-white/20 text-white" : "bg-red-500 text-white"
-                  )}>
-                    {item.badge}
-                  </span>
-                )}
+                {item.badgeKey && (() => {
+                  const count = item.badgeKey === 'live' ? stats.live : stats.today
+                  if (!count) return null
+                  return (
+                    <span className={cn(
+                      "flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-xs font-bold",
+                      isActive ? "bg-white/20 text-white" : (item.badgeKey === 'live' ? "bg-red-500 text-white" : "bg-primary text-primary-foreground")
+                    )}>
+                      {count}
+                    </span>
+                  )
+                })()}
               </Link>
             )
           })}
