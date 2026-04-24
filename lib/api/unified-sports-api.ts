@@ -602,6 +602,37 @@ export interface ESPNSummaryResponse {
     }>;
   }>;
   broadcasts?: Array<{ market?: string; media?: { shortName?: string } }>;
+  scoringPlays?: Array<{
+    id?: string;
+    type?: { id?: string; text?: string; abbreviation?: string };
+    period?: { number?: number; type?: string };
+    clock?: { value?: number; displayValue?: string };
+    team?: { id?: string; displayName?: string; abbreviation?: string };
+    participants?: Array<{
+      athlete?: { id?: string; displayName?: string; shortName?: string; headshot?: string };
+      type?: { name?: string };
+    }>;
+    text?: string;
+    scoreValue?: number;
+    awayScore?: number;
+    homeScore?: number;
+  }>;
+  plays?: Array<{
+    id?: string;
+    type?: { id?: string; text?: string; abbreviation?: string };
+    period?: { number?: number };
+    clock?: { value?: number; displayValue?: string };
+    team?: { id?: string; displayName?: string };
+    participants?: Array<{
+      athlete?: { id?: string; displayName?: string; shortName?: string; headshot?: string };
+      type?: { name?: string };
+    }>;
+    text?: string;
+    scoringPlay?: boolean;
+    scoreValue?: number;
+    homeScore?: number;
+    awayScore?: number;
+  }>;
 }
 
 export async function fetchESPNSummary(sport: string, league: string, eventId: string): Promise<ESPNSummaryResponse | null> {

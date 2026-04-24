@@ -9,7 +9,7 @@ import {
 } from '@/lib/api/unified-sports-api';
 
 export const dynamic = 'force-dynamic';
-export const revalidate = 60;
+export const revalidate = 30;
 
 interface RouteContext {
   params: Promise<{ id: string }>;
@@ -23,7 +23,6 @@ function americanToDecimal(american: number | string | undefined): number | unde
   return Math.round(decimal * 100) / 100;
 }
 
-// Convert pickcenter providers to a sortable bookmaker odds list
 function buildBookmakerOdds(summary: ESPNSummaryResponse, hasDraw: boolean) {
   const sources = [
     ...(summary.pickcenter || []),
@@ -103,7 +102,6 @@ function buildLineups(summary: ESPNSummaryResponse) {
 
 function buildH2H(summary: ESPNSummaryResponse) {
   if (!summary.headToHeadGames || summary.headToHeadGames.length === 0) return null;
-  // ESPN nests games per team — flatten unique games by date+score combination
   const seen = new Set<string>();
   const games: Array<{
     date: string;
@@ -135,7 +133,6 @@ function buildH2H(summary: ESPNSummaryResponse) {
       });
     }
   }
-  // Sort by date desc
   games.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   return games.slice(0, 10);
 }
@@ -146,7 +143,6 @@ function buildStandings(summary: ESPNSummaryResponse) {
     header: g.header,
     rows: (g.standings?.entries || []).map((e: unknown) => {
       const ent = e as { team?: unknown; id?: string; logo?: string; stats?: Array<{ name?: string; abbreviation?: string; value?: number; displayValue?: string }> };
-      // ESPN sometimes returns team as a string (displayName), sometimes as an object
       const teamObj = typeof ent.team === 'object' && ent.team !== null ? ent.team as { id?: string; displayName?: string; logo?: string } : null;
       const teamName = teamObj?.displayName || (typeof ent.team === 'string' ? ent.team : '');
       const teamId = teamObj?.id || ent.id;
@@ -222,6 +218,179 @@ function buildLeaders(summary: ESPNSummaryResponse) {
   );
 }
 
+export type MatchEventType = 'goal' | 'own_goal' | 'penalty_goal' | 'yellow_card' | 'red_card' | 'yellow_red_card' | 'substitution' | 'var' | 'other';
+
+export interface MatchEvent {
+  id: string;
+  minute: string;
+  type: MatchEventType;
+  side: 'home' | 'away';
+  playerName?: string;
+  playerOut?: string;
+  assistName?: string;
+  homeScore?: number;
+  awayScore?: number;
+  description?: string;
+  period?: number;
+}
+
+function parseClockMinute(clock?: { displayValue?: string; value?: number }): string {
+  if (!clock) return '';
+  if (clock.displayValue) {
+    const parts = clock.displayValue.split(':');
+    const mins = parseInt(parts[0] || '0', 10);
+    return `${mins}'`;
+  }
+  if (clock.value !== undefined) {
+    const mins = Math.floor(clock.value / 60);
+    return `${mins}'`;
+  }
+  return '';
+}
+
+function detectEventType(typeText: string): MatchEventType {
+  const t = (typeText || '').toLowerCase();
+  if (t.includes('own goal') || t.includes('own-goal')) return 'own_goal';
+  if (t.includes('penalty') && (t.includes('goal') || t.includes('score'))) return 'penalty_goal';
+  if (t.includes('goal') || t.includes('score') || t.includes('touchdown') || t.includes('basket')) return 'goal';
+  if (t.includes('red card') || t.includes('red-card') || t.includes('ejection') || t.includes('sent off')) return 'red_card';
+  if (t.includes('yellow red') || t.includes('second yellow')) return 'yellow_red_card';
+  if (t.includes('yellow card') || t.includes('yellow-card') || t.includes('caution') || t.includes('booking')) return 'yellow_card';
+  if (t.includes('substitut') || t.includes('sub ') || t.includes('subs ')) return 'substitution';
+  if (t.includes('var') || t.includes('review')) return 'var';
+  return 'other';
+}
+
+function buildMatchEvents(summary: ESPNSummaryResponse, homeTeamId?: string, awayTeamId?: string): MatchEvent[] {
+  const events: MatchEvent[] = [];
+  const seen = new Set<string>();
+
+  const getTeamSide = (teamId?: string): 'home' | 'away' => {
+    if (!teamId) return 'home';
+    if (homeTeamId && teamId === homeTeamId) return 'home';
+    if (awayTeamId && teamId === awayTeamId) return 'away';
+    return 'home';
+  };
+
+  // Process scoring plays first (goals)
+  if (summary.scoringPlays) {
+    for (const play of summary.scoringPlays) {
+      const id = play.id || `sp-${events.length}`;
+      if (seen.has(id)) continue;
+      seen.add(id);
+
+      const typeText = play.type?.text || play.type?.abbreviation || '';
+      const eventType = detectEventType(typeText);
+      const scorer = play.participants?.find(p => p.type?.name === 'scorer' || p.type?.name === 'athlete');
+      const assister = play.participants?.find(p => p.type?.name === 'assister' || p.type?.name === 'assist');
+      const side = getTeamSide(play.team?.id);
+      const minute = parseClockMinute(play.clock);
+
+      events.push({
+        id,
+        minute: minute || `${play.period?.number || 1}P`,
+        type: eventType === 'other' ? 'goal' : eventType,
+        side,
+        playerName: scorer?.athlete?.displayName || scorer?.athlete?.shortName,
+        assistName: assister?.athlete?.displayName || assister?.athlete?.shortName,
+        homeScore: play.homeScore,
+        awayScore: play.awayScore,
+        description: play.text,
+        period: play.period?.number,
+      });
+    }
+  }
+
+  // Process all plays for cards and substitutions
+  if (summary.plays) {
+    for (const play of summary.plays) {
+      const id = play.id || `p-${events.length}`;
+      if (seen.has(id)) continue;
+
+      const typeText = play.type?.text || play.type?.abbreviation || '';
+      const eventType = detectEventType(typeText);
+
+      if (eventType === 'other' || eventType === 'goal' || eventType === 'penalty_goal' || eventType === 'own_goal') continue;
+
+      seen.add(id);
+      const side = getTeamSide(play.team?.id);
+      const minute = parseClockMinute(play.clock);
+
+      if (eventType === 'substitution') {
+        const playerIn = play.participants?.[0];
+        const playerOut = play.participants?.[1];
+        events.push({
+          id,
+          minute: minute || `${play.period?.number || 1}P`,
+          type: 'substitution',
+          side,
+          playerName: playerIn?.athlete?.displayName || playerIn?.athlete?.shortName,
+          playerOut: playerOut?.athlete?.displayName || playerOut?.athlete?.shortName,
+          homeScore: play.homeScore,
+          awayScore: play.awayScore,
+          period: play.period?.number,
+        });
+      } else {
+        const player = play.participants?.[0];
+        events.push({
+          id,
+          minute: minute || `${play.period?.number || 1}P`,
+          type: eventType,
+          side,
+          playerName: player?.athlete?.displayName || player?.athlete?.shortName,
+          homeScore: play.homeScore,
+          awayScore: play.awayScore,
+          period: play.period?.number,
+        });
+      }
+    }
+  }
+
+  // Sort by minute numerically
+  events.sort((a, b) => {
+    const mA = parseInt(a.minute) || 0;
+    const mB = parseInt(b.minute) || 0;
+    return mA - mB;
+  });
+
+  return events;
+}
+
+function generateComputedOdds(homeTeamName: string, awayTeamName: string, sportType = 'soccer') {
+  const hashCode = (str: string) => {
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+      const char = str.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash = hash & hash;
+    }
+    return Math.abs(hash);
+  };
+  const matchHash = hashCode(homeTeamName + awayTeamName);
+  const seed = (matchHash % 1000) / 1000;
+  const noDrawSports = ['basketball', 'baseball', 'mma', 'tennis', 'golf', 'racing'];
+  const homeAdv = sportType === 'basketball' ? 0.55 : sportType === 'soccer' ? 0.45 : 0.52;
+  let homeProb = homeAdv + (seed - 0.5) * 0.3;
+  const hasDraw = !noDrawSports.includes(sportType);
+  let drawProb: number | undefined;
+  let awayProb: number;
+  if (hasDraw) {
+    drawProb = 0.25 + (seed * 0.1);
+    homeProb = Math.max(0.2, Math.min(0.55, homeProb));
+    awayProb = 1 - homeProb - drawProb;
+  } else {
+    awayProb = 1 - homeProb;
+  }
+  const margin = 1.06;
+  return {
+    home: Math.round(Math.max(1.15, Math.min((margin / homeProb), 6.0)) * 100) / 100,
+    draw: drawProb ? Math.round(Math.max(2.8, Math.min((margin / drawProb), 5.5)) * 100) / 100 : undefined,
+    away: Math.round(Math.max(1.15, Math.min((margin / awayProb), 8.0)) * 100) / 100,
+    bookmaker: 'Estimated',
+    isComputed: true,
+  };
+}
+
 export async function GET(_request: NextRequest, context: RouteContext) {
   const { id } = await context.params;
   try {
@@ -241,11 +410,17 @@ export async function GET(_request: NextRequest, context: RouteContext) {
     const noDrawSports = ['basketball', 'baseball', 'mma', 'tennis', 'golf', 'racing'];
     const hasDraw = !noDrawSports.includes(cfg?.sportType || 'soccer');
 
-    // Prefer richer pickcenter odds from summary if available; fall back to scoreboard odds already on match
     const summaryOddsList = [...(summary?.pickcenter || []), ...(summary?.odds || [])];
     const { odds: summaryOdds, markets: summaryMarkets } = extractEspnOdds(summaryOddsList, hasDraw);
-    const finalOdds = summaryOdds || match.odds;
+    const realOdds = summaryOdds || match.odds;
     const finalMarkets = summaryMarkets && summaryMarkets.length > 0 ? summaryMarkets : match.markets;
+
+    // Always ensure odds are present — fall back to computed estimates
+    const finalOdds = realOdds || generateComputedOdds(
+      match.homeTeam.name,
+      match.awayTeam.name,
+      cfg?.sportType || 'soccer'
+    );
 
     const bookmakerOdds = summary ? buildBookmakerOdds(summary, hasDraw) : [];
     const lineups = summary ? buildLineups(summary) : null;
@@ -254,6 +429,12 @@ export async function GET(_request: NextRequest, context: RouteContext) {
     const news = summary ? buildNews(summary) : [];
     const leaders = summary ? buildLeaders(summary) : [];
     const header = summary ? buildHeader(summary) : null;
+
+    // Extract home/away team IDs from header competitors for event attribution
+    const competition = summary?.header?.competitions?.[0];
+    const homeComp = competition?.competitors?.find(c => c.homeAway === 'home');
+    const awayComp = competition?.competitors?.find(c => c.homeAway === 'away');
+    const matchEvents = summary ? buildMatchEvents(summary, homeComp?.team?.id, awayComp?.team?.id) : [];
 
     const venue =
       summary?.gameInfo?.venue?.fullName ||
@@ -290,6 +471,7 @@ export async function GET(_request: NextRequest, context: RouteContext) {
         league: match.league,
         sport: match.sport,
         odds: finalOdds,
+        oddsIsComputed: !realOdds,
         markets: finalMarkets,
         venue,
         venueCity,
@@ -304,10 +486,12 @@ export async function GET(_request: NextRequest, context: RouteContext) {
       standings,
       news,
       leaders,
-      hasRealOdds: !!finalOdds,
+      matchEvents,
+      hasRealOdds: !!realOdds,
       hasLineups: !!lineups,
       hasStandings: !!standings,
       hasH2H: !!h2h && h2h.length > 0,
+      hasEvents: matchEvents.length > 0,
       timestamp: new Date().toISOString(),
     });
   } catch (error) {
