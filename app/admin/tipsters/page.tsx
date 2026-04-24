@@ -43,11 +43,11 @@ export default function AdminTipstersPage() {
   const pendingVerification = tipsters.filter(t => t.status === "pending").length
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-3">
       {/* Header */}
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Tipsters Management</h1>
+          <h1 className="text-lg font-bold">Tipsters Management</h1>
           <p className="text-muted-foreground">Manage and verify tipsters</p>
         </div>
         {pendingVerification > 0 && (
@@ -67,7 +67,7 @@ export default function AdminTipstersPage() {
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Total Tipsters</p>
-                <p className="text-2xl font-bold">1,284</p>
+                <p className="text-lg font-bold">1,284</p>
               </div>
             </div>
           </CardContent>
@@ -80,7 +80,7 @@ export default function AdminTipstersPage() {
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Verified</p>
-                <p className="text-2xl font-bold text-emerald-500">892</p>
+                <p className="text-lg font-bold text-emerald-500">892</p>
               </div>
             </div>
           </CardContent>
@@ -93,7 +93,7 @@ export default function AdminTipstersPage() {
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Avg Win Rate</p>
-                <p className="text-2xl font-bold">67%</p>
+                <p className="text-lg font-bold">67%</p>
               </div>
             </div>
           </CardContent>
@@ -106,7 +106,7 @@ export default function AdminTipstersPage() {
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Total Predictions</p>
-                <p className="text-2xl font-bold">45.2K</p>
+                <p className="text-lg font-bold">45.2K</p>
               </div>
             </div>
           </CardContent>

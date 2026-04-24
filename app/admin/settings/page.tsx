@@ -124,11 +124,11 @@ export default function AdminSettingsPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-3">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Settings</h1>
+          <h1 className="text-lg font-bold">Settings</h1>
           <p className="text-muted-foreground">Manage your application settings</p>
         </div>
         <Button 
@@ -155,7 +155,7 @@ export default function AdminSettingsPage() {
         </div>
       )}
 
-      <Tabs defaultValue="general" className="space-y-6">
+      <Tabs defaultValue="general" className="space-y-3">
         <TabsList className="grid w-full grid-cols-2 md:w-auto md:grid-cols-6">
           <TabsTrigger value="general" className="gap-2">
             <Globe className="h-4 w-4" /> General
@@ -184,7 +184,7 @@ export default function AdminSettingsPage() {
               <CardTitle>General Settings</CardTitle>
               <CardDescription>Configure basic site information</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-6">
+            <CardContent className="space-y-3">
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
                   <Label htmlFor="siteName">Site Name</Label>
@@ -224,7 +224,7 @@ export default function AdminSettingsPage() {
               <CardTitle>Security Settings</CardTitle>
               <CardDescription>Configure security and authentication options</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-2">
               <div className="flex items-center justify-between rounded-lg border border-border p-4">
                 <div>
                   <p className="font-medium">User Registration</p>
@@ -276,7 +276,7 @@ export default function AdminSettingsPage() {
               <CardTitle>Notification Settings</CardTitle>
               <CardDescription>Configure admin notifications</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-2">
               <div className="flex items-center justify-between rounded-lg border border-border p-4">
                 <div>
                   <p className="font-medium">New User Notifications</p>
@@ -318,7 +318,7 @@ export default function AdminSettingsPage() {
               <CardTitle>Predictions Settings</CardTitle>
               <CardDescription>Configure prediction rules and limits</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-6">
+            <CardContent className="space-y-3">
               <div className="grid gap-4 md:grid-cols-3">
                 <div className="space-y-2">
                   <Label htmlFor="maxPredictions">Max Predictions Per Day</Label>
@@ -361,7 +361,7 @@ export default function AdminSettingsPage() {
               <CardTitle>Appearance Settings</CardTitle>
               <CardDescription>Customize the look and feel</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-6">
+            <CardContent className="space-y-3">
               <div className="space-y-2">
                 <Label htmlFor="primaryColor">Primary Color</Label>
                 <div className="flex gap-2">
@@ -400,7 +400,7 @@ export default function AdminSettingsPage() {
               <CardTitle>SEO Settings</CardTitle>
               <CardDescription>Configure search engine optimization</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-6">
+            <CardContent className="space-y-3">
               <div className="space-y-2">
                 <Label htmlFor="googleAnalytics">Google Analytics ID</Label>
                 <Input 

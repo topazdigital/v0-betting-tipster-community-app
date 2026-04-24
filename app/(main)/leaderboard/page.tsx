@@ -49,11 +49,11 @@ export default function LeaderboardPage() {
     <div className="flex">
       <SidebarNew />
       <div className="flex-1 overflow-hidden">
-        <div className="mx-auto max-w-5xl px-4 py-6">
+        <div className="mx-auto max-w-5xl px-4 py-3">
           {/* Header */}
-          <div className="mb-6 flex items-center justify-between">
+          <div className="mb-3 flex items-center justify-between">
             <div>
-              <h1 className="flex items-center gap-2 text-2xl font-bold text-foreground">
+              <h1 className="flex items-center gap-2 text-lg font-bold text-foreground">
                 <Trophy className="h-7 w-7 text-warning" />
                 Leaderboard
               </h1>
@@ -70,7 +70,7 @@ export default function LeaderboardPage() {
           </div>
 
           {/* Top 3 Podium */}
-          <div className="mb-8 grid grid-cols-3 gap-4">
+          <div className="mb-4 grid grid-cols-3 gap-4">
             {/* Second Place */}
             <div className="mt-8 flex flex-col items-center">
               <div className="relative mb-3">
@@ -166,7 +166,7 @@ export default function LeaderboardPage() {
                       index < 3 && 'bg-muted/20'
                     )}
                   >
-                    <td className="px-4 py-4">
+                    <td className="px-4 py-2">
                       <div className={cn(
                         'flex h-8 w-8 items-center justify-center rounded-full font-bold',
                         entry.rank === 1 && 'bg-yellow-500 text-yellow-950',
@@ -177,7 +177,7 @@ export default function LeaderboardPage() {
                         {entry.rank}
                       </div>
                     </td>
-                    <td className="px-4 py-4">
+                    <td className="px-4 py-2">
                       <Link href={`/tipsters/${entry.username}`} className="flex items-center gap-3 hover:text-primary">
                         <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary text-sm font-bold text-primary-foreground">
                           {entry.avatar}
@@ -188,15 +188,15 @@ export default function LeaderboardPage() {
                         </div>
                       </Link>
                     </td>
-                    <td className="px-4 py-4 text-center">
+                    <td className="px-4 py-2 text-center">
                       <div className="font-semibold text-success">{entry.winRate}%</div>
                       <div className="text-xs text-muted-foreground">{entry.won}/{entry.tips}</div>
                     </td>
-                    <td className="px-4 py-4 text-center font-medium">{entry.tips}</td>
-                    <td className="px-4 py-4 text-center">
+                    <td className="px-4 py-2 text-center font-medium">{entry.tips}</td>
+                    <td className="px-4 py-2 text-center">
                       <span className="font-semibold text-primary">+{entry.roi}%</span>
                     </td>
-                    <td className="px-4 py-4 text-center">
+                    <td className="px-4 py-2 text-center">
                       {entry.streak > 0 && (
                         <div className="inline-flex items-center gap-1 rounded-full bg-warning/10 px-2 py-1 text-sm font-medium text-warning">
                           <Flame className="h-3 w-3" />
@@ -204,7 +204,7 @@ export default function LeaderboardPage() {
                         </div>
                       )}
                     </td>
-                    <td className="px-4 py-4 text-center">
+                    <td className="px-4 py-2 text-center">
                       {entry.change > 0 && (
                         <span className="text-success">+{entry.change}</span>
                       )}

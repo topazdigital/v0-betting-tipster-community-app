@@ -36,10 +36,10 @@ export default function AdminCompetitionsPage() {
   )
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-3">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Competitions Management</h1>
+          <h1 className="text-lg font-bold">Competitions Management</h1>
           <p className="text-muted-foreground">Create and manage prediction competitions</p>
         </div>
         <Button className="gap-2">
@@ -56,7 +56,7 @@ export default function AdminCompetitionsPage() {
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Total Competitions</p>
-                <p className="text-2xl font-bold">{competitions.length}</p>
+                <p className="text-lg font-bold">{competitions.length}</p>
               </div>
             </div>
           </CardContent>
@@ -69,7 +69,7 @@ export default function AdminCompetitionsPage() {
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Active</p>
-                <p className="text-2xl font-bold text-emerald-500">
+                <p className="text-lg font-bold text-emerald-500">
                   {competitions.filter(c => c.status === "active").length}
                 </p>
               </div>
@@ -84,7 +84,7 @@ export default function AdminCompetitionsPage() {
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Participants</p>
-                <p className="text-2xl font-bold">
+                <p className="text-lg font-bold">
                   {competitions.reduce((acc, c) => acc + c.participants, 0)}
                 </p>
               </div>
@@ -99,7 +99,7 @@ export default function AdminCompetitionsPage() {
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Upcoming</p>
-                <p className="text-2xl font-bold">
+                <p className="text-lg font-bold">
                   {competitions.filter(c => c.status === "upcoming").length}
                 </p>
               </div>

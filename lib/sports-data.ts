@@ -324,13 +324,9 @@ export const MARKETS: MarketConfig[] = [
 ];
 
 // Country flags utility
-export function getCountryFlag(countryCode: string): string {
-  const codePoints = countryCode
-    .toUpperCase()
-    .split('')
-    .map(char => 127397 + char.charCodeAt(0));
-  return String.fromCodePoint(...codePoints);
-}
+// Re-export the canonical flag resolver so old call sites get the same
+// England/Scotland/Wales/EU/continental special-cases as <LeagueFlag />.
+export { countryCodeToFlag as getCountryFlag } from './country-flags';
 
 // Get sport icon by slug or id
 export function getSportIcon(sportSlugOrId: string | number): string {

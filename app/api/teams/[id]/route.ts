@@ -104,20 +104,27 @@ export async function GET(
     },
   };
 
-  const events = (scheduleData?.events || []).map((ev: {
+  // ESPN's team /schedule endpoint nests status, score, and logo deeply,
+  // and the score field is an object `{ value, displayValue }` — not a string.
+  // We normalise everything here so the team page always sees rich, real data.
+  type CompTeam = { id: string; displayName?: string; abbreviation?: string; logo?: string; logos?: Array<{ href?: string; rel?: string[] }> };
+  type CompScore = string | number | { value?: number; displayValue?: string };
+  type Competitor = {
+    homeAway: string;
+    team?: CompTeam;
+    score?: CompScore;
+    winner?: boolean;
+    records?: Array<{ type?: string; summary?: string }>;
+  };
+  type RawEvent = {
     id: string;
     date: string;
     name?: string;
     shortName?: string;
     status?: { type?: { state?: string; completed?: boolean } };
     competitions?: Array<{
-      competitors?: Array<{
-        homeAway: string;
-        team?: { id: string; displayName?: string; abbreviation?: string; logo?: string };
-        score?: string;
-        winner?: boolean;
-        records?: Array<{ type?: string; summary?: string }>;
-      }>;
+      status?: { type?: { state?: string; completed?: boolean } };
+      competitors?: Competitor[];
       odds?: Array<{
         details?: string;
         moneyline?: { home?: { close?: { odds?: string } }; away?: { close?: { odds?: string } }; draw?: { close?: { odds?: string } } };
@@ -128,12 +135,38 @@ export async function GET(
       }>;
       venue?: { fullName?: string };
     }>;
-  }) => {
+  };
+
+  const readScore = (s: CompScore | undefined): number | null => {
+    if (s === undefined || s === null) return null;
+    if (typeof s === 'number') return s;
+    if (typeof s === 'string') {
+      const n = parseInt(s, 10);
+      return Number.isFinite(n) ? n : null;
+    }
+    if (typeof s.value === 'number') return s.value;
+    if (s.displayValue) {
+      const n = parseInt(s.displayValue, 10);
+      return Number.isFinite(n) ? n : null;
+    }
+    return null;
+  };
+
+  const pickLogo = (t?: CompTeam): string | undefined => {
+    if (!t) return undefined;
+    if (t.logo) return t.logo;
+    return t.logos?.find(l => l.rel?.includes('default') || l.rel?.includes('full'))?.href || t.logos?.[0]?.href;
+  };
+
+  const events = (scheduleData?.events || []).map((ev: RawEvent) => {
     const comp = ev.competitions?.[0];
     const home = comp?.competitors?.find(c => c.homeAway === 'home');
     const away = comp?.competitors?.find(c => c.homeAway === 'away');
-    const statusState = ev.status?.type?.state || 'pre';
-    const statusCompleted = ev.status?.type?.completed || false;
+    // Status lives on `competitions[0].status` (rich) but ESPN may also leave
+    // a partial copy on the event itself. Try competition first.
+    const statusType = comp?.status?.type || ev.status?.type;
+    const statusState = statusType?.state || 'pre';
+    const statusCompleted = !!statusType?.completed;
     const isHome = home?.team?.id === espnTeamId;
     const opponent = isHome ? away : home;
     const teamComp = isHome ? home : away;
@@ -156,32 +189,47 @@ export async function GET(
       if (h && a) odds = { home: h, away: a, draw: d };
     }
 
+    const teamScore = readScore(teamComp?.score);
+    const oppScore = readScore(opponentComp?.score);
+    const status = mapStatus(statusState, statusCompleted);
+
     return {
-      id: ev.id,
+      id: `espn_${parsed.league.replace(/[^a-z0-9]/gi, '')}_${ev.id}`,
+      espnEventId: ev.id,
       date: ev.date,
       name: ev.shortName || ev.name,
-      status: mapStatus(statusState, statusCompleted),
+      status,
       isHome,
       opponent: opponent?.team ? {
         id: opponent.team.id,
         name: opponent.team.displayName,
         shortName: opponent.team.abbreviation,
-        logo: opponent.team.logo,
+        logo: pickLogo(opponent.team),
       } : null,
-      score: teamComp?.score !== undefined && opponentComp?.score !== undefined ? {
-        team: parseInt(teamComp.score, 10),
-        opponent: parseInt(opponentComp.score || '0', 10),
+      score: teamScore !== null && oppScore !== null ? {
+        team: teamScore,
+        opponent: oppScore,
       } : null,
-      result: statusCompleted && teamComp?.winner !== undefined
-        ? (teamComp.winner ? 'W' : opponentComp?.winner ? 'L' : 'D')
+      result: statusCompleted
+        ? (teamComp?.winner === true ? 'W' : opponentComp?.winner === true ? 'L' : 'D')
         : null,
       venue: comp?.venue?.fullName,
       odds: isHome ? odds : odds ? { home: odds.away, draw: odds.draw, away: odds.home } : undefined,
     };
   });
 
-  const past = events.filter((e: { status: string }) => e.status === 'finished').slice(-10).reverse();
-  const upcoming = events.filter((e: { status: string }) => e.status === 'scheduled' || e.status === 'live').slice(0, 10);
+  // Sort by date so "past" is most-recent-first and "upcoming" is soonest-first.
+  type EventOut = (typeof events)[number];
+  const byDateAsc = (a: EventOut, b: EventOut) => new Date(a.date).getTime() - new Date(b.date).getTime();
+  const byDateDesc = (a: EventOut, b: EventOut) => new Date(b.date).getTime() - new Date(a.date).getTime();
+  const past = events
+    .filter((e: EventOut) => e.status === 'finished')
+    .sort(byDateDesc)
+    .slice(0, 12);
+  const upcoming = events
+    .filter((e: EventOut) => e.status === 'scheduled' || e.status === 'live')
+    .sort(byDateAsc)
+    .slice(0, 12);
 
   // ----- Roster (multiple ESPN response shapes: athletes:[…] or athletes:[{position, items:[…]}]) -----
   type RawAthlete = {

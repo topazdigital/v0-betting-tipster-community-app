@@ -177,17 +177,17 @@ export default function TipstersPage() {
     <div className="flex">
       <SidebarNew />
       <div className="flex-1 overflow-hidden">
-        <div className="mx-auto max-w-5xl px-4 py-6">
+        <div className="mx-auto max-w-5xl px-4 py-3">
           {/* Header */}
           <div className="mb-6">
-            <h1 className="text-2xl font-bold text-foreground">Tipsters</h1>
+            <h1 className="text-lg font-bold text-foreground">Tipsters</h1>
             <p className="text-sm text-muted-foreground">
               Follow expert tipsters and get winning predictions
             </p>
           </div>
 
           {/* Stats Cards */}
-          <div className="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
+          <div className="mb-3 grid grid-cols-2 gap-4 sm:grid-cols-4">
             <div className="rounded-xl border border-border bg-card p-4 text-center">
               <Users className="mx-auto h-5 w-5 text-primary" />
               <div className="mt-2 text-2xl font-bold">{tipsters.length}</div>
@@ -215,7 +215,7 @@ export default function TipstersPage() {
           </div>
 
           {/* Filters */}
-          <div className="mb-6 flex flex-wrap items-center gap-3">
+          <div className="mb-3 flex flex-wrap items-center gap-3">
             <div className="relative flex-1 sm:max-w-xs">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input

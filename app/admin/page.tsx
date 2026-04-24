@@ -93,11 +93,11 @@ const topTipsters = [
 
 export default function AdminDashboard() {
   return (
-    <div className="space-y-6">
+    <div className="space-y-3">
       {/* Header */}
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Dashboard</h1>
+          <h1 className="text-lg font-bold">Dashboard</h1>
           <p className="text-muted-foreground">Welcome back! Here&apos;s what&apos;s happening.</p>
         </div>
         <div className="flex gap-2">
@@ -124,7 +124,7 @@ export default function AdminDashboard() {
                 </Badge>
               </div>
               <div className="mt-3">
-                <p className="text-2xl font-bold">{stat.value}</p>
+                <p className="text-lg font-bold">{stat.value}</p>
                 <p className="text-sm text-muted-foreground">{stat.title}</p>
               </div>
             </CardContent>
@@ -133,7 +133,7 @@ export default function AdminDashboard() {
       </div>
 
       {/* Main Content Grid */}
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid gap-3 lg:grid-cols-2">
         {/* Recent Users */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
@@ -143,7 +143,7 @@ export default function AdminDashboard() {
             </Link>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
+            <div className="space-y-2">
               {recentUsers.map((user) => (
                 <div key={user.id} className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
@@ -174,7 +174,7 @@ export default function AdminDashboard() {
             </Link>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
+            <div className="space-y-2">
               {recentPredictions.map((pred) => (
                 <div key={pred.id} className="flex items-center justify-between">
                   <div>
@@ -200,7 +200,7 @@ export default function AdminDashboard() {
       </div>
 
       {/* Top Tipsters & Activity */}
-      <div className="grid gap-6 lg:grid-cols-3">
+      <div className="grid gap-3 lg:grid-cols-3">
         {/* Top Tipsters */}
         <Card className="lg:col-span-2">
           <CardHeader className="flex flex-row items-center justify-between">

@@ -92,10 +92,10 @@ export default function ResultsPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-3">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Results</h1>
+          <h1 className="text-lg font-bold text-foreground">Results</h1>
           <p className="text-muted-foreground">View finished match results across all sports</p>
         </div>
         <div className="flex items-center gap-2">
@@ -267,7 +267,7 @@ export default function ResultsPage() {
           ))}
         </div>
       ) : (
-        <div className="rounded-xl border border-border bg-card p-12 text-center">
+        <div className="rounded-xl border border-border bg-card p-6 text-center">
           <Calendar className="mx-auto h-12 w-12 text-muted-foreground" />
           <h3 className="mt-4 text-lg font-semibold">No results found</h3>
           <p className="mt-2 text-sm text-muted-foreground">

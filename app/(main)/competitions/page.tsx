@@ -163,11 +163,11 @@ export default function CompetitionsPage() {
     <div className="flex">
       <SidebarNew />
       <div className="flex-1 overflow-hidden">
-        <div className="mx-auto max-w-5xl px-4 py-6">
+        <div className="mx-auto max-w-5xl px-4 py-3">
           {/* Header */}
-          <div className="mb-6 flex items-center justify-between">
+          <div className="mb-3 flex items-center justify-between">
             <div>
-              <h1 className="flex items-center gap-2 text-2xl font-bold text-foreground">
+              <h1 className="flex items-center gap-2 text-lg font-bold text-foreground">
                 <Trophy className="h-7 w-7 text-warning" />
                 Competitions
               </h1>
@@ -184,7 +184,7 @@ export default function CompetitionsPage() {
           </div>
 
           {/* Stats */}
-          <div className="mb-8 grid grid-cols-2 gap-4 sm:grid-cols-4">
+          <div className="mb-4 grid grid-cols-2 gap-4 sm:grid-cols-4">
             <div className="rounded-xl border border-border bg-gradient-to-br from-warning/10 to-transparent p-4 text-center">
               <Target className="mx-auto h-6 w-6 text-warning" />
               <div className="mt-2 text-2xl font-bold text-warning">
@@ -303,7 +303,7 @@ export default function CompetitionsPage() {
 
             {/* Tipster Contests Tab */}
             <TabsContent value="contests" className="mt-6">
-              <div className="grid gap-6">
+              <div className="grid gap-3">
                 {activeComps.map(comp => (
                   <CompetitionCard 
                     key={comp.id} 

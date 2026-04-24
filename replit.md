@@ -95,3 +95,29 @@ Wired in `lib/api/unified-sports-api.ts`:
 ## Known Issues
 - Some team logo URLs are empty strings from ESPN — shows initials fallback correctly but triggers Next.js Image warnings in console.
 - No DATABASE_URL set; database calls in `lib/db.ts` no-op gracefully.
+
+## Apr 2026 — Real Team Schedule + Flag/Compactness Pass
+- **Team API real past results fix** (`app/api/teams/[id]/route.ts`): ESPN's
+  `/teams/{id}/schedule` puts status under `competitions[0].status.type`
+  (not `event.status`) and returns `score` as `{ value, displayValue }`
+  rather than a string. Both were re-read and the past/upcoming arrays now
+  populate with real W/L/D, real opponents, real scores. Verified against
+  Lakers (NBA, in-season): 2 results / 5 upcoming with correct H/A and crests.
+- **England/Scotland/Wales flags** (`components/ui/team-logo.tsx`,
+  `lib/sports-data.ts`): `LeagueFlag.getFlag` was stripping `GB-ENG` →
+  `GB`, so English & Scottish football leagues all rendered the Union
+  Jack. Both helpers now delegate to `lib/country-flags.ts` →
+  `countryCodeToFlag`, which has the correct subdivision codepoints
+  (🏴󠁧󠁢󠁥󠁮󠁧󠁿 / 🏴󠁧󠁢󠁳󠁣󠁴󠁿 / 🏴󠁧󠁢󠁷󠁬󠁳󠁿) plus EU/continental fallbacks.
+- **English league country codes** (`lib/api/unified-sports-api.ts`): all
+  11 English leagues (Premier League, EFL Championship, League One/Two,
+  FA Cup, EFL Cup, Premiership Rugby, WSL, Community Shield, National
+  League, T20 Blast) updated `countryCode: 'GB'` → `'GB-ENG'`. Geo
+  detection in `app/api/matches/route.ts` keys off the user's country
+  code (still `GB`) so it is unaffected.
+- **Compactness pass** across home, matches, results, leaderboard,
+  competitions, bookmakers, tipsters, all admin pages, and team detail
+  page — reduced section margins (`mb-8/6` → `mb-4/3`), padding
+  (`py-8/6/4` → `py-3/2`), spacing (`space-y-6/4` → `space-y-3/2`),
+  empty-state padding (`p-12` → `p-6`), and header sizes (`text-2xl/3xl`
+  → `text-lg/xl`) for less scrolling.

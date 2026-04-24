@@ -44,10 +44,10 @@ export default function AdminPaymentsPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-3">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Payments & Transactions</h1>
+          <h1 className="text-lg font-bold">Payments & Transactions</h1>
           <p className="text-muted-foreground">Manage payments and view transaction history</p>
         </div>
         <Button variant="outline" className="gap-2">
@@ -64,7 +64,7 @@ export default function AdminPaymentsPage() {
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Total Revenue</p>
-                <p className="text-2xl font-bold text-emerald-500">
+                <p className="text-lg font-bold text-emerald-500">
                   ${stats.totalRevenue.toFixed(2)}
                 </p>
               </div>
@@ -79,7 +79,7 @@ export default function AdminPaymentsPage() {
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Subscriptions</p>
-                <p className="text-2xl font-bold">{stats.subscriptions}</p>
+                <p className="text-lg font-bold">{stats.subscriptions}</p>
               </div>
             </div>
           </CardContent>
@@ -92,7 +92,7 @@ export default function AdminPaymentsPage() {
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Pending</p>
-                <p className="text-2xl font-bold text-amber-500">{stats.pending}</p>
+                <p className="text-lg font-bold text-amber-500">{stats.pending}</p>
               </div>
             </div>
           </CardContent>
@@ -105,7 +105,7 @@ export default function AdminPaymentsPage() {
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Active Subscribers</p>
-                <p className="text-2xl font-bold">{stats.activeUsers}</p>
+                <p className="text-lg font-bold">{stats.activeUsers}</p>
               </div>
             </div>
           </CardContent>

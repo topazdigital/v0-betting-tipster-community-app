@@ -3,6 +3,7 @@
 import { useState } from "react"
 import Image from "next/image"
 import { cn } from "@/lib/utils"
+import { countryCodeToFlag } from "@/lib/country-flags"
 
 interface TeamLogoProps {
   teamName: string
@@ -624,29 +625,12 @@ interface LeagueFlagProps {
 }
 
 export function LeagueFlag({ countryCode, size = 'md', className }: LeagueFlagProps) {
-  // Convert country code to flag emoji
-  const getFlag = (code: string): string => {
-    const cleanCode = code.replace('GB-ENG', 'GB').replace('GB-SCT', 'GB').split('-')[0].toUpperCase()
-    
-    // Special cases
-    if (cleanCode === 'EU') return '🇪🇺'
-    if (cleanCode === 'WO' || cleanCode === 'WORLD') return '🌍'
-    if (cleanCode === 'AF') return '🌍' // Africa
-    if (cleanCode === 'AS') return '🌏' // Asia
-    if (cleanCode === 'SA' && code !== 'SA') return '🌎' // South America
-    if (cleanCode === 'SH') return '🌏' // Southern Hemisphere
-    if (cleanCode === 'CB') return '🌴' // Caribbean
-    
-    // Standard country flag
-    if (cleanCode.length === 2) {
-      const codePoints = cleanCode
-        .split('')
-        .map(char => 127397 + char.charCodeAt(0))
-      return String.fromCodePoint(...codePoints)
-    }
-    
-    return '🏳️'
-  }
+  // Single source of truth: lib/country-flags handles GB-ENG/GB-SCT/GB-WLS
+  // (England/Scotland/Wales) plus EU and continental fallbacks.
+  // The previous implementation here stripped the subdivision so every
+  // English & Scottish league showed the Union Jack — that is fixed by
+  // delegating directly to countryCodeToFlag.
+  const getFlag = (code: string): string => countryCodeToFlag(code)
   
   const flagSizeClasses = {
     xs: 'text-sm',

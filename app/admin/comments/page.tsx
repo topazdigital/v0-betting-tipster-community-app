@@ -53,9 +53,9 @@ export default function AdminCommentsPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-3">
       <div>
-        <h1 className="text-2xl font-bold">Comments Moderation</h1>
+        <h1 className="text-lg font-bold">Comments Moderation</h1>
         <p className="text-muted-foreground">Review and moderate user comments</p>
       </div>
 
@@ -63,25 +63,25 @@ export default function AdminCommentsPage() {
         <Card>
           <CardContent className="p-4">
             <p className="text-sm text-muted-foreground">Total Comments</p>
-            <p className="text-2xl font-bold">{stats.total}</p>
+            <p className="text-lg font-bold">{stats.total}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
             <p className="text-sm text-muted-foreground">Pending Review</p>
-            <p className="text-2xl font-bold text-amber-500">{stats.pending}</p>
+            <p className="text-lg font-bold text-amber-500">{stats.pending}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
             <p className="text-sm text-muted-foreground">Flagged</p>
-            <p className="text-2xl font-bold text-red-500">{stats.flagged}</p>
+            <p className="text-lg font-bold text-red-500">{stats.flagged}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
             <p className="text-sm text-muted-foreground">Approved</p>
-            <p className="text-2xl font-bold text-emerald-500">{stats.approved}</p>
+            <p className="text-lg font-bold text-emerald-500">{stats.approved}</p>
           </CardContent>
         </Card>
       </div>

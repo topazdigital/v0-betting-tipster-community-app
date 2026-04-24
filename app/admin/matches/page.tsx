@@ -235,11 +235,11 @@ export default function AdminMatchesPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-3">
       {/* Header */}
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Matches Management</h1>
+          <h1 className="text-lg font-bold">Matches Management</h1>
           <p className="text-muted-foreground">Add and manage matches across all sports</p>
         </div>
 
@@ -254,13 +254,13 @@ export default function AdminMatchesPage() {
         <Card>
           <CardContent className="p-4">
             <p className="text-sm text-muted-foreground">Total Matches</p>
-            <p className="text-2xl font-bold">{matches.length}</p>
+            <p className="text-lg font-bold">{matches.length}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
             <p className="text-sm text-muted-foreground">Live Now</p>
-            <p className="text-2xl font-bold text-red-500">
+            <p className="text-lg font-bold text-red-500">
               {matches.filter(m => m.status === "live").length}
             </p>
           </CardContent>
@@ -268,7 +268,7 @@ export default function AdminMatchesPage() {
         <Card>
           <CardContent className="p-4">
             <p className="text-sm text-muted-foreground">Scheduled</p>
-            <p className="text-2xl font-bold text-blue-500">
+            <p className="text-lg font-bold text-blue-500">
               {matches.filter(m => m.status === "scheduled").length}
             </p>
           </CardContent>
@@ -276,7 +276,7 @@ export default function AdminMatchesPage() {
         <Card>
           <CardContent className="p-4">
             <p className="text-sm text-muted-foreground">Finished</p>
-            <p className="text-2xl font-bold text-emerald-500">
+            <p className="text-lg font-bold text-emerald-500">
               {matches.filter(m => m.status === "finished").length}
             </p>
           </CardContent>

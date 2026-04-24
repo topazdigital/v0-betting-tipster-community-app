@@ -208,7 +208,7 @@ interface ESPNLeagueConfig {
 // ESPN supports these leagues - all FREE, no API key needed
 const ESPN_LEAGUES: ESPNLeagueConfig[] = [
   // SOCCER - European Top Leagues
-  { sport: 'soccer', league: 'eng.1', sportId: 1, leagueId: 1, leagueName: 'Premier League', country: 'England', countryCode: 'GB', sportType: 'soccer' },
+  { sport: 'soccer', league: 'eng.1', sportId: 1, leagueId: 1, leagueName: 'Premier League', country: 'England', countryCode: 'GB-ENG', sportType: 'soccer' },
   { sport: 'soccer', league: 'esp.1', sportId: 1, leagueId: 2, leagueName: 'La Liga', country: 'Spain', countryCode: 'ES', sportType: 'soccer' },
   { sport: 'soccer', league: 'ger.1', sportId: 1, leagueId: 3, leagueName: 'Bundesliga', country: 'Germany', countryCode: 'DE', sportType: 'soccer' },
   { sport: 'soccer', league: 'ita.1', sportId: 1, leagueId: 4, leagueName: 'Serie A', country: 'Italy', countryCode: 'IT', sportType: 'soccer' },
@@ -247,11 +247,11 @@ const ESPN_LEAGUES: ESPNLeagueConfig[] = [
   { sport: 'soccer', league: 'ind.1', sportId: 1, leagueId: 40, leagueName: 'Indian Super League', country: 'India', countryCode: 'IN', sportType: 'soccer' },
 
   // SOCCER - Lower European Divisions
-  { sport: 'soccer', league: 'eng.2', sportId: 1, leagueId: 41, leagueName: 'EFL Championship', country: 'England', countryCode: 'GB', sportType: 'soccer' },
-  { sport: 'soccer', league: 'eng.3', sportId: 1, leagueId: 42, leagueName: 'EFL League One', country: 'England', countryCode: 'GB', sportType: 'soccer' },
-  { sport: 'soccer', league: 'eng.4', sportId: 1, leagueId: 43, leagueName: 'EFL League Two', country: 'England', countryCode: 'GB', sportType: 'soccer' },
-  { sport: 'soccer', league: 'eng.fa', sportId: 1, leagueId: 44, leagueName: 'FA Cup', country: 'England', countryCode: 'GB', sportType: 'soccer' },
-  { sport: 'soccer', league: 'eng.league_cup', sportId: 1, leagueId: 45, leagueName: 'EFL Cup', country: 'England', countryCode: 'GB', sportType: 'soccer' },
+  { sport: 'soccer', league: 'eng.2', sportId: 1, leagueId: 41, leagueName: 'EFL Championship', country: 'England', countryCode: 'GB-ENG', sportType: 'soccer' },
+  { sport: 'soccer', league: 'eng.3', sportId: 1, leagueId: 42, leagueName: 'EFL League One', country: 'England', countryCode: 'GB-ENG', sportType: 'soccer' },
+  { sport: 'soccer', league: 'eng.4', sportId: 1, leagueId: 43, leagueName: 'EFL League Two', country: 'England', countryCode: 'GB-ENG', sportType: 'soccer' },
+  { sport: 'soccer', league: 'eng.fa', sportId: 1, leagueId: 44, leagueName: 'FA Cup', country: 'England', countryCode: 'GB-ENG', sportType: 'soccer' },
+  { sport: 'soccer', league: 'eng.league_cup', sportId: 1, leagueId: 45, leagueName: 'EFL Cup', country: 'England', countryCode: 'GB-ENG', sportType: 'soccer' },
   { sport: 'soccer', league: 'esp.2', sportId: 1, leagueId: 46, leagueName: 'La Liga 2', country: 'Spain', countryCode: 'ES', sportType: 'soccer' },
   { sport: 'soccer', league: 'esp.copa_del_rey', sportId: 1, leagueId: 47, leagueName: 'Copa del Rey', country: 'Spain', countryCode: 'ES', sportType: 'soccer' },
   { sport: 'soccer', league: 'ger.2', sportId: 1, leagueId: 48, leagueName: '2. Bundesliga', country: 'Germany', countryCode: 'DE', sportType: 'soccer' },
@@ -369,7 +369,7 @@ const ESPN_LEAGUES: ESPNLeagueConfig[] = [
   // RUGBY
   { sport: 'rugby', league: 'six-nations', sportId: 8, leagueId: 701, leagueName: 'Six Nations', country: 'Europe', countryCode: 'EU', sportType: 'rugby' },
   { sport: 'rugby', league: 'super-rugby', sportId: 8, leagueId: 703, leagueName: 'Super Rugby', country: 'Southern Hemisphere', countryCode: 'SH', sportType: 'rugby' },
-  { sport: 'rugby', league: 'premiership', sportId: 8, leagueId: 704, leagueName: 'Premiership Rugby', country: 'England', countryCode: 'GB', sportType: 'rugby' },
+  { sport: 'rugby', league: 'premiership', sportId: 8, leagueId: 704, leagueName: 'Premiership Rugby', country: 'England', countryCode: 'GB-ENG', sportType: 'rugby' },
   
   // GOLF
   { sport: 'golf', league: 'pga', sportId: 17, leagueId: 1701, leagueName: 'PGA Tour', country: 'USA', countryCode: 'US', sportType: 'golf' },
@@ -382,7 +382,7 @@ const ESPN_LEAGUES: ESPNLeagueConfig[] = [
   { sport: 'racing', league: 'indycar', sportId: 32, leagueId: 3201, leagueName: 'IndyCar', country: 'USA', countryCode: 'US', sportType: 'racing' },
 
   // SOCCER - Women's Top Leagues
-  { sport: 'soccer', league: 'eng.w.1', sportId: 1, leagueId: 200, leagueName: "Women's Super League", country: 'England', countryCode: 'GB', sportType: 'soccer' },
+  { sport: 'soccer', league: 'eng.w.1', sportId: 1, leagueId: 200, leagueName: "Women's Super League", country: 'England', countryCode: 'GB-ENG', sportType: 'soccer' },
   { sport: 'soccer', league: 'esp.w.1', sportId: 1, leagueId: 201, leagueName: "Liga F", country: 'Spain', countryCode: 'ES', sportType: 'soccer' },
   { sport: 'soccer', league: 'ger.w.1', sportId: 1, leagueId: 202, leagueName: "Frauen Bundesliga", country: 'Germany', countryCode: 'DE', sportType: 'soccer' },
   { sport: 'soccer', league: 'fra.w.1', sportId: 1, leagueId: 203, leagueName: "Première Ligue", country: 'France', countryCode: 'FR', sportType: 'soccer' },
@@ -398,7 +398,7 @@ const ESPN_LEAGUES: ESPNLeagueConfig[] = [
 
   // SOCCER - More Cups
   { sport: 'soccer', league: 'uefa.super_cup', sportId: 1, leagueId: 220, leagueName: 'UEFA Super Cup', country: 'Europe', countryCode: 'EU', sportType: 'soccer' },
-  { sport: 'soccer', league: 'eng.charity', sportId: 1, leagueId: 221, leagueName: 'FA Community Shield', country: 'England', countryCode: 'GB', sportType: 'soccer' },
+  { sport: 'soccer', league: 'eng.charity', sportId: 1, leagueId: 221, leagueName: 'FA Community Shield', country: 'England', countryCode: 'GB-ENG', sportType: 'soccer' },
   { sport: 'soccer', league: 'esp.super_cup', sportId: 1, leagueId: 222, leagueName: 'Supercopa de España', country: 'Spain', countryCode: 'ES', sportType: 'soccer' },
   { sport: 'soccer', league: 'ita.super_cup', sportId: 1, leagueId: 223, leagueName: 'Supercoppa Italiana', country: 'Italy', countryCode: 'IT', sportType: 'soccer' },
   { sport: 'soccer', league: 'fra.super_cup', sportId: 1, leagueId: 224, leagueName: 'Trophée des Champions', country: 'France', countryCode: 'FR', sportType: 'soccer' },
@@ -407,7 +407,7 @@ const ESPN_LEAGUES: ESPNLeagueConfig[] = [
   { sport: 'soccer', league: 'por.super_cup', sportId: 1, leagueId: 227, leagueName: 'Supertaça Cândido de Oliveira', country: 'Portugal', countryCode: 'PT', sportType: 'soccer' },
 
   // SOCCER - Lower English & Scottish
-  { sport: 'soccer', league: 'eng.5', sportId: 1, leagueId: 230, leagueName: 'National League', country: 'England', countryCode: 'GB', sportType: 'soccer' },
+  { sport: 'soccer', league: 'eng.5', sportId: 1, leagueId: 230, leagueName: 'National League', country: 'England', countryCode: 'GB-ENG', sportType: 'soccer' },
   { sport: 'soccer', league: 'sco.2', sportId: 1, leagueId: 231, leagueName: 'Scottish Championship', country: 'Scotland', countryCode: 'GB-SCT', sportType: 'soccer' },
   { sport: 'soccer', league: 'sco.fa', sportId: 1, leagueId: 232, leagueName: 'Scottish Cup', country: 'Scotland', countryCode: 'GB-SCT', sportType: 'soccer' },
 
@@ -478,7 +478,7 @@ const ESPN_LEAGUES: ESPNLeagueConfig[] = [
   { sport: 'cricket', league: 'cpl', sportId: 4, leagueId: 310, leagueName: 'Caribbean Premier League', country: 'Caribbean', countryCode: 'CB', sportType: 'cricket' },
   { sport: 'cricket', league: 't20.world', sportId: 4, leagueId: 311, leagueName: 'ICC T20 World Cup', country: 'World', countryCode: 'WO', sportType: 'cricket' },
   { sport: 'cricket', league: 'odi.world', sportId: 4, leagueId: 312, leagueName: 'ICC Cricket World Cup', country: 'World', countryCode: 'WO', sportType: 'cricket' },
-  { sport: 'cricket', league: 'eng.t20.blast', sportId: 4, leagueId: 313, leagueName: 'T20 Blast', country: 'England', countryCode: 'GB', sportType: 'cricket' },
+  { sport: 'cricket', league: 'eng.t20.blast', sportId: 4, leagueId: 313, leagueName: 'T20 Blast', country: 'England', countryCode: 'GB-ENG', sportType: 'cricket' },
 
   // RUGBY - More
   { sport: 'rugby', league: 'top14', sportId: 8, leagueId: 710, leagueName: 'Top 14', country: 'France', countryCode: 'FR', sportType: 'rugby' },

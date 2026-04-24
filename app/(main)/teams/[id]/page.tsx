@@ -202,7 +202,7 @@ export default function TeamPage({ params }: PageProps) {
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
         {/* ── Main column ─────────────────────────────────────────── */}
-        <div className="min-w-0 space-y-6">
+        <div className="min-w-0 space-y-3">
 
       {/* Team Hero */}
       <div
@@ -781,7 +781,7 @@ function SquadPanel({ roster, accentColor }: { roster: Player[]; accentColor: st
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-2">
       {Array.from(groups.entries()).map(([pos, players]) => (
         <div key={pos}>
           <div className="mb-2 flex items-center gap-2">

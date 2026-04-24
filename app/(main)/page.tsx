@@ -84,31 +84,31 @@ export default function HomePage() {
       <SidebarNew selectedSportId={selectedSportId} onSelectSport={setSelectedSportId} />
       
       <div className="flex-1 overflow-hidden">
-        {/* Hero Section */}
+        {/* Hero Section — compact */}
         <section className="relative overflow-hidden border-b border-border bg-gradient-to-br from-background via-background to-primary/5">
-          <div className="mx-auto max-w-6xl px-4 py-8 sm:py-12">
-            <div className="grid gap-8 lg:grid-cols-2 lg:gap-12">
+          <div className="mx-auto max-w-6xl px-4 py-4 sm:py-6">
+            <div className="grid gap-4 lg:grid-cols-2 lg:gap-8">
               {/* Left: Main content */}
               <div className="flex flex-col justify-center">
-                <Badge variant="secondary" className="mb-4 w-fit">
+                <Badge variant="secondary" className="mb-2 w-fit text-[10px]">
                   <Zap className="mr-1 h-3 w-3" />
                   Trusted by 50,000+ tipsters
                 </Badge>
-                <h1 className="mb-4 text-balance text-3xl font-bold tracking-tight text-foreground sm:text-4xl lg:text-5xl">
+                <h1 className="mb-2 text-balance text-2xl font-bold tracking-tight text-foreground sm:text-3xl lg:text-4xl">
                   The Complete Platform for
                   <span className="bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent"> Sports Betting Tips</span>
                 </h1>
-                <p className="mb-6 text-pretty text-lg text-muted-foreground">
-                  Get expert predictions across 35+ sports, track your performance, and compete with the best tipsters worldwide.
+                <p className="mb-3 text-pretty text-sm text-muted-foreground">
+                  Expert predictions across 35+ sports — track performance and compete worldwide.
                 </p>
-                <div className="flex flex-wrap gap-3">
-                  <Button size="lg" asChild>
+                <div className="flex flex-wrap gap-2">
+                  <Button size="sm" asChild>
                     <Link href="/register">
                       Get Started Free
                       <ArrowRight className="ml-2 h-4 w-4" />
                     </Link>
                   </Button>
-                  <Button variant="outline" size="lg" asChild>
+                  <Button variant="outline" size="sm" asChild>
                     <Link href="/matches">
                       Browse Matches
                     </Link>
@@ -116,7 +116,7 @@ export default function HomePage() {
                 </div>
 
                 {/* Quick Stats */}
-                <div className="mt-8 grid grid-cols-4 gap-4">
+                <div className="mt-4 grid grid-cols-4 gap-2">
                   <div className="text-center">
                     <div className="text-2xl font-bold text-foreground">{stats.live ?? 0}</div>
                     <div className="text-xs text-muted-foreground">Live Now</div>
@@ -142,7 +142,7 @@ export default function HomePage() {
                   {/* Live matches preview */}
                   {liveMatches.length > 0 ? (
                     <div className="rounded-2xl border border-live/30 bg-gradient-to-br from-live/10 to-transparent p-6 shadow-xl shadow-live/10">
-                      <div className="mb-4 flex items-center gap-2">
+                      <div className="mb-2 flex items-center gap-2">
                         <span className="relative flex h-3 w-3">
                           <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-live opacity-75"></span>
                           <span className="relative inline-flex h-3 w-3 rounded-full bg-live"></span>
@@ -181,7 +181,7 @@ export default function HomePage() {
                     </div>
                   ) : (
                     <div className="rounded-2xl border border-border bg-card p-6 shadow-xl">
-                      <div className="mb-4 flex items-center gap-2">
+                      <div className="mb-2 flex items-center gap-2">
                         <Clock className="h-5 w-5 text-primary" />
                         <span className="font-semibold">Coming Up</span>
                       </div>
@@ -222,7 +222,7 @@ export default function HomePage() {
         </section>
 
         {/* Sports Filter */}
-        <section className="border-b border-border bg-card/50 px-4 py-4">
+        <section className="border-b border-border bg-card/50 px-4 py-2">
           <div className="mx-auto max-w-6xl">
             <SportsFilter 
               selectedSportId={selectedSportId}
@@ -232,7 +232,7 @@ export default function HomePage() {
           </div>
         </section>
 
-        <div className="mx-auto max-w-6xl px-4 py-8">
+        <div className="mx-auto max-w-6xl px-4 py-4">
           {isLoading ? (
             <div className="flex h-64 items-center justify-center">
               <Spinner className="h-8 w-8" />
@@ -241,8 +241,8 @@ export default function HomePage() {
             <>
               {/* Live Matches Section */}
               {liveMatches.length > 0 && (
-                <section className="mb-10">
-                  <div className="mb-4 flex items-center justify-between">
+                <section className="mb-5">
+                  <div className="mb-2 flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <span className="relative flex h-3 w-3">
                         <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-live opacity-75"></span>
@@ -272,8 +272,8 @@ export default function HomePage() {
               )}
 
               {/* Top Tipsters */}
-              <section className="mb-10">
-                <div className="mb-4 flex items-center justify-between">
+              <section className="mb-5">
+                <div className="mb-2 flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <Trophy className="h-5 w-5 text-warning" />
                     <h2 className="text-xl font-bold text-foreground">Top Tipsters</h2>
@@ -339,8 +339,8 @@ export default function HomePage() {
               </section>
 
               {/* Today's Matches by League */}
-              <section className="mb-10">
-                <div className="mb-4 flex items-center justify-between">
+              <section className="mb-5">
+                <div className="mb-2 flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <Clock className="h-5 w-5 text-primary" />
                     <h2 className="text-xl font-bold text-foreground">Today&apos;s Matches</h2>
@@ -361,7 +361,7 @@ export default function HomePage() {
                     ))}
                   </div>
                 ) : (
-                  <div className="rounded-xl border border-border bg-card p-12 text-center">
+                  <div className="rounded-xl border border-border bg-card p-6 text-center">
                     <Clock className="mx-auto h-12 w-12 text-muted-foreground" />
                     <h3 className="mt-4 text-lg font-semibold">No matches today</h3>
                     <p className="mt-2 text-sm text-muted-foreground">
@@ -376,8 +376,8 @@ export default function HomePage() {
 
               {/* Multi-Sport Section */}
               {Object.keys(upcomingBySport).length > 1 && (
-                <section className="mb-10">
-                  <div className="mb-4 flex items-center gap-3">
+                <section className="mb-5">
+                  <div className="mb-2 flex items-center gap-3">
                     <Target className="h-5 w-5 text-primary" />
                     <h2 className="text-xl font-bold text-foreground">Across All Sports</h2>
                   </div>
@@ -420,34 +420,34 @@ export default function HomePage() {
               )}
 
               {/* Features Section */}
-              <section className="mb-10">
-                <div className="rounded-2xl border border-border bg-gradient-to-br from-card to-muted/30 p-8">
-                  <h2 className="mb-6 text-center text-2xl font-bold">Why Choose Betcheza?</h2>
-                  <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+              <section className="mb-5">
+                <div className="rounded-2xl border border-border bg-gradient-to-br from-card to-muted/30 p-4">
+                  <h2 className="mb-3 text-center text-xl font-bold">Why Choose Betcheza?</h2>
+                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                     <div className="text-center">
-                      <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
-                        <Target className="h-6 w-6 text-primary" />
+                      <div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
+                        <Target className="h-5 w-5 text-primary" />
                       </div>
                       <h3 className="mb-1 font-semibold">Expert Predictions</h3>
                       <p className="text-sm text-muted-foreground">AI-powered tips with detailed analysis</p>
                     </div>
                     <div className="text-center">
-                      <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-success/10">
-                        <TrendingUp className="h-6 w-6 text-success" />
+                      <div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-success/10">
+                        <TrendingUp className="h-5 w-5 text-success" />
                       </div>
                       <h3 className="mb-1 font-semibold">Track Performance</h3>
                       <p className="text-sm text-muted-foreground">Detailed stats and ROI tracking</p>
                     </div>
                     <div className="text-center">
-                      <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-warning/10">
-                        <Users className="h-6 w-6 text-warning" />
+                      <div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-warning/10">
+                        <Users className="h-5 w-5 text-warning" />
                       </div>
                       <h3 className="mb-1 font-semibold">Community</h3>
                       <p className="text-sm text-muted-foreground">Connect with top tipsters worldwide</p>
                     </div>
                     <div className="text-center">
-                      <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-destructive/10">
-                        <Shield className="h-6 w-6 text-destructive" />
+                      <div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-destructive/10">
+                        <Shield className="h-5 w-5 text-destructive" />
                       </div>
                       <h3 className="mb-1 font-semibold">Verified Results</h3>
                       <p className="text-sm text-muted-foreground">Transparent and audited statistics</p>

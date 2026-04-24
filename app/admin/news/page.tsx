@@ -45,10 +45,10 @@ export default function AdminNewsPage() {
   })
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-3">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="text-2xl font-bold">News Management</h1>
+          <h1 className="text-lg font-bold">News Management</h1>
           <p className="text-muted-foreground">Create and manage news articles</p>
         </div>
         <Button className="gap-2">
@@ -65,7 +65,7 @@ export default function AdminNewsPage() {
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Total Articles</p>
-                <p className="text-2xl font-bold">{articles.length}</p>
+                <p className="text-lg font-bold">{articles.length}</p>
               </div>
             </div>
           </CardContent>
@@ -78,7 +78,7 @@ export default function AdminNewsPage() {
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Total Views</p>
-                <p className="text-2xl font-bold">
+                <p className="text-lg font-bold">
                   {articles.reduce((acc, a) => acc + a.views, 0).toLocaleString()}
                 </p>
               </div>
@@ -93,7 +93,7 @@ export default function AdminNewsPage() {
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Drafts</p>
-                <p className="text-2xl font-bold">
+                <p className="text-lg font-bold">
                   {articles.filter(a => a.status === "draft").length}
                 </p>
               </div>

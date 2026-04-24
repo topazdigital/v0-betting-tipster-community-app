@@ -214,10 +214,10 @@ export default function BookmakersPage() {
     <div className="flex">
       <SidebarNew />
       <div className="flex-1 overflow-hidden">
-        <div className="mx-auto max-w-5xl px-4 py-6">
+        <div className="mx-auto max-w-5xl px-4 py-3">
           {/* Header */}
           <div className="mb-6">
-            <h1 className="flex items-center gap-2 text-2xl font-bold text-foreground">
+            <h1 className="flex items-center gap-2 text-lg font-bold text-foreground">
               <Globe className="h-7 w-7 text-primary" />
               Bookmakers
             </h1>
@@ -227,7 +227,7 @@ export default function BookmakersPage() {
           </div>
 
           {/* Filters */}
-          <div className="mb-6 flex flex-wrap items-center gap-3">
+          <div className="mb-3 flex flex-wrap items-center gap-3">
             <div className="relative flex-1 sm:max-w-xs">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
@@ -270,7 +270,7 @@ export default function BookmakersPage() {
           </div>
 
           {/* Bookmakers Grid */}
-          <div className="grid gap-6">
+          <div className="grid gap-3">
             {filteredBookmakers.map((bookie, index) => (
               <div 
                 key={bookie.id}

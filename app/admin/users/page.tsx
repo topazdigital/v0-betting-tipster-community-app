@@ -41,11 +41,11 @@ export default function AdminUsersPage() {
   })
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-3">
       {/* Header */}
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Users Management</h1>
+          <h1 className="text-lg font-bold">Users Management</h1>
           <p className="text-muted-foreground">Manage all registered users</p>
         </div>
         <div className="flex gap-2">
@@ -63,25 +63,25 @@ export default function AdminUsersPage() {
         <Card>
           <CardContent className="p-4">
             <p className="text-sm text-muted-foreground">Total Users</p>
-            <p className="text-2xl font-bold">24,532</p>
+            <p className="text-lg font-bold">24,532</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
             <p className="text-sm text-muted-foreground">Active Users</p>
-            <p className="text-2xl font-bold text-emerald-500">21,847</p>
+            <p className="text-lg font-bold text-emerald-500">21,847</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
             <p className="text-sm text-muted-foreground">Tipsters</p>
-            <p className="text-2xl font-bold text-amber-500">1,284</p>
+            <p className="text-lg font-bold text-amber-500">1,284</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
             <p className="text-sm text-muted-foreground">Banned</p>
-            <p className="text-2xl font-bold text-red-500">156</p>
+            <p className="text-lg font-bold text-red-500">156</p>
           </CardContent>
         </Card>
       </div>

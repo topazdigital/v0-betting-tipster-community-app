@@ -121,7 +121,7 @@ function MatchesContent() {
       
       <div className="flex-1 overflow-hidden">
         {/* Sports Filter Bar */}
-        <div className="border-b border-border bg-card/50 px-4 py-4">
+        <div className="border-b border-border bg-card/50 px-4 py-2">
           <div className="mx-auto max-w-5xl">
             <SportsFilter 
               selectedSportId={selectedSportId}
@@ -131,19 +131,16 @@ function MatchesContent() {
           </div>
         </div>
 
-        <div className="mx-auto max-w-5xl px-4 py-6">
+        <div className="mx-auto max-w-5xl px-4 py-3">
           {/* Header */}
-          <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
             <div>
-              <h1 className="text-2xl font-bold text-foreground">
+              <h1 className="text-lg font-bold text-foreground">
                 {selectedSportId 
                   ? ALL_SPORTS.find(s => s.id === selectedSportId)?.name + ' Matches'
                   : 'All Matches'
                 }
               </h1>
-              <p className="text-sm text-muted-foreground">
-                Browse and bet on matches across all sports
-              </p>
             </div>
 
             {/* Quick Stats */}
@@ -167,7 +164,7 @@ function MatchesContent() {
           </div>
 
           {/* Filters */}
-          <div className="mb-6 flex flex-wrap items-center gap-3">
+          <div className="mb-3 flex flex-wrap items-center gap-2">
             <div className="relative flex-1 sm:max-w-xs">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
@@ -220,7 +217,7 @@ function MatchesContent() {
           </div>
 
           {/* Results Count */}
-          <div className="mb-4 text-sm text-muted-foreground">
+          <div className="mb-2 text-xs text-muted-foreground">
             {filteredMatches.length} match{filteredMatches.length !== 1 ? 'es' : ''} found
             {statusFilter === 'live' && (
               <span className="ml-2 text-live">• Updating every 10 seconds</span>
@@ -234,7 +231,7 @@ function MatchesContent() {
             </div>
           ) : filteredMatches.length > 0 ? (
             /* Match Lists Grouped by League */
-            <div className="space-y-6">
+            <div className="space-y-3">
               {groupedMatches.map(({ key, sport, league, matches: leagueMatches }) => (
                 <div key={key}>
                   <div className="mb-2 flex items-center justify-between border-b border-border/60 pb-2">

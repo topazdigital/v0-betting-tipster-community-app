@@ -48,10 +48,10 @@ export default function AdminPredictionsPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-3">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold">Predictions Management</h1>
+        <h1 className="text-lg font-bold">Predictions Management</h1>
         <p className="text-muted-foreground">Review and manage all predictions</p>
       </div>
 
@@ -60,31 +60,31 @@ export default function AdminPredictionsPage() {
         <Card>
           <CardContent className="p-4">
             <p className="text-sm text-muted-foreground">Total</p>
-            <p className="text-2xl font-bold">{stats.total}</p>
+            <p className="text-lg font-bold">{stats.total}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
             <p className="text-sm text-muted-foreground">Won</p>
-            <p className="text-2xl font-bold text-emerald-500">{stats.won}</p>
+            <p className="text-lg font-bold text-emerald-500">{stats.won}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
             <p className="text-sm text-muted-foreground">Lost</p>
-            <p className="text-2xl font-bold text-red-500">{stats.lost}</p>
+            <p className="text-lg font-bold text-red-500">{stats.lost}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
             <p className="text-sm text-muted-foreground">Pending</p>
-            <p className="text-2xl font-bold text-amber-500">{stats.pending}</p>
+            <p className="text-lg font-bold text-amber-500">{stats.pending}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
             <p className="text-sm text-muted-foreground">Win Rate</p>
-            <p className="text-2xl font-bold">{stats.winRate}%</p>
+            <p className="text-lg font-bold">{stats.winRate}%</p>
           </CardContent>
         </Card>
       </div>
