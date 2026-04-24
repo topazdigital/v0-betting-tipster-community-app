@@ -70,6 +70,39 @@ const NO_DRAW_SPORTS = new Set([
   'american-football', 'ice-hockey', // OT means binary outcome for betting markets
 ]);
 
+/**
+ * Sport-specific live status label. Football uses minutes (45') and HT.
+ * Other sports use periods (Q2 / Set 3 / Inn 5 / Rd 4) when minute is overloaded
+ * by the API to mean period number.
+ */
+function liveStatusLabel(sportSlug: string, status: string, minute?: number): string {
+  if (status === 'halftime') return 'HT';
+  if (status === 'extra_time') return 'ET';
+  if (status === 'penalties') return 'PEN';
+  const m = minute ?? 0;
+  switch (sportSlug) {
+    case 'basketball':
+    case 'american-football':
+      return m > 0 ? `Q${Math.min(m, 4)}` : 'LIVE';
+    case 'tennis':
+      return m > 0 ? `Set ${m}` : 'LIVE';
+    case 'baseball':
+      return m > 0 ? `Inn ${m}` : 'LIVE';
+    case 'ice-hockey':
+      return m > 0 ? `P${Math.min(m, 3)}` : 'LIVE';
+    case 'mma':
+    case 'boxing':
+      return m > 0 ? `Rd ${m}` : 'LIVE';
+    case 'cricket':
+      return m > 0 ? `Inn ${m}` : 'LIVE';
+    case 'rugby':
+      return m > 0 ? `${m}'` : 'LIVE';
+    default:
+      // Football / soccer / default
+      return m > 0 ? `${m}'` : 'LIVE';
+  }
+}
+
 export function MatchCardNew({ 
   match, 
   variant = 'default',
@@ -112,7 +145,7 @@ export function MatchCardNew({
                 <span className="relative inline-flex h-2 w-2 rounded-full bg-live"></span>
               </span>
               <span className="mt-1 text-[10px] font-bold text-live">
-                {isHalftime ? 'HT' : `${match.minute ?? 0}'`}
+                {liveStatusLabel(match.sport.slug, match.status, match.minute)}
               </span>
             </div>
           ) : isFinished ? (
@@ -129,7 +162,7 @@ export function MatchCardNew({
         <Link href={`/matches/${match.id}`} className="min-w-0 flex-1 space-y-1">
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2">
-              <TeamLogo teamName={match.homeTeam.name} size="xs" />
+              <TeamLogo teamName={match.homeTeam.name} logoUrl={match.homeTeam.logo} sportSlug={match.sport.slug} size="xs" />
               <span className={cn(
                 'truncate text-sm font-medium',
                 isFinished && match.homeScore !== null && match.awayScore !== null && 
@@ -146,7 +179,7 @@ export function MatchCardNew({
           </div>
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2">
-              <TeamLogo teamName={match.awayTeam.name} size="xs" />
+              <TeamLogo teamName={match.awayTeam.name} logoUrl={match.awayTeam.logo} sportSlug={match.sport.slug} size="xs" />
               <span className={cn(
                 'truncate text-sm font-medium',
                 isFinished && match.homeScore !== null && match.awayScore !== null && 
@@ -221,7 +254,7 @@ export function MatchCardNew({
                 <span className="relative inline-flex h-2 w-2 rounded-full bg-live"></span>
               </span>
               <span className="text-xs font-bold text-live">
-                {isHalftime ? 'HT' : `${match.minute ?? 0}'`}
+                {liveStatusLabel(match.sport.slug, match.status, match.minute)}
               </span>
             </div>
           ) : isFinished ? (
@@ -241,7 +274,7 @@ export function MatchCardNew({
           {/* Home Team */}
           <div className="flex items-center justify-between gap-3">
             <div className="flex min-w-0 flex-1 items-center gap-2">
-              <TeamLogo teamName={match.homeTeam.name} size="sm" />
+              <TeamLogo teamName={match.homeTeam.name} logoUrl={match.homeTeam.logo} sportSlug={match.sport.slug} size="sm" />
               <div className="min-w-0 flex-1">
                 <span className={cn(
                   'block truncate text-sm font-semibold',
@@ -268,7 +301,7 @@ export function MatchCardNew({
           {/* Away Team */}
           <div className="flex items-center justify-between gap-3">
             <div className="flex min-w-0 flex-1 items-center gap-2">
-              <TeamLogo teamName={match.awayTeam.name} size="sm" />
+              <TeamLogo teamName={match.awayTeam.name} logoUrl={match.awayTeam.logo} sportSlug={match.sport.slug} size="sm" />
               <div className="min-w-0 flex-1">
                 <span className={cn(
                   'block truncate text-sm font-semibold',

@@ -13,6 +13,24 @@ interface TeamLogoProps {
   size?: "xs" | "sm" | "md" | "lg" | "xl"
   className?: string
   showFallback?: boolean
+  /**
+   * Visual treatment.
+   *  - 'team' (default): rounded crest, object-contain (preserves logo whitespace)
+   *  - 'athlete': rounded portrait, object-cover (fills frame for individual sports
+   *    like tennis, MMA, boxing, golf, racing).
+   */
+  variant?: 'team' | 'athlete'
+  /** Sport slug — when provided, automatically picks athlete variant for individual sports. */
+  sportSlug?: string
+}
+
+// Sports where each "team" is actually an individual competitor (use portrait avatars).
+const INDIVIDUAL_SPORTS = new Set([
+  'tennis', 'mma', 'boxing', 'golf', 'racing', 'motorsport', 'formula1', 'f1', 'darts', 'snooker', 'cycling',
+])
+
+export function isIndividualSport(slug?: string): boolean {
+  return !!slug && INDIVIDUAL_SPORTS.has(slug.toLowerCase())
 }
 
 // Team to logo URL mappings (using public APIs and Wikimedia)
@@ -253,17 +271,23 @@ export function TeamLogo({
   logoUrl: providedLogoUrl,
   size = 'md', 
   className,
-  showFallback = true 
+  showFallback = true,
+  variant,
+  sportSlug,
 }: TeamLogoProps) {
   const [hasError, setHasError] = useState(false)
   // Real provided URL (e.g. ESPN) wins; otherwise consult curated map.
   const logoUrl = providedLogoUrl || TEAM_LOGOS[teamName]
-  
+  // Auto-pick athlete variant for individual sports.
+  const effectiveVariant = variant ?? (isIndividualSport(sportSlug) ? 'athlete' : 'team')
+  const isAthlete = effectiveVariant === 'athlete'
+
   // Use image if available and no error
   if (logoUrl && !hasError) {
     return (
       <div className={cn(
-        "relative shrink-0 overflow-hidden rounded-full bg-muted",
+        "relative shrink-0 overflow-hidden rounded-full",
+        isAthlete ? "bg-muted ring-1 ring-border" : "bg-muted",
         sizeClasses[size],
         className
       )}>
@@ -271,7 +295,7 @@ export function TeamLogo({
           src={logoUrl}
           alt={teamName}
           fill
-          className="object-contain p-0.5"
+          className={isAthlete ? "object-cover" : "object-contain p-0.5"}
           onError={() => setHasError(true)}
           unoptimized
         />

@@ -1,67 +1,68 @@
 "use client"
 
 import { useState, useMemo } from "react"
-import Link from "next/link"
-import { Radio, Clock, TrendingUp, Users, Zap } from "lucide-react"
+import { Radio, Users } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { SidebarNew } from "@/components/layout/sidebar-new"
-import { TeamLogo } from "@/components/ui/team-logo"
 import { Spinner } from "@/components/ui/spinner"
-import { cn } from "@/lib/utils"
+import { MatchCardNew } from "@/components/matches/match-card-new"
 import { ALL_SPORTS, getSportIcon } from "@/lib/sports-data"
 import { useLiveMatches } from "@/lib/hooks/use-matches"
+import { countryCodeToFlag } from "@/lib/country-flags"
 
 // Priority order for sports (football first, then by popularity)
 const SPORT_PRIORITY: Record<number, number> = {
-  1: 0,   // Football - highest priority
-  2: 1,   // Basketball
-  3: 2,   // Tennis
-  4: 3,   // Cricket
-  5: 4,   // American Football
-  6: 5,   // Baseball
-  7: 6,   // Ice Hockey
-  8: 7,   // Rugby
-  27: 8,  // MMA
-  26: 9,  // Boxing
-  29: 10, // Formula 1
-  33: 11, // Esports
+  1: 0, 2: 1, 3: 2, 4: 3, 5: 4, 6: 5, 7: 6, 8: 7, 27: 8, 26: 9, 29: 10, 33: 11,
 }
 
 export default function LivePage() {
   const { matches, isLoading, error } = useLiveMatches()
   const [selectedSport, setSelectedSport] = useState<number | null>(null)
 
-  const filteredMatches = selectedSport 
-    ? matches.filter(m => m.sportId === selectedSport) 
+  const filteredMatches = selectedSport
+    ? matches.filter(m => m.sportId === selectedSport)
     : matches
 
-  // Get sport counts - sorted by priority
+  // Sport tabs (only sports with live matches)
   const sportCounts = useMemo(() => {
     const counts = ALL_SPORTS.map(sport => ({
       ...sport,
       icon: getSportIcon(sport.slug),
-      count: matches.filter(m => m.sportId === sport.id).length
+      count: matches.filter(m => m.sportId === sport.id).length,
     })).filter(s => s.count > 0)
-    
-    // Sort by priority
-    return counts.sort((a, b) => {
-      const priorityA = SPORT_PRIORITY[a.id] ?? 99
-      const priorityB = SPORT_PRIORITY[b.id] ?? 99
-      return priorityA - priorityB
-    })
+    return counts.sort((a, b) => (SPORT_PRIORITY[a.id] ?? 99) - (SPORT_PRIORITY[b.id] ?? 99))
   }, [matches])
 
-  // Group matches by league
+  // Group matches by league with metadata
   const groupedMatches = useMemo(() => {
-    const groups: Record<string, typeof matches> = {}
+    const groups: Record<string, {
+      leagueName: string
+      country: string
+      countryCode?: string
+      sportSlug: string
+      matches: typeof matches
+    }> = {}
     filteredMatches.forEach(match => {
-      const sportIcon = match.sport?.icon || getSportIcon(match.sport?.slug || 'football')
-      const key = `${sportIcon} ${match.league?.name || 'Unknown League'}`
-      if (!groups[key]) groups[key] = []
-      groups[key].push(match)
+      const leagueName = match.league?.name || 'Other'
+      const key = `${match.sportId}-${leagueName}`
+      if (!groups[key]) {
+        groups[key] = {
+          leagueName,
+          country: match.league?.country || '',
+          countryCode: match.league?.countryCode,
+          sportSlug: match.sport?.slug || 'football',
+          matches: [],
+        }
+      }
+      groups[key].matches.push(match)
     })
-    return Object.entries(groups)
+    // Sort: football first, more matches first
+    return Object.values(groups).sort((a, b) => {
+      if (a.sportSlug === 'football' && b.sportSlug !== 'football') return -1
+      if (b.sportSlug === 'football' && a.sportSlug !== 'football') return 1
+      return b.matches.length - a.matches.length
+    })
   }, [filteredMatches])
 
   if (isLoading) {
@@ -71,7 +72,7 @@ export default function LivePage() {
         <div className="flex-1 flex h-96 items-center justify-center">
           <div className="flex items-center gap-3">
             <Spinner className="h-8 w-8" />
-            <span className="text-muted-foreground">Loading live matches...</span>
+            <span className="text-muted-foreground">Loading live matches…</span>
           </div>
         </div>
       </div>
@@ -91,45 +92,44 @@ export default function LivePage() {
     )
   }
 
+  const totalLive = matches.length
+  const totalPredictions = matches.reduce((acc, m) => acc + (m.tipsCount || 0), 0)
+  const totalWatching = totalPredictions * 10
+
   return (
     <div className="flex">
       <SidebarNew selectedSportId={selectedSport} onSelectSport={setSelectedSport} />
-      
+
       <div className="flex-1 overflow-hidden">
-        <div className="mx-auto max-w-5xl px-4 py-6">
-          {/* Header */}
-          <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-            <div className="flex items-center gap-3">
-              <div className="relative">
-                <Radio className="h-6 w-6 text-live" />
-                <span className="absolute -right-1 -top-1 flex h-3 w-3">
-                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-live opacity-75"></span>
-                  <span className="relative inline-flex h-3 w-3 rounded-full bg-live"></span>
-                </span>
-              </div>
-              <div>
-                <h1 className="text-2xl font-bold text-foreground">Live Now</h1>
-                <p className="text-muted-foreground">{matches.length} matches in progress</p>
-              </div>
+        <div className="mx-auto max-w-7xl px-3 py-4 md:px-6 md:py-5">
+          {/* Compact Header */}
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5">
+              <span className="relative flex h-2.5 w-2.5">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-live opacity-75"></span>
+                <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-live"></span>
+              </span>
+              <h1 className="text-xl font-bold">Live</h1>
+              <Badge variant="destructive" className="font-bold">{totalLive}</Badge>
             </div>
-            <div className="flex items-center gap-3">
-              <Badge variant="outline" className="gap-1 border-success/50 bg-success/10 text-success">
-                <Users className="h-3 w-3" />
-                {matches.reduce((acc, m) => acc + (m.tipsCount || 0) * 10, 0).toLocaleString()} watching
-              </Badge>
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <Users className="h-3.5 w-3.5" />
+              <span className="tabular-nums">{totalWatching.toLocaleString()} watching</span>
+              <span className="hidden sm:inline">·</span>
+              <span className="hidden sm:inline tabular-nums">{totalPredictions} tips</span>
             </div>
           </div>
 
-          {/* Sport Filters - sorted by priority */}
-          <div className="mb-6 flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+          {/* Sport Filter Pills */}
+          <div className="mb-4 flex gap-1.5 overflow-x-auto pb-1 scrollbar-hide">
             <Button
               variant={selectedSport === null ? "default" : "outline"}
               size="sm"
               onClick={() => setSelectedSport(null)}
-              className="shrink-0"
+              className="shrink-0 h-8 text-xs"
             >
-              All Sports
-              <Badge variant="secondary" className="ml-2">{matches.length}</Badge>
+              All
+              <Badge variant="secondary" className="ml-1.5 h-4 px-1 text-[10px]">{matches.length}</Badge>
             </Button>
             {sportCounts.map(sport => (
               <Button
@@ -137,125 +137,47 @@ export default function LivePage() {
                 variant={selectedSport === sport.id ? "default" : "outline"}
                 size="sm"
                 onClick={() => setSelectedSport(sport.id)}
-                className="shrink-0 gap-2"
+                className="shrink-0 h-8 gap-1.5 text-xs"
               >
-                <span>{sport.icon}</span>
-                {sport.name}
-                <Badge variant="secondary">{sport.count}</Badge>
+                <span className="text-sm leading-none">{sport.icon}</span>
+                <span>{sport.name}</span>
+                <Badge variant="secondary" className="h-4 px-1 text-[10px]">{sport.count}</Badge>
               </Button>
             ))}
           </div>
 
-          {/* Live Matches by League */}
+          {/* Live Matches grouped by league — DENSE single-column rows */}
           {groupedMatches.length > 0 ? (
-            <div className="space-y-6">
-              {groupedMatches.map(([leagueName, leagueMatches]) => (
-                <div key={leagueName}>
-                  <div className="mb-3 flex items-center gap-2">
-                    <h2 className="text-lg font-semibold">{leagueName}</h2>
-                    <Badge variant="destructive" className="animate-pulse">
-                      {leagueMatches.length} LIVE
+            <div className="space-y-3">
+              {groupedMatches.map(group => (
+                <section key={`${group.sportSlug}-${group.leagueName}`} className="overflow-hidden rounded-xl border border-border bg-card">
+                  {/* League header row */}
+                  <header className="flex items-center justify-between gap-2 border-b border-border bg-muted/40 px-3 py-2">
+                    <div className="flex min-w-0 items-center gap-2">
+                      <span className="text-base leading-none">{getSportIcon(group.sportSlug)}</span>
+                      {group.countryCode && (
+                        <span className="text-sm leading-none">{countryCodeToFlag(group.countryCode)}</span>
+                      )}
+                      <h2 className="truncate text-sm font-semibold">{group.leagueName}</h2>
+                      {group.country && (
+                        <span className="hidden text-xs text-muted-foreground sm:inline">· {group.country}</span>
+                      )}
+                    </div>
+                    <Badge variant="destructive" className="h-5 gap-1 px-1.5 text-[10px] font-bold">
+                      <span className="relative flex h-1.5 w-1.5">
+                        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-white opacity-75"></span>
+                        <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-white"></span>
+                      </span>
+                      {group.matches.length}
                     </Badge>
+                  </header>
+                  {/* Match rows */}
+                  <div className="divide-y divide-border">
+                    {group.matches.map(match => (
+                      <MatchCardNew key={match.id} match={match} variant="compact" />
+                    ))}
                   </div>
-                  <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                    {leagueMatches.map(match => {
-                      const isHot = (match.tipsCount || 0) > 30
-                      
-                      return (
-                        <Link 
-                          key={match.id} 
-                          href={`/matches/${match.id}`}
-                          className="group"
-                        >
-                          <div className={cn(
-                            "relative overflow-hidden rounded-xl border border-border bg-card p-4 transition-all hover:border-primary/50 hover:shadow-lg",
-                            isHot && "border-warning/50"
-                          )}>
-                            {/* Live Badge */}
-                            <div className="mb-3 flex items-center justify-between">
-                              <span className="text-sm text-muted-foreground">{match.league?.country || 'Unknown'}</span>
-                              <div className="flex items-center gap-2">
-                                {isHot && (
-                                  <Badge className="gap-1 bg-warning text-warning-foreground">
-                                    <Zap className="h-3 w-3" /> Hot
-                                  </Badge>
-                                )}
-                                <Badge variant="destructive" className="gap-1 animate-pulse">
-                                  <Radio className="h-3 w-3" /> LIVE
-                                </Badge>
-                              </div>
-                            </div>
-
-                            {/* Teams & Score */}
-                            <div className="mb-4 space-y-3">
-                              <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-2">
-                                  <TeamLogo 
-                                    teamName={match.homeTeam.name} 
-                                    logoUrl={match.homeTeam.logo}
-                                    size="sm"
-                                  />
-                                  <span className="font-medium">{match.homeTeam.name}</span>
-                                </div>
-                                <span className="text-2xl font-bold text-primary">{match.homeScore ?? 0}</span>
-                              </div>
-                              <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-2">
-                                  <TeamLogo 
-                                    teamName={match.awayTeam.name} 
-                                    logoUrl={match.awayTeam.logo}
-                                    size="sm"
-                                  />
-                                  <span className="font-medium">{match.awayTeam.name}</span>
-                                </div>
-                                <span className="text-2xl font-bold text-primary">{match.awayScore ?? 0}</span>
-                              </div>
-                            </div>
-
-                            {/* Match Time */}
-                            <div className="mb-4 flex items-center justify-center gap-2 rounded-lg bg-muted/50 py-2">
-                              <Clock className="h-4 w-4 text-live" />
-                              <span className="font-mono text-lg font-bold text-live">{match.minute || 0}&apos;</span>
-                              <span className="text-sm text-muted-foreground">
-                                {match.status === 'halftime' ? 'HT' : (match.minute || 0) <= 45 ? '1st Half' : '2nd Half'}
-                              </span>
-                            </div>
-
-                            {/* Odds */}
-                            {match.odds && (
-                              <div className="grid grid-cols-3 gap-2">
-                                <div className="rounded-lg bg-muted p-2 text-center transition-colors group-hover:bg-primary/10">
-                                  <p className="text-xs text-muted-foreground">Home</p>
-                                  <p className="font-bold text-primary">{match.odds.home}</p>
-                                </div>
-                                <div className="rounded-lg bg-muted p-2 text-center transition-colors group-hover:bg-primary/10">
-                                  <p className="text-xs text-muted-foreground">Draw</p>
-                                  <p className="font-bold text-primary">{match.odds.draw || '-'}</p>
-                                </div>
-                                <div className="rounded-lg bg-muted p-2 text-center transition-colors group-hover:bg-primary/10">
-                                  <p className="text-xs text-muted-foreground">Away</p>
-                                  <p className="font-bold text-primary">{match.odds.away}</p>
-                                </div>
-                              </div>
-                            )}
-
-                            {/* Stats */}
-                            <div className="mt-3 flex items-center justify-between text-xs text-muted-foreground">
-                              <div className="flex items-center gap-1">
-                                <Users className="h-3 w-3" />
-                                {((match.tipsCount || 0) * 10).toLocaleString()} watching
-                              </div>
-                              <div className="flex items-center gap-1">
-                                <TrendingUp className="h-3 w-3" />
-                                {match.tipsCount || 0} predictions
-                              </div>
-                            </div>
-                          </div>
-                        </Link>
-                      )
-                    })}
-                  </div>
-                </div>
+                </section>
               ))}
             </div>
           ) : (

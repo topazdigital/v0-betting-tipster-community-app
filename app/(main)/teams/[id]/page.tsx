@@ -184,16 +184,25 @@ export default function TeamPage({ params }: PageProps) {
 
   const accentColor = team.color || '#3b82f6';
 
+  const sportSlug: string | undefined = (team as any).sport?.slug || (team as any).sportSlug;
+  const countryCode: string | undefined = (team as any).countryCode || (team as any).country?.code;
+  const country: string | undefined = (team as any).country?.name || (team as any).country;
+  const nextMatch = upcoming?.find((e: MatchEvent) => e.status !== 'finished') || upcoming?.[0];
+
   return (
-    <div className="mx-auto max-w-3xl space-y-6 p-4">
+    <div className="mx-auto max-w-7xl p-4">
       {/* Back nav */}
       <Link
         href="/matches"
-        className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
+        className="mb-4 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
       >
         <ArrowLeft className="h-4 w-4" />
         Back to Matches
       </Link>
+
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
+        {/* ── Main column ─────────────────────────────────────────── */}
+        <div className="min-w-0 space-y-6">
 
       {/* Team Hero */}
       <div
@@ -206,7 +215,7 @@ export default function TeamPage({ params }: PageProps) {
         />
         <div className="relative flex items-center gap-5">
           <div className="h-20 w-20 shrink-0 overflow-hidden rounded-2xl border border-border bg-card shadow-lg">
-            <TeamLogo teamName={team.name} logoUrl={team.logo} size="xl" className="h-full w-full" />
+            <TeamLogo teamName={team.name} logoUrl={team.logo} sportSlug={sportSlug} size="xl" className="h-full w-full" />
           </div>
           <div className="min-w-0 flex-1">
             <h1 className="text-2xl font-bold">{team.name}</h1>
@@ -214,6 +223,12 @@ export default function TeamPage({ params }: PageProps) {
               <p className="text-sm text-muted-foreground">{team.nickname}</p>
             )}
             <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+              {countryCode && (
+                <span className="flex items-center gap-1">
+                  <span className="text-sm leading-none">{countryCodeToFlag(countryCode)}</span>
+                  {country || countryCode}
+                </span>
+              )}
               {team.venue && (
                 <span className="flex items-center gap-1">
                   <MapPin className="h-3 w-3" />
@@ -363,20 +378,104 @@ export default function TeamPage({ params }: PageProps) {
         </TabsContent>
       </Tabs>
 
-      {/* Quick links */}
-      <div className="space-y-2">
-        <h3 className="text-sm font-semibold text-muted-foreground">Quick Links</h3>
-        <div className="flex flex-wrap gap-2">
-          <Link href="/matches" className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-2 text-sm hover:bg-muted">
-            All Matches <ChevronRight className="h-3.5 w-3.5" />
-          </Link>
-          <Link href="/leaderboard" className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-2 text-sm hover:bg-muted">
-            Tipster Leaderboard <ChevronRight className="h-3.5 w-3.5" />
-          </Link>
-          <Link href="/live" className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-2 text-sm hover:bg-muted">
-            Live Now <Activity className="h-3.5 w-3.5" />
-          </Link>
         </div>
+        {/* ── Right rail (xl only sticky) ────────────────────────── */}
+        <aside className="space-y-4 xl:sticky xl:top-4 xl:self-start">
+          {/* Team Info card */}
+          <div className="rounded-xl border border-border bg-card p-4">
+            <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Team Info</h3>
+            <dl className="space-y-2 text-sm">
+              {countryCode && (
+                <div className="flex items-center justify-between gap-3">
+                  <dt className="text-muted-foreground">Country</dt>
+                  <dd className="flex items-center gap-1.5 font-medium">
+                    <span className="text-base leading-none">{countryCodeToFlag(countryCode)}</span>
+                    <span>{country || countryCode}</span>
+                  </dd>
+                </div>
+              )}
+              {team.venue && (
+                <div className="flex items-center justify-between gap-3">
+                  <dt className="text-muted-foreground">Stadium</dt>
+                  <dd className="text-right font-medium truncate max-w-[180px]" title={team.venue}>{team.venue}</dd>
+                </div>
+              )}
+              {team.founded && (
+                <div className="flex items-center justify-between gap-3">
+                  <dt className="text-muted-foreground">Founded</dt>
+                  <dd className="font-medium">{team.founded}</dd>
+                </div>
+              )}
+              {team.standing?.position && (
+                <div className="flex items-center justify-between gap-3">
+                  <dt className="text-muted-foreground">League Position</dt>
+                  <dd className="font-medium">{team.standing.position}</dd>
+                </div>
+              )}
+              {team.record && (
+                <div className="flex items-center justify-between gap-3">
+                  <dt className="text-muted-foreground">Record</dt>
+                  <dd className="font-medium tabular-nums">{team.record}</dd>
+                </div>
+              )}
+              {played > 0 && (
+                <div className="flex items-center justify-between gap-3">
+                  <dt className="text-muted-foreground">Win rate</dt>
+                  <dd className="font-medium tabular-nums">
+                    {Math.round((wins / played) * 100)}%
+                  </dd>
+                </div>
+              )}
+            </dl>
+          </div>
+
+          {/* Next match teaser */}
+          {nextMatch && nextMatch.opponent && (
+            <Link
+              href={`/matches/${encodeURIComponent(nextMatch.id)}`}
+              className="block rounded-xl border border-border bg-card p-4 hover:border-primary/50 hover:shadow-md transition"
+            >
+              <h3 className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                <Flame className="h-3.5 w-3.5 text-orange-500" />
+                Next match
+              </h3>
+              <p className="text-sm font-bold truncate">
+                {nextMatch.isHome ? team.name : nextMatch.opponent.name}
+                <span className="text-muted-foreground"> vs </span>
+                {nextMatch.isHome ? nextMatch.opponent.name : team.name}
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {formatDate(new Date(nextMatch.date), timezone)} · {formatTime(new Date(nextMatch.date), timezone)}
+              </p>
+              <div className="mt-3 flex items-center gap-1.5 text-xs font-semibold text-primary">
+                View match details <ChevronRight className="h-3.5 w-3.5" />
+              </div>
+            </Link>
+          )}
+
+          {/* Quick links */}
+          <div className="rounded-xl border border-border bg-card p-4">
+            <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Quick Links</h3>
+            <div className="flex flex-col gap-1.5">
+              <Link href="/matches" className="flex items-center justify-between rounded-lg px-2.5 py-2 text-sm hover:bg-muted">
+                <span>All Matches</span><ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
+              </Link>
+              <Link href="/leaderboard" className="flex items-center justify-between rounded-lg px-2.5 py-2 text-sm hover:bg-muted">
+                <span>Tipster Leaderboard</span><ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
+              </Link>
+              <Link href="/live" className="flex items-center justify-between rounded-lg px-2.5 py-2 text-sm hover:bg-muted">
+                <span className="flex items-center gap-2">
+                  <span className="relative flex h-1.5 w-1.5">
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-live opacity-75"></span>
+                    <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-live"></span>
+                  </span>
+                  Live Now
+                </span>
+                <Activity className="h-3.5 w-3.5 text-muted-foreground" />
+              </Link>
+            </div>
+          </div>
+        </aside>
       </div>
     </div>
   );
