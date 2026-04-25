@@ -26,6 +26,7 @@ import { useMatches, useLiveMatches, useMatchStats } from '@/lib/hooks/use-match
 import { Spinner } from '@/components/ui/spinner';
 import { cn } from '@/lib/utils';
 import { ALL_SPORTS, getSportIcon } from '@/lib/sports-data';
+import { BestBetsPanel } from '@/components/home/best-bets-panel';
 
 // Mock top tipsters data
 const topTipsters = [
@@ -267,7 +268,7 @@ export default function HomePage() {
                 </div>
               </section>
 
-              {/* Today's Matches by League */}
+              {/* Today's Matches by League — with Best Bets right rail */}
               <section className="mb-5">
                 <div className="mb-2 flex items-center justify-between">
                   <div className="flex items-center gap-3">
@@ -282,7 +283,9 @@ export default function HomePage() {
                     </Link>
                   </Button>
                 </div>
-                
+
+                <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
+                  <div className="min-w-0">
                 {todayMatches.length > 0 ? (
                   <div className="space-y-3">
                     {todayMatches.slice(0, 10).map(match => (
@@ -301,6 +304,15 @@ export default function HomePage() {
                     </Button>
                   </div>
                 )}
+                  </div>
+
+                  {/* Right rail: Today's Best Bets (lg+) */}
+                  <div className="hidden lg:block">
+                    <div className="sticky top-4">
+                      <BestBetsPanel matches={todayMatches} />
+                    </div>
+                  </div>
+                </div>
               </section>
 
               {/* Multi-Sport Section */}

@@ -75,3 +75,11 @@ The app degrades gracefully when external services are unavailable:
 - No `DATABASE_URL` → uses mock data and in-memory state
 - No OpenAI key → uses local rules-based AI replies
 - ESPN API down → uses generated realistic mock match data
+
+## Recent Additions
+
+- **Outrights**: `LEAGUE_TO_ODDS_KEYS` (array) probes multiple Odds API winner/top-scorer keys per league in parallel.
+- **TheSportsDB integration** (`lib/api/the-sports-db.ts`): pulls today's events for Kenya Premier League (4504) + small leagues; merged into `getAllMatches`.
+- **Auth-aware Add Tip**: `app/(main)/matches/[id]/page.tsx` shows inline `AddTipForm` for logged-in users with REAL `markets[]` from `/api/matches/[id]/details`. POST handler at `app/api/matches/[id]/tips/route.ts`.
+- **Multi-market AI** (`components/ai/ai-multi-market.tsx`): AI picks across 1X2, Double Chance, DNB, BTTS, O/U 1.5/2.5/3.5, HT result, Correct Score — pinned to real bookmaker prices when available.
+- **Today's Best Bets sidebar** (`components/home/best-bets-panel.tsx`): right rail at lg+ on the homepage with featured pick, 2-fold accumulator, and consensus list — all built from real odds.

@@ -1,6 +1,43 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getCurrentUser } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
+
+// ─── In-memory store of user-submitted tips, keyed by matchId ───
+// Persists for the lifetime of the dev server / serverless instance.
+interface SubmittedTip {
+  id: string;
+  matchId: string;
+  prediction: string;
+  market: string;
+  odds: number;
+  stake: number;
+  confidence: number;
+  analysis: string;
+  isPremium: boolean;
+  status: string;
+  likes: number;
+  dislikes: number;
+  comments: number;
+  createdAt: string;
+  tipster: {
+    id: string;
+    displayName: string;
+    totalTips: number;
+    wonTips: number;
+    winRate: number;
+    roi: number;
+    streak: number;
+    rank: number;
+    isPremium: boolean;
+    monthlyPrice: number;
+    followers: number;
+    verified: boolean;
+  };
+}
+const submittedTipsStore: Map<string, SubmittedTip[]> = (globalThis as { __tipsStore?: Map<string, SubmittedTip[]> }).__tipsStore
+  || new Map<string, SubmittedTip[]>();
+(globalThis as { __tipsStore?: Map<string, SubmittedTip[]> }).__tipsStore = submittedTipsStore;
 
 function seededRandom(seed: number) {
   const x = Math.sin(seed) * 10000;
@@ -110,7 +147,83 @@ export async function GET(
     });
   }
 
-  tips.sort((a, b) => b.confidence - a.confidence);
+  // Merge in any user-submitted tips for this match
+  const userTips = submittedTipsStore.get(matchId) || [];
 
-  return NextResponse.json({ tips, total: tips.length });
+  const merged = [...userTips, ...tips];
+  merged.sort((a, b) => b.confidence - a.confidence);
+
+  return NextResponse.json({ tips: merged, total: merged.length });
+}
+
+// ─── POST: tipsters submit a new tip on this match ───
+export async function POST(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id: matchId } = await params;
+  const user = await getCurrentUser();
+  if (!user) {
+    return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+  }
+
+  let body: {
+    prediction?: string;
+    predictionLabel?: string;
+    odds?: number;
+    stake?: number;
+    confidence?: number;
+    analysis?: string;
+    isPremium?: boolean;
+    marketKey?: string;
+  };
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+  }
+
+  if (!body.predictionLabel || typeof body.odds !== 'number' || typeof body.confidence !== 'number') {
+    return NextResponse.json({ error: 'Missing required fields: predictionLabel, odds, confidence' }, { status: 400 });
+  }
+  if (!body.analysis || body.analysis.length < 20) {
+    return NextResponse.json({ error: 'Analysis must be at least 20 characters' }, { status: 400 });
+  }
+
+  const newTip: SubmittedTip = {
+    id: `user-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    matchId,
+    prediction: body.predictionLabel,
+    market: body.marketKey || 'h2h',
+    odds: Math.round(body.odds * 100) / 100,
+    stake: body.stake || 3,
+    confidence: body.confidence,
+    analysis: body.analysis,
+    isPremium: !!body.isPremium && (user.role === 'admin' || user.role === 'tipster'),
+    status: 'pending',
+    likes: 0,
+    dislikes: 0,
+    comments: 0,
+    createdAt: new Date().toISOString(),
+    tipster: {
+      id: String(user.userId),
+      displayName: user.email.split('@')[0],
+      totalTips: 1,
+      wonTips: 0,
+      winRate: 0,
+      roi: 0,
+      streak: 0,
+      rank: 999,
+      isPremium: user.role === 'admin' || user.role === 'tipster',
+      monthlyPrice: 0,
+      followers: 0,
+      verified: user.role === 'admin',
+    },
+  };
+
+  const existing = submittedTipsStore.get(matchId) || [];
+  existing.unshift(newTip);
+  submittedTipsStore.set(matchId, existing);
+
+  return NextResponse.json({ tip: newTip, ok: true });
 }

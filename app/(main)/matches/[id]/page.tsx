@@ -24,6 +24,9 @@ import { formatTime, formatDate, getBrowserTimezone, getDayLabel } from "@/lib/u
 import { countryCodeToFlag } from "@/lib/country-flags"
 import { liveStatusLabel } from "@/lib/utils/live-status"
 import { AIMatchPrediction } from "@/components/ai/ai-match-prediction"
+import { AIMultiMarket } from "@/components/ai/ai-multi-market"
+import { AddTipForm } from "@/components/matches/add-tip-form"
+import { useAuth } from "@/contexts/auth-context"
 
 interface PageProps { params: Promise<{ id: string }> }
 
@@ -108,6 +111,8 @@ interface SegmentBreakdown {
   away: number[]
   totals?: { home: number; away: number }
 }
+interface MarketOutcome { name: string; price: number; point?: number }
+interface MatchMarket { key: string; name: string; outcomes: MarketOutcome[] }
 interface MatchDetails {
   match: {
     id: string
@@ -123,6 +128,7 @@ interface MatchDetails {
     sport: { name: string; slug: string; icon: string }
     odds?: { home: number; draw?: number; away: number; bookmaker?: string }
     oddsIsComputed?: boolean
+    markets?: MatchMarket[]
     venue?: string
     venueCity?: string
     venueCountry?: string
@@ -598,8 +604,10 @@ function ScorersList({ events, side }: { events: MatchEvent[]; side: 'home' | 'a
 export default function MatchDetailPage({ params }: PageProps) {
   const { id } = use(params)
   const timezone = getBrowserTimezone()
+  const { user, isAuthenticated, isLoading: authLoading } = useAuth()
   const [savedMatch, setSavedMatch] = useState(false)
   const [activeTab, setActiveTab] = useState('overview')
+  const [tipSubmitted, setTipSubmitted] = useState<null | { label: string; odds: number }>(null)
 
   const { data, error, isLoading } = useSWR<MatchDetails>(
     `/api/matches/${encodeURIComponent(id)}/details`,
@@ -912,6 +920,18 @@ export default function MatchDetailPage({ params }: PageProps) {
               h2h={data.h2h}
             />
 
+            {/* AI Multi-Market Predictions */}
+            <AIMultiMarket
+              homeTeam={match.homeTeam.name}
+              awayTeam={match.awayTeam.name}
+              sportSlug={sport}
+              odds={match.odds || null}
+              homeForm={match.homeTeam.form}
+              awayForm={match.awayTeam.form}
+              h2h={data.h2h}
+              markets={match.markets || null}
+            />
+
             {/* Tips Preview */}
             {tips.length > 0 && (
               <Card className="overflow-hidden border-amber-500/20">
@@ -1116,26 +1136,79 @@ export default function MatchDetailPage({ params }: PageProps) {
                 <CardContent className="py-16 text-center">
                   <Star className="h-12 w-12 mx-auto mb-3 text-amber-400/30" />
                   <p className="font-semibold text-lg">No tips yet for this match</p>
-                  <p className="text-sm mt-1 text-muted-foreground">Be the first tipster to add a prediction.</p>
-                  <Button asChild className="mt-5">
-                    <Link href="/register">Join & Add a Tip</Link>
-                  </Button>
+                  <p className="text-sm mt-1 text-muted-foreground">
+                    {isAuthenticated ? "Be the first tipster — use the form below." : "Sign in to be the first tipster on this match."}
+                  </p>
+                  {!isAuthenticated && !authLoading && (
+                    <Button asChild className="mt-5">
+                      <Link href={`/login?redirect=/matches/${encodeURIComponent(id)}`}>Sign in to add a tip</Link>
+                    </Button>
+                  )}
                 </CardContent>
               </Card>
             )}
 
-            {/* Add Tip CTA */}
-            <Card className="border-dashed border-2 border-primary/20 bg-primary/3">
-              <CardContent className="p-5 flex flex-col sm:flex-row items-center gap-4">
-                <div className="flex-1 min-w-0">
-                  <p className="font-semibold">Share your prediction</p>
-                  <p className="text-sm text-muted-foreground mt-0.5">Build your tipster record and get followers by posting accurate tips.</p>
-                </div>
-                <Button asChild size="sm" className="shrink-0">
-                  <Link href="/register">Add Your Tip</Link>
-                </Button>
-              </CardContent>
-            </Card>
+            {/* Inline Add Tip — auth-aware */}
+            {tipSubmitted ? (
+              <Card className="border-emerald-500/40 bg-emerald-500/5">
+                <CardContent className="p-5 flex items-center gap-3">
+                  <CheckCircle2 className="h-6 w-6 text-emerald-500 shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-foreground">Tip posted!</p>
+                    <p className="text-sm text-muted-foreground">
+                      {tipSubmitted.label} @ <span className="font-mono font-bold text-emerald-500">{tipSubmitted.odds.toFixed(2)}</span>
+                    </p>
+                  </div>
+                  <Button size="sm" variant="ghost" onClick={() => setTipSubmitted(null)}>Add another</Button>
+                </CardContent>
+              </Card>
+            ) : isAuthenticated && user ? (
+              <AddTipForm
+                matchId={match.id}
+                homeTeam={match.homeTeam.name}
+                awayTeam={match.awayTeam.name}
+                odds={match.odds}
+                markets={match.markets}
+                isPremiumUser={user.role === 'admin' || user.role === 'tipster'}
+                onSubmit={async (formData) => {
+                  try {
+                    const res = await fetch(`/api/matches/${encodeURIComponent(match.id)}/tips`, {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        ...formData,
+                        homeTeam: match.homeTeam.name,
+                        awayTeam: match.awayTeam.name,
+                      }),
+                    })
+                    if (res.ok) {
+                      setTipSubmitted({ label: formData.predictionLabel, odds: formData.odds })
+                    }
+                  } catch (err) {
+                    console.error('Failed to post tip', err)
+                  }
+                }}
+              />
+            ) : authLoading ? null : (
+              <Card className="border-dashed border-2 border-primary/20 bg-primary/3">
+                <CardContent className="p-5 flex flex-col sm:flex-row items-center gap-4">
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold">Share your prediction</p>
+                    <p className="text-sm text-muted-foreground mt-0.5">
+                      Sign in or create an account to post a tip on this match. Your odds will auto-fill from real bookmaker prices.
+                    </p>
+                  </div>
+                  <div className="flex gap-2 shrink-0">
+                    <Button asChild variant="outline" size="sm">
+                      <Link href={`/login?redirect=/matches/${encodeURIComponent(id)}`}>Sign in</Link>
+                    </Button>
+                    <Button asChild size="sm">
+                      <Link href={`/register?redirect=/matches/${encodeURIComponent(id)}`}>Sign up</Link>
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
           </TabsContent>
 
           {/* ══ EVENTS ══ */}

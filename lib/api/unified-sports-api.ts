@@ -4,6 +4,7 @@
 // ============================================
 
 import { ALL_SPORTS, ALL_LEAGUES, type LeagueConfig } from '@/lib/sports-data';
+import { fetchTSDBMatches } from './the-sports-db';
 
 // ============================================
 // Types
@@ -1746,10 +1747,11 @@ export async function getAllMatches(): Promise<UnifiedMatch[]> {
     }
   };
 
-  // Fetch ESPN matches AND real odds index in parallel
-  const [espnResults, realOddsIndex] = await Promise.all([
+  // Fetch ESPN matches, real odds index AND TheSportsDB extra leagues in parallel
+  const [espnResults, realOddsIndex, tsdbMatches] = await Promise.all([
     Promise.allSettled(ESPN_LEAGUES.map(config => getESPNMatches(config))),
     buildRealOddsIndex(),
+    fetchTSDBMatches().catch(() => [] as UnifiedMatch[]),
   ]);
 
   for (const result of espnResults) {
@@ -1773,6 +1775,24 @@ export async function getAllMatches(): Promise<UnifiedMatch[]> {
         addMatch(match);
       }
     }
+  }
+
+  // Merge in TheSportsDB matches (Kenya, Tanzania, Uganda, Cyprus, etc.)
+  // ESPN doesn't cover these leagues, so we won't have duplicates in practice,
+  // but the dedupe in addMatch is a belt-and-braces guard.
+  for (const match of tsdbMatches) {
+    // Try to enrich with real bookmaker odds (unlikely for small leagues but worth probing)
+    if (realOddsIndex.size > 0) {
+      const homeNorm = normalizeTeamName(match.homeTeam.name);
+      const awayNorm = normalizeTeamName(match.awayTeam.name);
+      const dateKey = new Date(match.kickoffTime).toISOString().split('T')[0];
+      const real = realOddsIndex.get(`${homeNorm}_${awayNorm}_${dateKey}`);
+      if (real) {
+        match.odds = real.odds;
+        match.markets = real.markets;
+      }
+    }
+    addMatch(match);
   }
 
   return sortMatchesWithPriority(allMatches);
@@ -1931,25 +1951,39 @@ interface TheOddsApiOutrightEvent {
   }>;
 }
 
-// leagueId → The Odds API sport_key for OUTRIGHTS markets specifically.
-// The Odds API exposes outrights only via dedicated "_winner" / "_championship_winner"
-// sport keys — the regular sport keys (soccer_epl, basketball_nba …) reject the
-// `markets=outrights` query with INVALID_MARKET_COMBO.
+// leagueId → ARRAY of The Odds API sport_keys for OUTRIGHTS markets.
+// We probe multiple winner / top-scorer / relegation keys per league and merge
+// whichever ones return data — this catches seasonal markets that come and go.
 //
-// Domestic soccer leagues currently have NO active outright market on the API,
-// so they're omitted here (the league page renders an empty state).
-const LEAGUE_TO_ODDS_KEY: Record<number, string> = {
-  // Soccer — only active international tournaments expose outrights right now.
-  // (Domestic EPL/La Liga/Serie A/Bundesliga winner markets are not currently
-  //  offered by The Odds API — they appear seasonally near league climaxes.)
-  // 1: 'soccer_epl_winner',           // not active
-  // 2: 'soccer_spain_la_liga_winner', // not active
-  // 9: 'soccer_uefa_champs_league_winner', // not active
-  // North-American majors — championship futures
-  101: 'basketball_nba_championship_winner', // NBA
-  401: 'americanfootball_nfl_super_bowl_winner', // NFL
-  501: 'baseball_mlb_world_series_winner', // MLB
-  601: 'icehockey_nhl_championship_winner', // NHL
+// We try ALL of these in parallel; empty responses are skipped silently.
+const LEAGUE_TO_ODDS_KEYS: Record<number, string[]> = {
+  // ─── Soccer — domestic top tiers ───
+  1:  ['soccer_epl_winner', 'soccer_epl_top_scorer'],                                 // Premier League
+  2:  ['soccer_spain_la_liga_winner', 'soccer_spain_la_liga_top_scorer'],             // La Liga
+  3:  ['soccer_germany_bundesliga_winner', 'soccer_germany_bundesliga_top_scorer'],   // Bundesliga
+  4:  ['soccer_italy_serie_a_winner', 'soccer_italy_serie_a_top_scorer'],             // Serie A
+  5:  ['soccer_france_ligue_one_winner', 'soccer_france_ligue_one_top_scorer'],       // Ligue 1
+  6:  ['soccer_netherlands_eredivisie_winner'],                                       // Eredivisie
+  7:  ['soccer_portugal_primeira_liga_winner'],                                       // Primeira Liga
+  // ─── Soccer — European competitions ───
+  9:  ['soccer_uefa_champs_league_winner'],
+  10: ['soccer_uefa_europa_league_winner'],
+  26: ['soccer_uefa_europa_conference_league_winner'],
+  // ─── Soccer — internationals ───
+  29: ['soccer_fifa_world_cup_winner'],
+  30: ['soccer_uefa_european_championship_winner', 'soccer_uefa_euros_qualification_winner'],
+  31: ['soccer_conmebol_copa_america_winner'],
+  24: ['soccer_caf_africa_cup_of_nations_winner'],
+  109: ['soccer_fifa_club_world_cup_winner'],
+  // ─── North-American majors — championship futures ───
+  101: ['basketball_nba_championship_winner'],   // NBA
+  107: ['basketball_wnba_championship_winner'],  // WNBA
+  401: ['americanfootball_nfl_super_bowl_winner'], // NFL
+  501: ['baseball_mlb_world_series_winner'],     // MLB
+  601: ['icehockey_nhl_championship_winner'],    // NHL
+  // ─── Other ───
+  108: ['basketball_ncaab_championship_winner'], // NCAA Basketball
+  402: ['americanfootball_ncaaf_championship_winner'], // NCAA Football
 };
 
 export async function getLeagueOutrights(leagueId: number): Promise<Outright[]> {
@@ -1957,56 +1991,62 @@ export async function getLeagueOutrights(leagueId: number): Promise<Outright[]> 
   const cached = getCached<Outright[]>(cacheKey, CACHE_DURATION.outrights);
   if (cached) return cached;
 
-  const sportKey = LEAGUE_TO_ODDS_KEY[leagueId];
-  if (!sportKey) {
+  const sportKeys = LEAGUE_TO_ODDS_KEYS[leagueId];
+  if (!sportKeys || sportKeys.length === 0) {
     setCache(cacheKey, []);
     return [];
   }
 
-  const data = await fetchTheOddsAPI(`sports/${sportKey}/odds`, {
-    regions: 'uk,eu,us',
-    markets: 'outrights',
-    oddsFormat: 'decimal',
-    dateFormat: 'iso',
-  }) as TheOddsApiOutrightEvent[] | null;
+  // Probe ALL configured outright keys for this league in parallel. We get
+  // back e.g. EPL Winner + EPL Top Scorer + EPL Relegation. Empty / 404
+  // responses are silently dropped (markets come and go seasonally).
+  const responses = await Promise.allSettled(
+    sportKeys.map(sportKey => fetchTheOddsAPI(`sports/${sportKey}/odds`, {
+      regions: 'uk,eu,us',
+      markets: 'outrights',
+      oddsFormat: 'decimal',
+      dateFormat: 'iso',
+    }) as Promise<TheOddsApiOutrightEvent[] | null>),
+  );
 
-  if (!data || !Array.isArray(data) || data.length === 0) {
-    setCache(cacheKey, []);
-    return [];
-  }
-
-  // For each event (e.g. "EPL Winner 2025/26") aggregate across bookmakers.
   const outrights: Outright[] = [];
-  for (const ev of data) {
-    if (!ev.bookmakers || ev.bookmakers.length === 0) continue;
 
-    // outcome name → array of prices across bookmakers
-    const tally = new Map<string, number[]>();
-    for (const bm of ev.bookmakers) {
-      for (const market of bm.markets) {
-        if (market.key !== 'outrights') continue;
-        for (const o of market.outcomes) {
-          if (!tally.has(o.name)) tally.set(o.name, []);
-          tally.get(o.name)!.push(o.price);
+  for (const result of responses) {
+    if (result.status !== 'fulfilled') continue;
+    const data = result.value;
+    if (!data || !Array.isArray(data) || data.length === 0) continue;
+
+    for (const ev of data) {
+      if (!ev.bookmakers || ev.bookmakers.length === 0) continue;
+
+      // outcome name → array of prices across bookmakers
+      const tally = new Map<string, number[]>();
+      for (const bm of ev.bookmakers) {
+        for (const market of bm.markets) {
+          if (market.key !== 'outrights') continue;
+          for (const o of market.outcomes) {
+            if (!tally.has(o.name)) tally.set(o.name, []);
+            tally.get(o.name)!.push(o.price);
+          }
         }
       }
+
+      if (tally.size === 0) continue;
+
+      const outcomes = Array.from(tally.entries())
+        .map(([name, prices]) => ({
+          name,
+          // best (highest) decimal price across bookmakers — that's what punters want
+          price: Math.round(Math.max(...prices) * 100) / 100,
+        }))
+        .sort((a, b) => a.price - b.price); // shortest odds = favourite first
+
+      outrights.push({
+        id: ev.id,
+        name: ev.sport_title || 'Outright Winner',
+        outcomes,
+      });
     }
-
-    if (tally.size === 0) continue;
-
-    const outcomes = Array.from(tally.entries())
-      .map(([name, prices]) => ({
-        name,
-        // best (highest) decimal price across bookmakers — that's what punters want
-        price: Math.round(Math.max(...prices) * 100) / 100,
-      }))
-      .sort((a, b) => a.price - b.price); // shortest odds = favourite first
-
-    outrights.push({
-      id: ev.id,
-      name: ev.sport_title || 'Outright Winner',
-      outcomes,
-    });
   }
 
   setCache(cacheKey, outrights);
