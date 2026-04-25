@@ -1,8 +1,9 @@
 'use client';
 
 import { useState, useMemo, Suspense } from 'react';
+import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { Calendar, Search, Filter, Clock, Flame, ChevronDown, CalendarDays, CalendarClock } from 'lucide-react';
+import { Calendar, Search, Filter, Clock, Flame, ChevronDown, ChevronRight, CalendarDays, CalendarClock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -294,16 +295,22 @@ function MatchesContent() {
           ) : filteredMatches.length > 0 ? (
             /* Match Lists Grouped by League */
             <div className="space-y-3">
-              {groupedMatches.map(({ key, sport, league, matches: leagueMatches }) => (
+              {groupedMatches.map(({ key, sport, league, matches: leagueMatches }) => {
+                const leagueSlug = league.slug || league.name.toLowerCase().replace(/\s+/g, '-');
+                return (
                 <div key={key}>
                   <div className="mb-2 flex items-center justify-between border-b border-border/60 pb-2">
-                    <h2 className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                    <Link
+                      href={`/leagues/${leagueSlug}`}
+                      className="group flex items-center gap-2 text-sm font-semibold text-foreground hover:text-primary transition-colors"
+                    >
                       <SportIcon sportSlug={sport.slug} size="sm" />
                       <LeagueFlag countryCode={league.countryCode} size="xs" />
-                      <span className="text-muted-foreground text-xs uppercase tracking-wide">{league.country}</span>
-                      <span>{league.name}</span>
+                      <span className="text-muted-foreground text-xs uppercase tracking-wide group-hover:text-primary/70">{league.country}</span>
+                      <span className="group-hover:underline underline-offset-4">{league.name}</span>
                       <Badge variant="secondary" className="ml-1 text-xs">{leagueMatches.length}</Badge>
-                    </h2>
+                      <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/60 group-hover:text-primary opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </Link>
                   </div>
                   <div className="space-y-1.5">
                     {leagueMatches.map(match => (
@@ -311,7 +318,8 @@ function MatchesContent() {
                     ))}
                   </div>
                 </div>
-              ))}
+              );
+              })}
             </div>
           ) : (
             /* Empty State */

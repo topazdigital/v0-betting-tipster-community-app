@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getEspnLeagueConfigForId } from '@/lib/api/unified-sports-api';
+import { ALL_LEAGUES } from '@/lib/sports-data';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 300;
 
 const ESPN_BASE = 'https://site.api.espn.com/apis/site/v2/sports';
 
-function parseTeamId(teamId: string): { sport: string; league: string; espnTeamId: string } | null {
+function parseTeamId(teamId: string): { sport: string; league: string; espnTeamId: string; leagueId?: number } | null {
   const m = teamId.match(/^espn_([a-z0-9]+)_(\d+)$/i);
   if (!m) return null;
   const leagueSlug = m[1];
@@ -14,7 +15,7 @@ function parseTeamId(teamId: string): { sport: string; league: string; espnTeamI
   const fake = `espn_${leagueSlug}_999999`;
   const cfg = getEspnLeagueConfigForId(fake);
   if (!cfg) return null;
-  return { sport: cfg.sport, league: cfg.league, espnTeamId };
+  return { sport: cfg.sport, league: cfg.league, espnTeamId, leagueId: cfg.leagueId };
 }
 
 async function fetchTeamInfo(sport: string, league: string, teamId: string) {
@@ -27,12 +28,55 @@ async function fetchTeamInfo(sport: string, league: string, teamId: string) {
 }
 
 async function fetchTeamSchedule(sport: string, league: string, teamId: string) {
-  const url = `${ESPN_BASE}/${sport}/${league}/teams/${teamId}/schedule`;
+  // ESPN's /schedule defaults to the *current* season window, which can be
+  // empty during off-season or early in a league. We probe multiple seasons
+  // (current year + next year) and merge so we always have something.
+  const year = new Date().getUTCFullYear();
+  const candidates = [
+    `${ESPN_BASE}/${sport}/${league}/teams/${teamId}/schedule`,
+    `${ESPN_BASE}/${sport}/${league}/teams/${teamId}/schedule?season=${year}`,
+    `${ESPN_BASE}/${sport}/${league}/teams/${teamId}/schedule?season=${year + 1}`,
+    `${ESPN_BASE}/${sport}/${league}/teams/${teamId}/schedule?season=${year - 1}`,
+  ];
+  type ScheduleResp = { events?: unknown[] } & Record<string, unknown>;
+  const results = await Promise.all(
+    candidates.map(async (url) => {
+      try {
+        const r = await fetch(url, { headers: { Accept: 'application/json' }, next: { revalidate: 300 } });
+        if (!r.ok) return null;
+        return (await r.json()) as ScheduleResp;
+      } catch { return null; }
+    })
+  );
+  const merged: { events: unknown[] } & Record<string, unknown> = { events: [] };
+  const seen = new Set<string>();
+  for (const data of results) {
+    if (!data) continue;
+    for (const ev of (data.events || []) as Array<{ id?: string }>) {
+      if (!ev?.id || seen.has(ev.id)) continue;
+      seen.add(ev.id);
+      merged.events.push(ev);
+    }
+  }
+  return merged.events.length > 0 ? merged : null;
+}
+
+async function fetchTeamCoach(sport: string, league: string, teamId: string): Promise<string | undefined> {
+  // ESPN coaches endpoint isn't always available, but worth trying for soccer/NFL/NBA.
+  const url = `https://sports.core.api.espn.com/v2/sports/${sport}/leagues/${league}/teams/${teamId}/coaches?lang=en`;
   try {
-    const r = await fetch(url, { headers: { Accept: 'application/json' }, next: { revalidate: 300 } });
-    if (!r.ok) return null;
-    return await r.json();
-  } catch { return null; }
+    const r = await fetch(url, { headers: { Accept: 'application/json' }, next: { revalidate: 86400 } });
+    if (!r.ok) return undefined;
+    type CoachIndex = { items?: Array<{ $ref?: string }> };
+    const data = (await r.json()) as CoachIndex;
+    const ref = data.items?.[0]?.$ref;
+    if (!ref) return undefined;
+    const sub = await fetch(ref, { headers: { Accept: 'application/json' }, next: { revalidate: 86400 } });
+    if (!sub.ok) return undefined;
+    type CoachDetail = { firstName?: string; lastName?: string; displayName?: string };
+    const c = (await sub.json()) as CoachDetail;
+    return c.displayName || [c.firstName, c.lastName].filter(Boolean).join(' ') || undefined;
+  } catch { return undefined; }
 }
 
 async function fetchTeamRoster(sport: string, league: string, teamId: string) {
@@ -71,11 +115,12 @@ export async function GET(
 
   const { sport, league, espnTeamId } = parsed;
 
-  const [teamData, scheduleData, rosterData, injuriesData] = await Promise.all([
+  const [teamData, scheduleData, rosterData, injuriesData, coachName] = await Promise.all([
     fetchTeamInfo(sport, league, espnTeamId),
     fetchTeamSchedule(sport, league, espnTeamId),
     fetchTeamRoster(sport, league, espnTeamId),
     fetchTeamInjuries(sport, league, espnTeamId),
+    fetchTeamCoach(sport, league, espnTeamId),
   ]);
 
   if (!teamData?.team) {
@@ -83,6 +128,18 @@ export async function GET(
   }
 
   const t = teamData.team;
+
+  // League / country lookup using the parsed league slug → ESPN config.
+  const leagueRow = ALL_LEAGUES.find(l => l.id === parsed.leagueId);
+
+  // Find the official website link if ESPN exposed one.
+  type RawLink = { rel?: string[]; href?: string; text?: string };
+  const links = (t.links || []) as RawLink[];
+  const officialSite =
+    links.find(l => l.rel?.includes('teamsite') || l.rel?.includes('externalLink'))?.href ||
+    links.find(l => /official/i.test(l.text || ''))?.href;
+  const espnLink = links.find(l => l.rel?.includes('clubhouse'))?.href;
+
   const team = {
     id: t.id,
     name: t.displayName || t.name,
@@ -95,12 +152,25 @@ export async function GET(
     venue: t.franchise?.venue?.fullName || t.venue?.fullName,
     venueCity: t.franchise?.venue?.address?.city || t.venue?.address?.city,
     founded: t.franchise?.yearFounded,
+    manager: coachName,
+    league: leagueRow?.name,
+    leagueSlug: leagueRow?.slug,
+    country: leagueRow?.country,
+    countryCode: leagueRow?.countryCode,
+    website: officialSite,
+    description: [
+      t.standingSummary,
+      t.location && t.franchise?.venue?.fullName
+        ? `Plays home matches at ${t.franchise.venue.fullName} in ${t.franchise.venue.address?.city || t.location}.`
+        : null,
+    ].filter(Boolean).join(' ') || undefined,
     record: t.record?.items?.find((r: { type?: string }) => r.type === 'total')?.summary,
     standing: {
       position: t.standingSummary,
     },
     links: {
-      espn: t.links?.find((l: { rel?: string[] }) => l.rel?.includes('clubhouse'))?.href,
+      espn: espnLink,
+      official: officialSite,
     },
   };
 

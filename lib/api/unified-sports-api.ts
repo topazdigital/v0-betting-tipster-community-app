@@ -1738,23 +1738,21 @@ async function getESPNMatches(config: ESPNLeagueConfig): Promise<UnifiedMatch[]>
   const cached = getCached<UnifiedMatch[]>(cacheKey, CACHE_DURATION.live);
   if (cached) return cached;
 
+  // Fetch yesterday + next 14 days for EVERY league (not just priority ones)
+  // so smaller sports always surface their upcoming fixtures, not just live.
   const isPriority = PRIORITY_LEAGUE_KEYS.has(config.league);
   let data: ESPNScoreboardResponseFull | null = null;
-
-  if (isPriority) {
-    // Fetch yesterday + next 7 days as a single date range for this league.
-    const now = new Date();
-    const start = new Date(now);
-    start.setUTCDate(start.getUTCDate() - 1);
-    const end = new Date(now);
-    end.setUTCDate(end.getUTCDate() + 7);
-    const range = `${formatYYYYMMDD(start)}-${formatYYYYMMDD(end)}`;
-    data = await fetchESPN(config.sport, config.league, 'scoreboard', range);
-    // Fall back to default endpoint if range request fails or returns nothing
-    if (!data?.events?.length) {
-      data = await fetchESPN(config.sport, config.league);
-    }
-  } else {
+  const now = new Date();
+  const start = new Date(now);
+  start.setUTCDate(start.getUTCDate() - 1);
+  const end = new Date(now);
+  // Priority leagues get a tight 7-day window for freshness; smaller / less-frequent
+  // leagues get a wider 21-day window so a single weekly fixture still shows up.
+  end.setUTCDate(end.getUTCDate() + (isPriority ? 7 : 21));
+  const range = `${formatYYYYMMDD(start)}-${formatYYYYMMDD(end)}`;
+  data = await fetchESPN(config.sport, config.league, 'scoreboard', range);
+  // Fall back to the default endpoint if range request fails or returns nothing.
+  if (!data?.events?.length) {
     data = await fetchESPN(config.sport, config.league);
   }
 
@@ -2490,17 +2488,25 @@ export async function getLeagueTopScorers(leagueId: number, limit = 10): Promise
   const config = ESPN_LEAGUES.find(l => l.leagueId === leagueId);
   if (!config) return [];
 
-  const url = `${ESPN_BASE_URL}/${config.sport}/${config.league}/leaders`;
-  let data: ESPNLeadersResponse | null = null;
-  try {
-    const resp = await fetch(url, {
-      headers: { 'Accept': 'application/json' },
-      next: { revalidate: 1800 },
-    });
-    if (resp.ok) data = await resp.json();
-  } catch {
-    /* network error → empty */
-  }
+  // ESPN exposes leaders under several endpoints depending on sport/season.
+  // We probe a few in parallel and pick the first one that comes back populated.
+  const year = new Date().getUTCFullYear();
+  const candidates = [
+    `${ESPN_BASE_URL}/${config.sport}/${config.league}/leaders`,
+    `${ESPN_BASE_URL}/${config.sport}/${config.league}/leaders?season=${year}`,
+    `${ESPN_BASE_URL}/${config.sport}/${config.league}/statistics?season=${year}`,
+    `${ESPN_BASE_URL}/${config.sport}/${config.league}/athletes/statistics?season=${year}`,
+  ];
+  const responses = await Promise.all(
+    candidates.map(async (u) => {
+      try {
+        const r = await fetch(u, { headers: { Accept: 'application/json' }, next: { revalidate: 1800 } });
+        if (!r.ok) return null;
+        return (await r.json()) as ESPNLeadersResponse;
+      } catch { return null; }
+    })
+  );
+  const data = responses.find(d => d && (d.categories?.length || d.leaders?.length)) || null;
 
   if (!data) return [];
 
