@@ -28,32 +28,53 @@ async function fetchTeamInfo(sport: string, league: string, teamId: string) {
 }
 
 async function fetchTeamSchedule(sport: string, league: string, teamId: string) {
-  // ESPN's /schedule defaults to the *current* season window, which can be
-  // empty during off-season or early in a league. We probe multiple seasons
-  // (current year + next year) and merge so we always have something.
+  // ESPN's /schedule returns the team's season-to-date games, but for many
+  // sports (especially soccer) it omits future fixtures. To surface
+  // *upcoming* matches we ALSO probe the league scoreboard across the next
+  // 35 days in 7-day windows and keep events involving this team.
   const year = new Date().getUTCFullYear();
+  const today = new Date();
+  const fmt = (d: Date) => `${d.getUTCFullYear()}${String(d.getUTCMonth() + 1).padStart(2, '0')}${String(d.getUTCDate()).padStart(2, '0')}`;
+  const dateWindows: string[] = [];
+  for (let offset = 0; offset < 35; offset += 7) {
+    const start = new Date(today);
+    start.setUTCDate(today.getUTCDate() + offset);
+    const end = new Date(today);
+    end.setUTCDate(today.getUTCDate() + offset + 7);
+    dateWindows.push(`${fmt(start)}-${fmt(end)}`);
+  }
+
   const candidates = [
     `${ESPN_BASE}/${sport}/${league}/teams/${teamId}/schedule`,
     `${ESPN_BASE}/${sport}/${league}/teams/${teamId}/schedule?season=${year}`,
     `${ESPN_BASE}/${sport}/${league}/teams/${teamId}/schedule?season=${year + 1}`,
     `${ESPN_BASE}/${sport}/${league}/teams/${teamId}/schedule?season=${year - 1}`,
+    ...dateWindows.map(w => `${ESPN_BASE}/${sport}/${league}/scoreboard?dates=${w}`),
   ];
-  type ScheduleResp = { events?: unknown[] } & Record<string, unknown>;
+  type ScheduleResp = { events?: Array<{ id?: string; competitions?: Array<{ competitors?: Array<{ team?: { id?: string } }> }> }> } & Record<string, unknown>;
   const results = await Promise.all(
     candidates.map(async (url) => {
       try {
         const r = await fetch(url, { headers: { Accept: 'application/json' }, next: { revalidate: 300 } });
-        if (!r.ok) return null;
-        return (await r.json()) as ScheduleResp;
-      } catch { return null; }
+        if (!r.ok) return { url, data: null as ScheduleResp | null };
+        return { url, data: (await r.json()) as ScheduleResp };
+      } catch { return { url, data: null }; }
     })
   );
   const merged: { events: unknown[] } & Record<string, unknown> = { events: [] };
   const seen = new Set<string>();
-  for (const data of results) {
+  for (const { url, data } of results) {
     if (!data) continue;
-    for (const ev of (data.events || []) as Array<{ id?: string }>) {
+    const isScoreboard = url.includes('/scoreboard');
+    for (const ev of (data.events || [])) {
       if (!ev?.id || seen.has(ev.id)) continue;
+      // Scoreboard endpoints return ALL league events for that date window —
+      // only keep ones involving the requested team.
+      if (isScoreboard) {
+        const competitors = ev.competitions?.[0]?.competitors || [];
+        const involves = competitors.some(c => c?.team?.id === teamId);
+        if (!involves) continue;
+      }
       seen.add(ev.id);
       merged.events.push(ev);
     }

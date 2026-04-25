@@ -2368,6 +2368,25 @@ const LEAGUE_TO_ODDS_KEYS: Record<number, string[]> = {
   2901: ['motorsport_f1_drivers_championship', 'motorsport_f1_constructors_championship'],
 };
 
+// Cached list of currently active outright sport keys from The Odds API.
+// Markets come and go (Super Bowl winner runs all year, EPL Winner only in season).
+// We re-fetch every 6h.
+let activeOutrightKeysCache: { keys: Set<string>; ts: number } | null = null;
+async function getActiveOutrightKeys(): Promise<Set<string>> {
+  if (activeOutrightKeysCache && Date.now() - activeOutrightKeysCache.ts < 6 * 60 * 60_000) {
+    return activeOutrightKeysCache.keys;
+  }
+  const list = await fetchTheOddsAPI('sports', { all: 'true' }) as Array<{ key: string; active: boolean; has_outrights: boolean }> | null;
+  const keys = new Set<string>();
+  if (Array.isArray(list)) {
+    for (const s of list) {
+      if (s.active && s.has_outrights) keys.add(s.key);
+    }
+  }
+  activeOutrightKeysCache = { keys, ts: Date.now() };
+  return keys;
+}
+
 export async function getLeagueOutrights(leagueId: number): Promise<Outright[]> {
   const cacheKey = `outrights-${leagueId}`;
   const cached = getCached<Outright[]>(cacheKey, CACHE_DURATION.outrights);
@@ -2379,11 +2398,18 @@ export async function getLeagueOutrights(leagueId: number): Promise<Outright[]> 
     return [];
   }
 
-  // Probe ALL configured outright keys for this league in parallel. We get
-  // back e.g. EPL Winner + EPL Top Scorer + EPL Relegation. Empty / 404
-  // responses are silently dropped (markets come and go seasonally).
+  // Filter to only sport keys actually active right now in The Odds API —
+  // calling an inactive key returns INVALID_MARKET_COMBO and burns quota.
+  const activeKeys = await getActiveOutrightKeys();
+  const callableKeys = sportKeys.filter(k => activeKeys.has(k));
+  if (callableKeys.length === 0) {
+    setCache(cacheKey, []);
+    return [];
+  }
+
+  // Probe all callable outright keys in parallel.
   const responses = await Promise.allSettled(
-    sportKeys.map(sportKey => fetchTheOddsAPI(`sports/${sportKey}/odds`, {
+    callableKeys.map(sportKey => fetchTheOddsAPI(`sports/${sportKey}/odds`, {
       regions: 'uk,eu,us',
       markets: 'outrights',
       oddsFormat: 'decimal',
@@ -2480,6 +2506,25 @@ interface ESPNLeadersResponse {
   }>;
 }
 
+type CoreLeader = {
+  displayValue?: string;
+  shortDisplayValue?: string;
+  value?: number;
+  athlete?: { $ref?: string; id?: string | number; displayName?: string; shortName?: string; headshot?: { href?: string }; position?: { abbreviation?: string } };
+  team?: { $ref?: string; id?: string | number; displayName?: string; logos?: Array<{ href?: string }>; logo?: string };
+};
+
+async function dereferenceEspnRef<T>(ref?: string): Promise<T | null> {
+  if (!ref) return null;
+  try {
+    // ESPN $ref values come back as http:// — upgrade to https for safety
+    const url = ref.replace(/^http:\/\//, 'https://');
+    const r = await fetch(url, { headers: { Accept: 'application/json' }, next: { revalidate: 3600 } });
+    if (!r.ok) return null;
+    return (await r.json()) as T;
+  } catch { return null; }
+}
+
 export async function getLeagueTopScorers(leagueId: number, limit = 10): Promise<TopScorer[]> {
   const cacheKey = `top-scorers-${leagueId}-${limit}`;
   const cached = getCached<TopScorer[]>(cacheKey, CACHE_DURATION.standings);
@@ -2488,64 +2533,78 @@ export async function getLeagueTopScorers(leagueId: number, limit = 10): Promise
   const config = ESPN_LEAGUES.find(l => l.leagueId === leagueId);
   if (!config) return [];
 
-  // ESPN exposes leaders under several endpoints depending on sport/season.
-  // We probe a few in parallel and pick the first one that comes back populated.
-  const year = new Date().getUTCFullYear();
+  // The reliable ESPN core leaders endpoint: per-season per-type.
+  // type=1 (regular season) is the only one that's populated for soccer/most leagues.
+  // Try current year first, then previous year (covers off-season + late-starting leagues).
+  const now = new Date();
+  const yr = now.getUTCFullYear();
   const candidates = [
-    `${ESPN_BASE_URL}/${config.sport}/${config.league}/leaders`,
-    `${ESPN_BASE_URL}/${config.sport}/${config.league}/leaders?season=${year}`,
-    `${ESPN_BASE_URL}/${config.sport}/${config.league}/statistics?season=${year}`,
-    `${ESPN_BASE_URL}/${config.sport}/${config.league}/athletes/statistics?season=${year}`,
+    `https://sports.core.api.espn.com/v2/sports/${config.sport}/leagues/${config.league}/seasons/${yr}/types/1/leaders`,
+    `https://sports.core.api.espn.com/v2/sports/${config.sport}/leagues/${config.league}/seasons/${yr - 1}/types/1/leaders`,
+    `https://sports.core.api.espn.com/v2/sports/${config.sport}/leagues/${config.league}/seasons/${yr}/types/2/leaders`,
   ];
-  const responses = await Promise.all(
-    candidates.map(async (u) => {
-      try {
-        const r = await fetch(u, { headers: { Accept: 'application/json' }, next: { revalidate: 1800 } });
-        if (!r.ok) return null;
-        return (await r.json()) as ESPNLeadersResponse;
-      } catch { return null; }
-    })
-  );
-  const data = responses.find(d => d && (d.categories?.length || d.leaders?.length)) || null;
 
-  if (!data) return [];
+  let data: { categories?: Array<{ name?: string; displayName?: string; leaders?: CoreLeader[] }> } | null = null;
+  for (const url of candidates) {
+    try {
+      const r = await fetch(url, { headers: { Accept: 'application/json' }, next: { revalidate: 1800 } });
+      if (!r.ok) continue;
+      const j = await r.json();
+      if (j?.categories?.length) { data = j; break; }
+    } catch { /* try next */ }
+  }
 
-  const categories = data.categories || data.leaders || [];
+  if (!data?.categories?.length) {
+    setCache(cacheKey, []);
+    return [];
+  }
 
-  // Pick the goals/scoring category — name varies per sport.
-  const SCORING_KEYS = ['goals', 'goalsscored', 'totalpoints', 'points', 'pointsperGame', 'totalgoals', 'goalsLeaders'];
-  const goalsCategory =
-    categories.find(c => SCORING_KEYS.includes((c.name || c.abbreviation || '').toLowerCase())) ||
-    categories.find(c => /goal/i.test(c.name || c.displayName || '')) ||
-    categories[0];
+  // Sport-aware scoring category — soccer uses goalsLeaders, basketball uses pointsPerGame, etc.
+  const SCORING_PRIORITY: Record<string, string[]> = {
+    soccer: ['goalsLeaders', 'goals'],
+    basketball: ['pointsPerGame', 'points', 'totalPoints', 'pointsLeaders'],
+    football: ['passingYards', 'rushingYards', 'totalTouchdowns'],
+    baseball: ['homeRuns', 'rbi', 'battingAverage'],
+    hockey: ['goals', 'points', 'goalsLeaders'],
+  };
+  const wantList = SCORING_PRIORITY[config.sport] || ['goals', 'goalsLeaders', 'points'];
+  const scoringCat =
+    wantList.map(n => data!.categories!.find(c => (c.name || '').toLowerCase() === n.toLowerCase())).find(Boolean) ||
+    data.categories.find(c => /goal|point|score/i.test(c.name || c.displayName || '')) ||
+    data.categories[0];
 
-  if (!goalsCategory?.leaders) return [];
+  if (!scoringCat?.leaders?.length) {
+    setCache(cacheKey, []);
+    return [];
+  }
 
-  const scorers: TopScorer[] = goalsCategory.leaders.slice(0, limit).map((l, idx) => {
-    const team = l.athlete?.team || l.team;
-    const goals = typeof l.value === 'number'
-      ? l.value
-      : parseFloat(l.displayValue || '0') || 0;
-
+  // Dereference athlete + team for top N in parallel
+  const top = scoringCat.leaders.slice(0, limit);
+  const enriched = await Promise.all(top.map(async (l, idx) => {
+    const [athlete, team] = await Promise.all([
+      dereferenceEspnRef<{ id?: string; displayName?: string; shortName?: string; headshot?: { href?: string }; position?: { abbreviation?: string } }>(l.athlete?.$ref),
+      dereferenceEspnRef<{ id?: string; displayName?: string; logos?: Array<{ href?: string }> }>(l.team?.$ref),
+    ]);
+    const goals = typeof l.value === 'number' ? l.value : parseFloat(l.displayValue || '0') || 0;
     return {
       position: idx + 1,
       player: {
-        id: String(l.athlete?.id || idx),
-        name: l.athlete?.displayName || l.athlete?.shortName || `Player ${idx + 1}`,
-        photo: l.athlete?.headshot?.href,
-        position: l.athlete?.position?.abbreviation,
+        id: String(athlete?.id || idx),
+        name: athlete?.displayName || athlete?.shortName || `Player ${idx + 1}`,
+        photo: athlete?.headshot?.href,
+        position: athlete?.position?.abbreviation,
       },
       team: {
         id: team?.id ? String(team.id) : undefined,
         name: team?.displayName || 'Unknown',
-        logo: team?.logos?.[0]?.href || team?.logo,
+        logo: team?.logos?.[0]?.href,
       },
       stats: { goals: Math.round(goals) },
-    };
-  });
+    } as TopScorer;
+  }));
 
-  setCache(cacheKey, scorers);
-  return scorers;
+  setCache(cacheKey, enriched);
+  return enriched;
 }
 
 // ============================================
