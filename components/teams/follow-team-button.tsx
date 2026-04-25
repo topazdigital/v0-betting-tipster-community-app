@@ -5,6 +5,7 @@ import { Star, Loader2, Check } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/auth-context';
+import { ensurePushSubscribed, isPushSupported } from '@/lib/push-client';
 
 interface FollowTeamButtonProps {
   teamId: string;
@@ -73,6 +74,9 @@ export function FollowTeamButton({
           setFollowing(true);
           setShowHint(true);
           setTimeout(() => setShowHint(false), 4000);
+          if (isPushSupported()) {
+            ensurePushSubscribed({ topics: ['match_reminders', 'team_news'], countryCode: countryCode || null }).catch(() => {});
+          }
         }
       }
     } finally {

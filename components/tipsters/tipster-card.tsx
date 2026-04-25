@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { TrendingUp, TrendingDown, Users, Target } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import { FollowTipsterButton } from '@/components/tipsters/follow-tipster-button';
 import type { User, TipsterProfile } from '@/lib/types';
 
 interface TipsterCardProps {
@@ -124,7 +125,7 @@ export function TipsterCard({ user, profile, compact = false }: TipsterCardProps
           <Button size="sm" variant="outline" asChild>
             <Link href={`/tipsters/${user.username}`}>View</Link>
           </Button>
-          <Button size="sm">Follow</Button>
+          <FollowTipsterButton tipsterId={user.id} tipsterName={user.display_name} size="sm" />
         </div>
       </div>
 

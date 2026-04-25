@@ -17,6 +17,7 @@ import { Progress } from "@/components/ui/progress"
 import { Spinner } from "@/components/ui/spinner"
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/contexts/auth-context"
+import { FollowTipsterButton } from "@/components/tipsters/follow-tipster-button"
 
 interface PageProps {
   params: Promise<{ id: string }>
@@ -144,13 +145,12 @@ export default function TipsterProfilePage({ params }: PageProps) {
                 
                 {/* Actions */}
                 <div className="flex flex-wrap gap-2">
-                  <Button 
-                    variant={isFollowing ? "secondary" : "default"}
-                    onClick={() => setIsFollowing(!isFollowing)}
-                  >
-                    {isFollowing ? "Following" : "Follow"}
-                  </Button>
-                  
+                  <FollowTipsterButton
+                    tipsterId={tipster.id}
+                    tipsterName={tipster.displayName}
+                    onFollowChange={setIsFollowing}
+                  />
+
                   {tipster.isPro && tipster.subscriptionPrice && (
                     <Button variant="outline">
                       Subscribe {tipster.currency} {tipster.subscriptionPrice}/mo

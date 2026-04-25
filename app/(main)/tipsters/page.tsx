@@ -14,6 +14,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { SidebarNew } from '@/components/layout/sidebar-new';
+import { FollowTipsterButton } from '@/components/tipsters/follow-tipster-button';
 import { cn } from '@/lib/utils';
 
 // Mock tipsters data
@@ -348,11 +349,19 @@ export default function TipstersPage() {
                 </div>
 
                 {/* CTA */}
-                {tipster.isPro && tipster.subscriptionPrice && (
-                  <Button className="mt-3 w-full" size="sm">
-                    Subscribe KES {tipster.subscriptionPrice}/mo
-                  </Button>
-                )}
+                <div className="mt-3 flex gap-2">
+                  <FollowTipsterButton
+                    tipsterId={tipster.id}
+                    tipsterName={tipster.displayName}
+                    size="sm"
+                    className="flex-1 justify-center"
+                  />
+                  {tipster.isPro && tipster.subscriptionPrice && (
+                    <Button size="sm" variant="outline" className="flex-1" onClick={(e) => e.preventDefault()}>
+                      Sub KES {tipster.subscriptionPrice}
+                    </Button>
+                  )}
+                </div>
               </Link>
             ))}
           </div>
