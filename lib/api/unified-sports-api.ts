@@ -1931,14 +1931,26 @@ interface TheOddsApiOutrightEvent {
   }>;
 }
 
-// leagueId → The Odds API sport_key (inverse of THE_ODDS_API_SPORTS map)
-const LEAGUE_TO_ODDS_KEY: Record<number, string> = Object.entries(THE_ODDS_API_SPORTS).reduce(
-  (acc, [sportKey, info]) => {
-    acc[info.leagueId] = sportKey;
-    return acc;
-  },
-  {} as Record<number, string>
-);
+// leagueId → The Odds API sport_key for OUTRIGHTS markets specifically.
+// The Odds API exposes outrights only via dedicated "_winner" / "_championship_winner"
+// sport keys — the regular sport keys (soccer_epl, basketball_nba …) reject the
+// `markets=outrights` query with INVALID_MARKET_COMBO.
+//
+// Domestic soccer leagues currently have NO active outright market on the API,
+// so they're omitted here (the league page renders an empty state).
+const LEAGUE_TO_ODDS_KEY: Record<number, string> = {
+  // Soccer — only active international tournaments expose outrights right now.
+  // (Domestic EPL/La Liga/Serie A/Bundesliga winner markets are not currently
+  //  offered by The Odds API — they appear seasonally near league climaxes.)
+  // 1: 'soccer_epl_winner',           // not active
+  // 2: 'soccer_spain_la_liga_winner', // not active
+  // 9: 'soccer_uefa_champs_league_winner', // not active
+  // North-American majors — championship futures
+  101: 'basketball_nba_championship_winner', // NBA
+  401: 'americanfootball_nfl_super_bowl_winner', // NFL
+  501: 'baseball_mlb_world_series_winner', // MLB
+  601: 'icehockey_nhl_championship_winner', // NHL
+};
 
 export async function getLeagueOutrights(leagueId: number): Promise<Outright[]> {
   const cacheKey = `outrights-${leagueId}`;
