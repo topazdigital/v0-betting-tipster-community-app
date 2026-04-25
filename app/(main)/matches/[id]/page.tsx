@@ -22,6 +22,7 @@ import { TeamLogo } from "@/components/ui/team-logo"
 import { cn } from "@/lib/utils"
 import { formatTime, formatDate, getBrowserTimezone, getDayLabel } from "@/lib/utils/timezone"
 import { countryCodeToFlag } from "@/lib/country-flags"
+import { liveStatusLabel } from "@/lib/utils/live-status"
 import { AIMatchPrediction } from "@/components/ai/ai-match-prediction"
 
 interface PageProps { params: Promise<{ id: string }> }
@@ -182,10 +183,24 @@ const fetcher = async (url: string) => {
   return res.json()
 }
 
+// Slug → emoji. NOTE: in this app the sport with id=1 is "Football" (soccer)
+// with slug 'football' — id=5 is American Football with slug 'american-football'.
+// So `football` must render the soccer ball, not the American football.
 const SPORT_EMOJI: Record<string, string> = {
-  soccer: '⚽', football: '🏈', basketball: '🏀', tennis: '🎾',
-  baseball: '⚾', hockey: '🏒', mma: '🥊', cricket: '🏏',
-  rugby: '🏉', golf: '⛳', 'formula-1': '🏎️', racing: '🏎️',
+  soccer: '⚽', football: '⚽',
+  'american-football': '🏈',
+  basketball: '🏀', tennis: '🎾',
+  baseball: '⚾', hockey: '🏒', 'ice-hockey': '🏒',
+  mma: '🥊', boxing: '🥊', cricket: '🏏',
+  rugby: '🏉', golf: '⛳',
+  'formula-1': '🏎️', racing: '🏎️', motogp: '🏍️', nascar: '🏁',
+  volleyball: '🏐', 'beach-volleyball': '🏐',
+  handball: '🤾', 'water-polo': '🤽', 'field-hockey': '🏑',
+  futsal: '⚽', lacrosse: '🥍', 'aussie-rules': '🏉',
+  snooker: '🎱', darts: '🎯', 'table-tennis': '🏓', badminton: '🏸',
+  squash: '🎾', cycling: '🚴', athletics: '🏃', swimming: '🏊',
+  wrestling: '🤼', 'horse-racing': '🐎',
+  esports: '🎮', chess: '♟️', 'ski-jumping': '⛷️',
 }
 
 function FormBadge({ result }: { result: string }) {
@@ -214,32 +229,29 @@ function EventIcon({ type }: { type: MatchEvent['type'] }) {
 }
 
 // ---- Live Minute Timer ----
-// For soccer: caps at 90 + injury time can push it. For other sports: counts elapsed minutes uncapped.
+// For soccer / rugby: ticks the clock every 15 s based on kickoff so the
+// displayed minute keeps moving between API polls. For all other sports
+// the ESPN `minute` field actually means "current period" — we just
+// pass it through and let `liveStatusLabel` translate it (Q1 / Set 3 / etc).
 function useLiveMinute(kickoffTime: string, storedMinute: number | undefined, status: string, sportSlug: string = 'soccer') {
   const [minute, setMinute] = useState(storedMinute ?? 0)
   const isLive = status === 'live' || status === 'halftime' || status === 'extra_time' || status === 'penalties'
   const isHalftime = status === 'halftime'
-  const isSoccer = sportSlug === 'soccer' || sportSlug === 'football'
+  const ticksByMinute = sportSlug === 'soccer' || sportSlug === 'football' || sportSlug === 'rugby'
 
   useEffect(() => {
     if (!isLive) { setMinute(storedMinute ?? 0); return }
+    if (!ticksByMinute) { setMinute(storedMinute ?? 0); return }
     const kick = new Date(kickoffTime).getTime()
     const compute = () => {
-      const elapsed = Math.floor((Date.now() - kick) / 60000)
       if (isHalftime) { setMinute(45); return }
-      // Trust stored minute from API if it's higher (it often comes from real ESPN clock)
-      if (isSoccer) {
-        // Soccer: 90 + extra time (cap at 120 for full extra time)
-        setMinute(Math.max(storedMinute ?? 0, Math.min(elapsed, 120)))
-      } else {
-        // Other sports: prefer storedMinute (could be quarter/period elapsed)
-        setMinute(storedMinute ?? Math.min(elapsed, 999))
-      }
+      const elapsed = Math.floor((Date.now() - kick) / 60000)
+      setMinute(Math.max(storedMinute ?? 0, Math.min(elapsed, 120)))
     }
     compute()
     const id = setInterval(compute, 15000)
     return () => clearInterval(id)
-  }, [isLive, isHalftime, isSoccer, kickoffTime, storedMinute])
+  }, [isLive, isHalftime, ticksByMinute, kickoffTime, storedMinute])
 
   return minute
 }
@@ -612,6 +624,9 @@ export default function MatchDetailPage({ params }: PageProps) {
     match?.status || '',
     match?.sport.slug || 'soccer'
   )
+  const sportSlug = match?.sport.slug || 'soccer'
+  const ticksByMinute = sportSlug === 'soccer' || sportSlug === 'football' || sportSlug === 'rugby'
+  const liveLabel = liveStatusLabel(sportSlug, match?.status || '', liveMinute)
 
   if (isLoading) {
     return (
@@ -665,7 +680,7 @@ export default function MatchDetailPage({ params }: PageProps) {
               {isLive && !isHalftime && (
                 <div className="flex items-center gap-1.5 bg-rose-500/20 border border-rose-500/40 text-rose-400 text-xs font-bold px-2.5 py-1 rounded-full">
                   <span className="inline-block h-1.5 w-1.5 rounded-full bg-rose-400 animate-pulse" />
-                  LIVE {liveMinute ? `${liveMinute}'` : ''}
+                  LIVE {liveLabel !== 'LIVE' ? liveLabel : ''}
                 </div>
               )}
               {isHalftime && (
@@ -741,7 +756,9 @@ export default function MatchDetailPage({ params }: PageProps) {
                     {isLive && !isHalftime && (
                       <div className="mt-3 flex items-center gap-1.5">
                         <span className="inline-block h-1.5 w-1.5 rounded-full bg-rose-400 animate-pulse" />
-                        <span className="font-mono text-sm font-bold text-rose-400">{liveMinute}&apos;</span>
+                        <span className="font-mono text-sm font-bold text-rose-400">
+                          {ticksByMinute ? `${liveMinute}'` : liveLabel}
+                        </span>
                       </div>
                     )}
                     {isHalftime && <p className="mt-2 text-xs font-bold text-amber-400">HALF TIME</p>}

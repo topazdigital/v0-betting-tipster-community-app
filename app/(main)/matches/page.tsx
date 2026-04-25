@@ -2,7 +2,7 @@
 
 import { useState, useMemo, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { Calendar, Search, Filter, Clock, Flame, ChevronDown } from 'lucide-react';
+import { Calendar, Search, Filter, Clock, Flame, ChevronDown, CalendarDays, CalendarClock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -22,6 +22,17 @@ import { useMatches, useMatchStats } from '@/lib/hooks/use-matches';
 import { ALL_SPORTS, ALL_LEAGUES } from '@/lib/sports-data';
 import type { Match } from '@/lib/api/sports-api';
 import { cn } from '@/lib/utils';
+import { getBrowserTimezone, isToday as isTodayTz } from '@/lib/utils/timezone';
+
+type DateTab = 'today' | 'upcoming' | 'calendar';
+
+function toLocalISODate(d: Date): string {
+  // YYYY-MM-DD in browser tz so <input type="date"> matches
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+}
 
 const statusOptions = [
   { value: 'all', label: 'All Matches' },
@@ -43,6 +54,8 @@ function MatchesContent() {
     searchParams.get('league') || 'all'
   );
   const [showFilters, setShowFilters] = useState(false);
+  const [dateTab, setDateTab] = useState<DateTab>('today');
+  const [calendarDate, setCalendarDate] = useState<string>(toLocalISODate(new Date()));
 
   // Get matches with filters
   const { matches, isLoading } = useMatches({
@@ -69,6 +82,23 @@ function MatchesContent() {
   // Apply additional filters
   const filteredMatches = useMemo(() => {
     let result = matches;
+    const tz = getBrowserTimezone();
+
+    // Date tab filter — applies on top of all other filters
+    if (dateTab === 'today') {
+      result = result.filter(m => isTodayTz(new Date(m.kickoffTime), tz));
+    } else if (dateTab === 'upcoming') {
+      const startOfTomorrow = new Date();
+      startOfTomorrow.setHours(0, 0, 0, 0);
+      startOfTomorrow.setDate(startOfTomorrow.getDate() + 1);
+      result = result.filter(m => {
+        const t = new Date(m.kickoffTime).getTime();
+        return t >= startOfTomorrow.getTime() && m.status === 'scheduled';
+      });
+    } else if (dateTab === 'calendar' && calendarDate) {
+      // Compare YYYY-MM-DD in local tz
+      result = result.filter(m => toLocalISODate(new Date(m.kickoffTime)) === calendarDate);
+    }
 
     // League filter
     if (leagueFilter !== 'all') {
@@ -89,7 +119,7 @@ function MatchesContent() {
     }
 
     return result;
-  }, [matches, leagueFilter, search]);
+  }, [matches, leagueFilter, search, dateTab, calendarDate]);
 
   // Group matches by league — preserves the API's sport priority → league priority → time order
   // (filteredMatches is already sorted by sportPriority -> leaguePriority -> status -> kickoff)
@@ -161,6 +191,39 @@ function MatchesContent() {
                 {stats.today} Today
               </Badge>
             </div>
+          </div>
+
+          {/* Today / Upcoming / Calendar tabs */}
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            <div className="inline-flex rounded-lg border border-border bg-card p-1">
+              {([
+                { v: 'today' as DateTab,    label: 'Today',    Icon: Clock },
+                { v: 'upcoming' as DateTab, label: 'Upcoming', Icon: CalendarClock },
+                { v: 'calendar' as DateTab, label: 'Calendar', Icon: CalendarDays },
+              ]).map(({ v, label, Icon }) => (
+                <button
+                  key={v}
+                  onClick={() => setDateTab(v)}
+                  className={cn(
+                    'flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors',
+                    dateTab === v
+                      ? 'bg-primary text-primary-foreground shadow-sm'
+                      : 'text-muted-foreground hover:text-foreground'
+                  )}
+                >
+                  <Icon className="h-3.5 w-3.5" />
+                  {label}
+                </button>
+              ))}
+            </div>
+            {dateTab === 'calendar' && (
+              <Input
+                type="date"
+                value={calendarDate}
+                onChange={(e) => setCalendarDate(e.target.value)}
+                className="w-44"
+              />
+            )}
           </div>
 
           {/* Filters */}

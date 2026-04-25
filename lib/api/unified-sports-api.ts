@@ -1753,31 +1753,303 @@ export async function getUpcomingMatches(): Promise<UnifiedMatch[]> {
 }
 
 // ============================================
-// Standings API
+// Standings API (real ESPN data)
 // ============================================
+
+interface ESPNStandingEntry {
+  team?: {
+    id?: string;
+    displayName?: string;
+    shortDisplayName?: string;
+    logos?: Array<{ href?: string }>;
+    logo?: string;
+  };
+  stats?: Array<{
+    name?: string;
+    type?: string;
+    abbreviation?: string;
+    value?: number;
+    displayValue?: string;
+  }>;
+  note?: { description?: string; rank?: number };
+}
+
+interface ESPNStandingsResponse {
+  children?: Array<{
+    standings?: { entries?: ESPNStandingEntry[] };
+  }>;
+  standings?: { entries?: ESPNStandingEntry[] };
+}
+
+function pickStat(stats: ESPNStandingEntry['stats'], names: string[]): number {
+  if (!stats) return 0;
+  for (const s of stats) {
+    const key = (s.name || s.type || s.abbreviation || '').toLowerCase();
+    if (names.some(n => key === n.toLowerCase())) {
+      const v = typeof s.value === 'number' ? s.value : parseFloat(s.displayValue || '0');
+      if (Number.isFinite(v)) return v;
+    }
+  }
+  return 0;
+}
 
 export async function getLeagueStandings(leagueId: number): Promise<Standing[]> {
   const cacheKey = `standings-${leagueId}`;
   const cached = getCached<Standing[]>(cacheKey, CACHE_DURATION.standings);
   if (cached) return cached;
 
-  const league = ALL_LEAGUES.find(l => l.id === leagueId);
-  if (!league) return [];
+  const config = ESPN_LEAGUES.find(l => l.leagueId === leagueId);
+  if (!config) return [];
 
-  // Return empty for now - would implement via API
-  return [];
+  // Soccer uses a slightly different host/path that exposes table directly.
+  const url = config.sportType === 'soccer'
+    ? `https://site.web.api.espn.com/apis/v2/sports/soccer/${config.league}/standings`
+    : `https://site.api.espn.com/apis/v2/sports/${config.sport}/${config.league}/standings`;
+
+  let data: ESPNStandingsResponse | null = null;
+  try {
+    const resp = await fetch(url, {
+      headers: { 'Accept': 'application/json' },
+      next: { revalidate: 600 },
+    });
+    if (resp.ok) data = await resp.json();
+  } catch {
+    /* network error → empty */
+  }
+
+  if (!data) return [];
+
+  // ESPN packages standings either at top-level or in `children[].standings.entries`
+  const entries: ESPNStandingEntry[] =
+    data.standings?.entries ||
+    data.children?.flatMap(c => c.standings?.entries || []) ||
+    [];
+
+  const standings: Standing[] = entries.map((e, idx) => {
+    const won = pickStat(e.stats, ['wins', 'gameswon']);
+    const drawn = pickStat(e.stats, ['ties', 'draws']);
+    const lost = pickStat(e.stats, ['losses', 'gameslost']);
+    const played = pickStat(e.stats, ['gamesplayed', 'games']) || won + drawn + lost;
+    const goalsFor = pickStat(e.stats, ['pointsfor', 'goalsfor', 'pf']);
+    const goalsAgainst = pickStat(e.stats, ['pointsagainst', 'goalsagainst', 'pa']);
+    const goalDifference = pickStat(e.stats, ['pointdifferential', 'goaldifference', 'gd']) || (goalsFor - goalsAgainst);
+    const points = pickStat(e.stats, ['points', 'leaguepoints']);
+    const rank = pickStat(e.stats, ['rank']) || idx + 1;
+
+    return {
+      position: rank,
+      team: {
+        id: String(e.team?.id || idx),
+        name: e.team?.displayName || e.team?.shortDisplayName || `Team ${idx + 1}`,
+        logo: e.team?.logos?.[0]?.href || e.team?.logo,
+      },
+      played,
+      won,
+      drawn,
+      lost,
+      goalsFor,
+      goalsAgainst,
+      goalDifference,
+      points,
+    };
+  }).sort((a, b) => a.position - b.position);
+
+  setCache(cacheKey, standings);
+  return standings;
 }
 
 // ============================================
-// Outrights API
+// Outrights API (real bookmaker odds via The Odds API)
 // ============================================
+
+interface TheOddsApiOutrightEvent {
+  id: string;
+  sport_key: string;
+  sport_title: string;
+  commence_time: string;
+  bookmakers?: Array<{
+    key: string;
+    title: string;
+    markets: Array<{
+      key: string;
+      outcomes: Array<{ name: string; price: number }>;
+    }>;
+  }>;
+}
+
+// leagueId → The Odds API sport_key (inverse of THE_ODDS_API_SPORTS map)
+const LEAGUE_TO_ODDS_KEY: Record<number, string> = Object.entries(THE_ODDS_API_SPORTS).reduce(
+  (acc, [sportKey, info]) => {
+    acc[info.leagueId] = sportKey;
+    return acc;
+  },
+  {} as Record<number, string>
+);
 
 export async function getLeagueOutrights(leagueId: number): Promise<Outright[]> {
   const cacheKey = `outrights-${leagueId}`;
   const cached = getCached<Outright[]>(cacheKey, CACHE_DURATION.outrights);
   if (cached) return cached;
 
-  return [];
+  const sportKey = LEAGUE_TO_ODDS_KEY[leagueId];
+  if (!sportKey) {
+    setCache(cacheKey, []);
+    return [];
+  }
+
+  const data = await fetchTheOddsAPI(`sports/${sportKey}/odds`, {
+    regions: 'uk,eu,us',
+    markets: 'outrights',
+    oddsFormat: 'decimal',
+    dateFormat: 'iso',
+  }) as TheOddsApiOutrightEvent[] | null;
+
+  if (!data || !Array.isArray(data) || data.length === 0) {
+    setCache(cacheKey, []);
+    return [];
+  }
+
+  // For each event (e.g. "EPL Winner 2025/26") aggregate across bookmakers.
+  const outrights: Outright[] = [];
+  for (const ev of data) {
+    if (!ev.bookmakers || ev.bookmakers.length === 0) continue;
+
+    // outcome name → array of prices across bookmakers
+    const tally = new Map<string, number[]>();
+    for (const bm of ev.bookmakers) {
+      for (const market of bm.markets) {
+        if (market.key !== 'outrights') continue;
+        for (const o of market.outcomes) {
+          if (!tally.has(o.name)) tally.set(o.name, []);
+          tally.get(o.name)!.push(o.price);
+        }
+      }
+    }
+
+    if (tally.size === 0) continue;
+
+    const outcomes = Array.from(tally.entries())
+      .map(([name, prices]) => ({
+        name,
+        // best (highest) decimal price across bookmakers — that's what punters want
+        price: Math.round(Math.max(...prices) * 100) / 100,
+      }))
+      .sort((a, b) => a.price - b.price); // shortest odds = favourite first
+
+    outrights.push({
+      id: ev.id,
+      name: ev.sport_title || 'Outright Winner',
+      outcomes,
+    });
+  }
+
+  setCache(cacheKey, outrights);
+  return outrights;
+}
+
+// ============================================
+// Top scorers / leaders (real ESPN data)
+// ============================================
+
+export interface TopScorer {
+  position: number;
+  player: {
+    id: string;
+    name: string;
+    photo?: string;
+    position?: string;
+  };
+  team: { id?: string; name: string; logo?: string };
+  stats: { goals: number; appearances?: number; assists?: number };
+}
+
+interface ESPNLeader {
+  displayValue?: string;
+  value?: number;
+  athlete?: {
+    id?: string;
+    displayName?: string;
+    shortName?: string;
+    headshot?: { href?: string };
+    position?: { abbreviation?: string };
+    team?: { id?: string; displayName?: string; logo?: string; logos?: Array<{ href?: string }> };
+  };
+  team?: { id?: string; displayName?: string; logo?: string; logos?: Array<{ href?: string }> };
+}
+
+interface ESPNLeadersResponse {
+  categories?: Array<{
+    name?: string;
+    displayName?: string;
+    abbreviation?: string;
+    leaders?: ESPNLeader[];
+  }>;
+  leaders?: Array<{
+    name?: string;
+    displayName?: string;
+    abbreviation?: string;
+    leaders?: ESPNLeader[];
+  }>;
+}
+
+export async function getLeagueTopScorers(leagueId: number, limit = 10): Promise<TopScorer[]> {
+  const cacheKey = `top-scorers-${leagueId}-${limit}`;
+  const cached = getCached<TopScorer[]>(cacheKey, CACHE_DURATION.standings);
+  if (cached) return cached;
+
+  const config = ESPN_LEAGUES.find(l => l.leagueId === leagueId);
+  if (!config) return [];
+
+  const url = `${ESPN_BASE_URL}/${config.sport}/${config.league}/leaders`;
+  let data: ESPNLeadersResponse | null = null;
+  try {
+    const resp = await fetch(url, {
+      headers: { 'Accept': 'application/json' },
+      next: { revalidate: 1800 },
+    });
+    if (resp.ok) data = await resp.json();
+  } catch {
+    /* network error → empty */
+  }
+
+  if (!data) return [];
+
+  const categories = data.categories || data.leaders || [];
+
+  // Pick the goals/scoring category — name varies per sport.
+  const SCORING_KEYS = ['goals', 'goalsscored', 'totalpoints', 'points', 'pointsperGame', 'totalgoals', 'goalsLeaders'];
+  const goalsCategory =
+    categories.find(c => SCORING_KEYS.includes((c.name || c.abbreviation || '').toLowerCase())) ||
+    categories.find(c => /goal/i.test(c.name || c.displayName || '')) ||
+    categories[0];
+
+  if (!goalsCategory?.leaders) return [];
+
+  const scorers: TopScorer[] = goalsCategory.leaders.slice(0, limit).map((l, idx) => {
+    const team = l.athlete?.team || l.team;
+    const goals = typeof l.value === 'number'
+      ? l.value
+      : parseFloat(l.displayValue || '0') || 0;
+
+    return {
+      position: idx + 1,
+      player: {
+        id: String(l.athlete?.id || idx),
+        name: l.athlete?.displayName || l.athlete?.shortName || `Player ${idx + 1}`,
+        photo: l.athlete?.headshot?.href,
+        position: l.athlete?.position?.abbreviation,
+      },
+      team: {
+        id: team?.id ? String(team.id) : undefined,
+        name: team?.displayName || 'Unknown',
+        logo: team?.logos?.[0]?.href || team?.logo,
+      },
+      stats: { goals: Math.round(goals) },
+    };
+  });
+
+  setCache(cacheKey, scorers);
+  return scorers;
 }
 
 // ============================================

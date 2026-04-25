@@ -96,6 +96,37 @@ Wired in `lib/api/unified-sports-api.ts`:
 - Some team logo URLs are empty strings from ESPN — shows initials fallback correctly but triggers Next.js Image warnings in console.
 - No DATABASE_URL set; database calls in `lib/db.ts` no-op gracefully.
 
+## Apr 25 2026 — League/Competition pages, sport-aware live timer, matches tabs
+- **Sport-aware live timer** (`lib/utils/live-status.ts`, `app/(main)/matches/[id]/page.tsx`,
+  `components/matches/match-card-new.tsx`): new `liveStatusLabel(status, minute, sportSlug)`
+  returns `HT`, `Q1 6'`, `Set 3`, `Inn 5`, etc. Shared between match cards and detail
+  hero. `useLiveMinute` only ticks for soccer/football/rugby (other sports don't have
+  a continuous match clock).
+- **Sport icon fix** (`SPORT_EMOJI` map in match detail page): slug `football` and
+  `soccer` now both → ⚽; `american-football` → 🏈.
+- **Real league standings/outrights/scorers** (`lib/api/unified-sports-api.ts`):
+  - `getLeagueStandings(leagueId)` — ESPN `/standings` (soccer uses
+    `site.web.api.espn.com`, others `site.api.espn.com`). Returns position, team,
+    P/W/D/L/GF/GA/GD/Pts.
+  - `getLeagueOutrights(leagueId)` — The Odds API `sports/{key}/odds?markets=outrights`.
+    Aggregates best (highest decimal) price across UK/EU/US bookmakers per outcome,
+    sorted shortest-odds first. Cached 30 min, gracefully empty if quota exhausted.
+  - `getLeagueTopScorers(leagueId)` — ESPN `/leaders`, picks the goals/scoring category.
+- **API routes**: `app/api/leagues/[id]/{standings,outrights,scorers}/route.ts` all wired
+  to the real backend functions above.
+- **Competitions page** (`app/(main)/competitions/page.tsx`): removed all mock outright
+  generators. New `OutrightCard` component fetches `/api/leagues/[id]/outrights` via SWR
+  with empty-state message when no bookmaker market is open. Listed leagues:
+  EPL, La Liga, Bundesliga, Serie A, Ligue 1, UCL, NBA, NFL, MLB, NHL, MMA.
+- **League page redesign** (`app/(main)/leagues/[slug]/page.tsx`): removed `generateStandings`
+  / `generateOutrightOdds` / `generateTopScorers` mocks. New layout:
+  `xl:grid-cols-[minmax(0,1fr)_360px]` with main column showing live/upcoming/finished
+  matches + full standings table, right sidebar showing outright winner odds + top scorers.
+  All three sidebar widgets fetch via SWR with loading + empty states.
+- **Matches page Today/Upcoming/Calendar tabs** (`app/(main)/matches/page.tsx`): tab strip
+  filters by browser local timezone (`isTodayTz`, `toLocalISODate`); Calendar tab exposes
+  a date-input filter.
+
 ## Apr 2026 — Real Team Schedule + Flag/Compactness Pass
 - **Team API real past results fix** (`app/api/teams/[id]/route.ts`): ESPN's
   `/teams/{id}/schedule` puts status under `competitions[0].status.type`

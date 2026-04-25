@@ -6,6 +6,7 @@ import { useUserSettings } from '@/contexts/user-settings-context';
 import { formatOdds } from '@/lib/utils/odds-converter';
 import { TeamLogo, SportIcon, LeagueFlag } from '@/components/ui/team-logo';
 import { getBrowserTimezone, formatTime, formatDate, isToday, isTomorrow } from '@/lib/utils/timezone';
+import { liveStatusLabel } from '@/lib/utils/live-status';
 
 // Match type from our API
 interface Match {
@@ -69,39 +70,6 @@ const NO_DRAW_SPORTS = new Set([
   'formula-1', 'racing', 'horse-racing', 'darts', 'snooker',
   'american-football', 'ice-hockey', // OT means binary outcome for betting markets
 ]);
-
-/**
- * Sport-specific live status label. Football uses minutes (45') and HT.
- * Other sports use periods (Q2 / Set 3 / Inn 5 / Rd 4) when minute is overloaded
- * by the API to mean period number.
- */
-function liveStatusLabel(sportSlug: string, status: string, minute?: number): string {
-  if (status === 'halftime') return 'HT';
-  if (status === 'extra_time') return 'ET';
-  if (status === 'penalties') return 'PEN';
-  const m = minute ?? 0;
-  switch (sportSlug) {
-    case 'basketball':
-    case 'american-football':
-      return m > 0 ? `Q${Math.min(m, 4)}` : 'LIVE';
-    case 'tennis':
-      return m > 0 ? `Set ${m}` : 'LIVE';
-    case 'baseball':
-      return m > 0 ? `Inn ${m}` : 'LIVE';
-    case 'ice-hockey':
-      return m > 0 ? `P${Math.min(m, 3)}` : 'LIVE';
-    case 'mma':
-    case 'boxing':
-      return m > 0 ? `Rd ${m}` : 'LIVE';
-    case 'cricket':
-      return m > 0 ? `Inn ${m}` : 'LIVE';
-    case 'rugby':
-      return m > 0 ? `${m}'` : 'LIVE';
-    default:
-      // Football / soccer / default
-      return m > 0 ? `${m}'` : 'LIVE';
-  }
-}
 
 export function MatchCardNew({ 
   match, 

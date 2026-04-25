@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from 'react';
 import Link from 'next/link';
+import useSWR from 'swr';
 import { 
   Trophy, 
   Calendar, 
@@ -13,7 +14,8 @@ import {
   ChevronRight,
   Timer,
   Target,
-  TrendingUp
+  TrendingUp,
+  Loader2
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -22,7 +24,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { SidebarNew } from '@/components/layout/sidebar-new';
 import { cn } from '@/lib/utils';
-import { ALL_LEAGUES, TEAMS_DATABASE, getSportIcon, BOOKMAKERS } from '@/lib/sports-data';
+import { ALL_LEAGUES, getSportIcon } from '@/lib/sports-data';
+
+const fetcher = (url: string) => fetch(url).then(r => r.json());
+
+interface OutrightOutcome { name: string; price: number }
+interface OutrightMarket { id: string; name: string; outcomes: OutrightOutcome[] }
 
 // Sport priority for sorting
 const SPORT_PRIORITY: Record<number, number> = {
@@ -78,46 +85,14 @@ const tipsterCompetitions = [
   },
 ];
 
-// Generate outright markets for major leagues
-function generateOutrightMarkets() {
-  // Football leagues first, then other sports
-  const footballLeagues = ALL_LEAGUES.filter(l => l.sportId === 1 && l.tier === 1).slice(0, 8);
-  const otherLeagues = ALL_LEAGUES.filter(l => l.sportId !== 1 && l.tier === 1).slice(0, 6);
-  
-  const leagues = [...footballLeagues, ...otherLeagues].sort((a, b) => {
-    const priorityA = SPORT_PRIORITY[a.sportId] ?? 99;
-    const priorityB = SPORT_PRIORITY[b.sportId] ?? 99;
-    return priorityA - priorityB;
-  });
-  
-  return leagues.map(league => {
-    const teams = TEAMS_DATABASE.filter(t => t.leagueId === league.id);
-    const topTeams = teams.length >= 3 ? teams.slice(0, 5) : Array.from({ length: 5 }, (_, i) => ({
-      id: 8000 + i + league.id * 100,
-      name: `Team ${i + 1}`,
-      shortName: `T${i + 1}`,
-      sportId: league.sportId,
-      leagueId: league.id,
-      country: league.country
-    }));
-    
-    return {
-      league,
-      sportIcon: getSportIcon(league.sportId === 1 ? 'football' : 
-        league.sportId === 2 ? 'basketball' : 
-        league.sportId === 3 ? 'tennis' : 
-        league.sportId === 5 ? 'american-football' : 'football'),
-      favourite: {
-        team: topTeams[0],
-        odds: +(1.5 + Math.random() * 2).toFixed(2)
-      },
-      contenders: topTeams.slice(0, 5).map((team, idx) => ({
-        team,
-        odds: +(1.5 + (idx * 3) + Math.random() * 3).toFixed(2)
-      }))
-    };
-  });
-}
+// League IDs that The Odds API exposes outrights for (matches THE_ODDS_API_SPORTS map)
+const OUTRIGHT_LEAGUE_IDS = [1, 2, 3, 4, 5, 9, 101, 401, 501, 601, 2701];
+
+const SPORT_ICON_BY_ID: Record<number, string> = {
+  1: 'football', 2: 'basketball', 3: 'tennis',
+  5: 'american-football', 6: 'baseball', 7: 'ice-hockey',
+  27: 'mma',
+};
 
 // Country flag helper
 function getCountryFlag(countryCode: string): string {
@@ -145,8 +120,15 @@ function getCountryFlag(countryCode: string): string {
 
 export default function CompetitionsPage() {
   const [activeTab, setActiveTab] = useState('outrights');
-  
-  const outrightMarkets = useMemo(() => generateOutrightMarkets(), []);
+
+  // Fetch real bookmaker outright odds for the major leagues in parallel.
+  const outrightLeagues = useMemo(() => {
+    return OUTRIGHT_LEAGUE_IDS
+      .map(id => ALL_LEAGUES.find(l => l.id === id))
+      .filter((l): l is NonNullable<typeof l> => Boolean(l))
+      .sort((a, b) => (SPORT_PRIORITY[a.sportId] ?? 99) - (SPORT_PRIORITY[b.sportId] ?? 99));
+  }, []);
+
   const activeComps = tipsterCompetitions.filter(c => c.status === 'active');
 
   const formatTimeLeft = (endDate: Date) => {
@@ -188,7 +170,7 @@ export default function CompetitionsPage() {
             <div className="rounded-xl border border-border bg-gradient-to-br from-warning/10 to-transparent p-4 text-center">
               <Target className="mx-auto h-6 w-6 text-warning" />
               <div className="mt-2 text-2xl font-bold text-warning">
-                {outrightMarkets.length}
+                {outrightLeagues.length}
               </div>
               <div className="text-xs text-muted-foreground">Outright Markets</div>
             </div>
@@ -229,74 +211,12 @@ export default function CompetitionsPage() {
             {/* Outright Winners Tab */}
             <TabsContent value="outrights" className="mt-6">
               <div className="mb-4 text-sm text-muted-foreground">
-                Bet on who will win each competition. Football leagues shown first.
+                Real bookmaker odds aggregated from UK / EU / US sportsbooks. Football leagues shown first.
               </div>
-              
+
               <div className="grid gap-4 md:grid-cols-2">
-                {outrightMarkets.map(market => (
-                  <Card key={market.league.id} className="overflow-hidden transition-all hover:shadow-lg">
-                    <CardHeader className="bg-gradient-to-r from-primary/5 to-transparent pb-3">
-                      <CardTitle className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <span className="text-xl">{market.sportIcon}</span>
-                          <span className="text-sm">{getCountryFlag(market.league.countryCode)}</span>
-                          <span>{market.league.name}</span>
-                        </div>
-                        <Link href={`/leagues/${market.league.slug}`}>
-                          <Button variant="ghost" size="sm">
-                            <ChevronRight className="h-4 w-4" />
-                          </Button>
-                        </Link>
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="pt-3">
-                      {/* Favourite */}
-                      <div className="mb-3 flex items-center justify-between rounded-lg bg-warning/10 p-3">
-                        <div className="flex items-center gap-2">
-                          <Badge className="bg-warning text-warning-foreground">
-                            <Star className="mr-1 h-3 w-3" />
-                            Favourite
-                          </Badge>
-                          <span className="font-semibold">{market.favourite.team.name}</span>
-                        </div>
-                        <span className="font-mono text-lg font-bold text-success">
-                          {market.favourite.odds.toFixed(2)}
-                        </span>
-                      </div>
-                      
-                      {/* Other Contenders */}
-                      <div className="space-y-2">
-                        {market.contenders.slice(1, 4).map((contender, idx) => (
-                          <div 
-                            key={contender.team.id}
-                            className="flex items-center justify-between rounded-lg bg-muted/50 px-3 py-2"
-                          >
-                            <div className="flex items-center gap-2">
-                              <span className={cn(
-                                "flex h-5 w-5 items-center justify-center rounded-full text-xs font-bold",
-                                idx === 0 && "bg-gray-300 text-gray-700",
-                                idx === 1 && "bg-amber-700 text-amber-100",
-                                idx > 1 && "bg-muted"
-                              )}>
-                                {idx + 2}
-                              </span>
-                              <span className="text-sm">{contender.team.name}</span>
-                            </div>
-                            <span className="font-mono font-semibold text-primary">
-                              {contender.odds.toFixed(2)}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                      
-                      <Button variant="outline" className="mt-3 w-full" asChild>
-                        <Link href={`/leagues/${market.league.slug}`}>
-                          View All Odds & Standings
-                          <TrendingUp className="ml-2 h-4 w-4" />
-                        </Link>
-                      </Button>
-                    </CardContent>
-                  </Card>
+                {outrightLeagues.map(league => (
+                  <OutrightCard key={league.id} league={league} />
                 ))}
               </div>
             </TabsContent>
@@ -426,5 +346,96 @@ function CompetitionCard({
         )}
       </div>
     </div>
+  );
+}
+
+interface OutrightApiResponse { success: boolean; data: OutrightMarket[] }
+
+function OutrightCard({ league }: { league: typeof ALL_LEAGUES[number] }) {
+  const { data, isLoading } = useSWR<OutrightApiResponse>(
+    `/api/leagues/${league.id}/outrights`,
+    fetcher,
+    { revalidateOnFocus: false, dedupingInterval: 60_000 }
+  );
+
+  const outrights = data?.data ?? [];
+  const market = outrights[0];
+  const sportIcon = getSportIcon(SPORT_ICON_BY_ID[league.sportId] || 'football');
+  const favourite = market?.outcomes[0];
+  const others = market?.outcomes.slice(1, 4) ?? [];
+
+  return (
+    <Card className="overflow-hidden transition-all hover:shadow-lg">
+      <CardHeader className="bg-gradient-to-r from-primary/5 to-transparent pb-3">
+        <CardTitle className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="text-xl">{sportIcon}</span>
+            <span className="text-sm">{getCountryFlag(league.countryCode)}</span>
+            <span>{league.name}</span>
+          </div>
+          <Link href={`/leagues/${league.slug}`}>
+            <Button variant="ghost" size="sm">
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </Link>
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="pt-3">
+        {isLoading ? (
+          <div className="flex h-24 items-center justify-center text-muted-foreground">
+            <Loader2 className="h-5 w-5 animate-spin" />
+          </div>
+        ) : favourite ? (
+          <>
+            <div className="mb-3 flex items-center justify-between rounded-lg bg-warning/10 p-3">
+              <div className="flex items-center gap-2">
+                <Badge className="bg-warning text-warning-foreground">
+                  <Star className="mr-1 h-3 w-3" />
+                  Favourite
+                </Badge>
+                <span className="font-semibold">{favourite.name}</span>
+              </div>
+              <span className="font-mono text-lg font-bold text-success">
+                {favourite.price.toFixed(2)}
+              </span>
+            </div>
+            <div className="space-y-2">
+              {others.map((o, idx) => (
+                <div
+                  key={`${o.name}-${idx}`}
+                  className="flex items-center justify-between rounded-lg bg-muted/50 px-3 py-2"
+                >
+                  <div className="flex items-center gap-2">
+                    <span className={cn(
+                      'flex h-5 w-5 items-center justify-center rounded-full text-xs font-bold',
+                      idx === 0 && 'bg-gray-300 text-gray-700',
+                      idx === 1 && 'bg-amber-700 text-amber-100',
+                      idx > 1 && 'bg-muted'
+                    )}>
+                      {idx + 2}
+                    </span>
+                    <span className="text-sm">{o.name}</span>
+                  </div>
+                  <span className="font-mono font-semibold text-primary">
+                    {o.price.toFixed(2)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </>
+        ) : (
+          <div className="rounded-lg border border-dashed border-border bg-muted/20 p-4 text-center text-xs text-muted-foreground">
+            No bookmaker odds yet. Outright markets open closer to the season.
+          </div>
+        )}
+
+        <Button variant="outline" className="mt-3 w-full" asChild>
+          <Link href={`/leagues/${league.slug}`}>
+            View All Odds & Standings
+            <TrendingUp className="ml-2 h-4 w-4" />
+          </Link>
+        </Button>
+      </CardContent>
+    </Card>
   );
 }
