@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, Calendar, Radio, Trophy, User } from 'lucide-react';
+import { Home, Calendar, Radio, Trophy, LayoutDashboard } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import useSWR from 'swr';
 
@@ -17,8 +17,8 @@ const navItems: NavItem[] = [
   { href: '/', label: 'Home', icon: Home },
   { href: '/live', label: 'Live', icon: Radio, badge: true },
   { href: '/matches', label: 'Matches', icon: Calendar },
+  { href: '/dashboard', label: 'My Feed', icon: LayoutDashboard },
   { href: '/leaderboard', label: 'Ranks', icon: Trophy },
-  { href: '/tipsters', label: 'Tipsters', icon: User },
 ];
 
 const fetcher = (url: string) => fetch(url).then(res => res.json());

@@ -14,9 +14,10 @@ import { Badge } from '@/components/ui/badge';
 import { Spinner } from '@/components/ui/spinner';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { TeamLogo } from '@/components/ui/team-logo';
+import { FlagIcon } from '@/components/ui/flag-icon';
+import { FollowTeamButton } from '@/components/teams/follow-team-button';
 import { cn } from '@/lib/utils';
 import { formatDate, getBrowserTimezone, formatTime } from '@/lib/utils/timezone';
-import { countryCodeToFlag } from '@/lib/country-flags';
 
 interface PageProps { params: Promise<{ id: string }> }
 
@@ -218,14 +219,29 @@ export default function TeamPage({ params }: PageProps) {
             <TeamLogo teamName={team.name} logoUrl={team.logo} sportSlug={sportSlug} size="xl" className="h-full w-full" />
           </div>
           <div className="min-w-0 flex-1">
-            <h1 className="text-2xl font-bold">{team.name}</h1>
-            {team.nickname && team.nickname !== team.name && (
-              <p className="text-sm text-muted-foreground">{team.nickname}</p>
-            )}
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <h1 className="text-2xl font-bold">{team.name}</h1>
+                {team.nickname && team.nickname !== team.name && (
+                  <p className="text-sm text-muted-foreground">{team.nickname}</p>
+                )}
+              </div>
+              <FollowTeamButton
+                teamId={id}
+                teamName={team.name}
+                teamLogo={team.logo}
+                leagueId={(team as any).leagueId ?? null}
+                leagueSlug={(team as any).leagueSlug ?? null}
+                leagueName={(team as any).league ?? null}
+                sportSlug={sportSlug ?? null}
+                countryCode={countryCode ?? null}
+                size="md"
+              />
+            </div>
             <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
               {countryCode && (
-                <span className="flex items-center gap-1">
-                  <span className="text-sm leading-none">{countryCodeToFlag(countryCode)}</span>
+                <span className="flex items-center gap-1.5">
+                  <FlagIcon countryCode={countryCode} size="sm" />
                   {country || countryCode}
                 </span>
               )}
@@ -389,7 +405,7 @@ export default function TeamPage({ params }: PageProps) {
                 <div className="flex items-center justify-between gap-3">
                   <dt className="text-muted-foreground">Country</dt>
                   <dd className="flex items-center gap-1.5 font-medium">
-                    <span className="text-base leading-none">{countryCodeToFlag(countryCode)}</span>
+                    <FlagIcon countryCode={countryCode} size="sm" />
                     <span>{country || countryCode}</span>
                   </dd>
                 </div>
@@ -671,36 +687,76 @@ function StatCard({ label, value, icon }: { label: string; value: string; icon: 
 // ───────────────────────────────────────────────
 interface TeamMeta {
   name: string;
+  shortName?: string;
   nickname?: string;
   venue?: string;
+  venueCity?: string;
   founded?: string | number;
   country?: string;
   countryCode?: string;
   league?: string;
+  leagueSlug?: string;
   manager?: string;
   website?: string;
   description?: string;
+  location?: string;
+  color?: string;
+  alternateColor?: string;
+  record?: string;
+  standing?: { position?: string };
+  links?: { espn?: string; official?: string };
 }
+
 function AboutPanel({ team }: { team: TeamMeta }) {
   const items: Array<{ label: string; value: React.ReactNode }> = [];
   if (team.nickname && team.nickname !== team.name) items.push({ label: 'Nickname', value: team.nickname });
+  if (team.shortName && team.shortName !== team.name) items.push({ label: 'Abbreviation', value: team.shortName });
   if (team.founded) items.push({ label: 'Founded', value: String(team.founded) });
-  if (team.venue) items.push({ label: 'Home Stadium', value: team.venue });
-  if (team.manager) items.push({ label: 'Manager', value: team.manager });
-  if (team.league) items.push({ label: 'League', value: team.league });
+  if (team.venue) {
+    items.push({
+      label: 'Home Stadium',
+      value: team.venueCity ? `${team.venue} · ${team.venueCity}` : team.venue,
+    });
+  }
+  if (team.location && team.location !== team.venueCity) items.push({ label: 'Location', value: team.location });
+  if (team.manager) items.push({ label: 'Head Coach', value: team.manager });
+  if (team.league) {
+    items.push({
+      label: 'League',
+      value: team.leagueSlug ? (
+        <Link href={`/leagues/${team.leagueSlug}`} className="text-primary hover:underline">{team.league}</Link>
+      ) : team.league,
+    });
+  }
   if (team.country) {
     items.push({
       label: 'Country',
       value: (
         <span className="inline-flex items-center gap-1.5">
-          <span className="text-base">{countryCodeToFlag(team.countryCode)}</span>
+          <FlagIcon countryCode={team.countryCode} size="sm" />
           {team.country}
         </span>
       ),
     });
   }
+  if (team.standing?.position) items.push({ label: 'Standing', value: team.standing.position });
+  if (team.record) items.push({ label: 'Record', value: <span className="tabular-nums">{team.record}</span> });
+  if (team.color) {
+    items.push({
+      label: 'Club Colours',
+      value: (
+        <span className="inline-flex items-center gap-1.5">
+          <span className="h-4 w-4 rounded-full border border-border" style={{ background: team.color }} />
+          {team.alternateColor && (
+            <span className="h-4 w-4 rounded-full border border-border" style={{ background: team.alternateColor }} />
+          )}
+        </span>
+      ),
+    });
+  }
 
-  if (items.length === 0 && !team.description && !team.website) {
+  const hasContent = items.length > 0 || team.description || team.website || team.links?.espn;
+  if (!hasContent) {
     return (
       <div className="flex h-32 flex-col items-center justify-center gap-2 rounded-lg border border-dashed">
         <Shield className="h-8 w-8 text-muted-foreground/40" />
@@ -719,27 +775,43 @@ function AboutPanel({ team }: { team: TeamMeta }) {
       {items.length > 0 && (
         <div className="rounded-xl border border-border bg-card divide-y divide-border">
           {items.map((it, i) => (
-            <div key={i} className="flex items-center justify-between px-4 py-3">
+            <div key={i} className="flex items-center justify-between px-4 py-3 gap-3">
               <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{it.label}</span>
-              <span className="text-sm font-medium">{it.value}</span>
+              <span className="text-sm font-medium text-right">{it.value}</span>
             </div>
           ))}
         </div>
       )}
-      {team.website && (
-        <a
-          href={team.website}
-          target="_blank"
-          rel="noreferrer noopener"
-          className="flex items-center justify-between rounded-xl border border-border bg-card px-4 py-3 hover:bg-muted/50 transition-colors"
-        >
-          <span className="flex items-center gap-2 text-sm font-medium">
-            <Globe className="h-4 w-4 text-primary" />
-            Official Website
-          </span>
-          <ExternalLink className="h-4 w-4 text-muted-foreground" />
-        </a>
-      )}
+      <div className="grid gap-2 sm:grid-cols-2">
+        {team.website && (
+          <a
+            href={team.website}
+            target="_blank"
+            rel="noreferrer noopener"
+            className="flex items-center justify-between rounded-xl border border-border bg-card px-4 py-3 hover:bg-muted/50 transition-colors"
+          >
+            <span className="flex items-center gap-2 text-sm font-medium">
+              <Globe className="h-4 w-4 text-primary" />
+              Official Website
+            </span>
+            <ExternalLink className="h-4 w-4 text-muted-foreground" />
+          </a>
+        )}
+        {team.links?.espn && (
+          <a
+            href={team.links.espn}
+            target="_blank"
+            rel="noreferrer noopener"
+            className="flex items-center justify-between rounded-xl border border-border bg-card px-4 py-3 hover:bg-muted/50 transition-colors"
+          >
+            <span className="flex items-center gap-2 text-sm font-medium">
+              <BarChart3 className="h-4 w-4 text-primary" />
+              ESPN Clubhouse
+            </span>
+            <ExternalLink className="h-4 w-4 text-muted-foreground" />
+          </a>
+        )}
+      </div>
     </>
   );
 }

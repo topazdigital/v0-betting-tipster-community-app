@@ -1809,7 +1809,10 @@ async function getESPNMatches(config: ESPNLeagueConfig): Promise<UnifiedMatch[]>
       league: {
         id: config.leagueId,
         name: config.leagueName,
-        slug: config.league.replace(/\./g, '-'),
+        // Prefer the friendly slug from ALL_LEAGUES (e.g. "premier-league") so
+        // sidebar links and matches-page links resolve to the same URL. Fall
+        // back to the ESPN-style code (e.g. "eng-1") only when no row exists.
+        slug: ALL_LEAGUES.find(l => l.id === config.leagueId)?.slug || config.league.replace(/\./g, '-'),
         country: config.country,
         countryCode: config.countryCode,
         tier: 1,

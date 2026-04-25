@@ -12,13 +12,15 @@ import {
   BarChart3, 
   Flame,
   TrendingUp,
-  Zap
+  Zap,
+  LayoutDashboard,
+  Bell
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ALL_SPORTS, ALL_LEAGUES, BOOKMAKERS, getSportIcon } from '@/lib/sports-data';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useMatchStats } from '@/lib/hooks/use-matches';
-import { countryCodeToFlag } from '@/lib/country-flags';
+import { FlagIcon } from '@/components/ui/flag-icon';
 
 interface SidebarNewProps {
   selectedSportId?: number | null;
@@ -195,7 +197,7 @@ export function SidebarNew({ selectedSportId, onSelectSport }: SidebarNewProps) 
                   className="flex items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-sm text-sidebar-foreground transition-colors hover:bg-sidebar-accent/50"
                 >
                   <div className="flex items-center gap-2">
-                    <span className="text-sm">{getCountryFlag(league.countryCode)}</span>
+                    <FlagIcon countryCode={league.countryCode} size="xs" />
                     <span className="truncate">{league.name}</span>
                   </div>
                   <ChevronRight className="h-3 w-3 text-sidebar-foreground/40" />
@@ -233,6 +235,30 @@ export function SidebarNew({ selectedSportId, onSelectSport }: SidebarNewProps) 
               >
                 <Users className="h-4 w-4" />
                 <span>Tipsters</span>
+              </Link>
+              <Link
+                href="/dashboard"
+                className={cn(
+                  'flex items-center gap-2 rounded-lg px-2 py-2 text-sm transition-colors',
+                  pathname === '/dashboard'
+                    ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+                    : 'text-sidebar-foreground hover:bg-sidebar-accent/50'
+                )}
+              >
+                <LayoutDashboard className="h-4 w-4" />
+                <span>My Dashboard</span>
+              </Link>
+              <Link
+                href="/notifications"
+                className={cn(
+                  'flex items-center gap-2 rounded-lg px-2 py-2 text-sm transition-colors',
+                  pathname === '/notifications'
+                    ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+                    : 'text-sidebar-foreground hover:bg-sidebar-accent/50'
+                )}
+              >
+                <Bell className="h-4 w-4" />
+                <span>Notifications</span>
               </Link>
               <Link
                 href="/leaderboard"
@@ -313,7 +339,3 @@ export function SidebarNew({ selectedSportId, onSelectSport }: SidebarNewProps) 
   );
 }
 
-// Country flag helper — wraps the centralised countryCodeToFlag utility.
-function getCountryFlag(countryCode: string): string {
-  return countryCodeToFlag(countryCode);
-}

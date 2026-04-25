@@ -3,7 +3,7 @@
 import { useState } from "react"
 import Image from "next/image"
 import { cn } from "@/lib/utils"
-import { countryCodeToFlag } from "@/lib/country-flags"
+import { FlagIcon } from "@/components/ui/flag-icon"
 
 interface TeamLogoProps {
   teamName: string
@@ -625,23 +625,13 @@ interface LeagueFlagProps {
 }
 
 export function LeagueFlag({ countryCode, size = 'md', className }: LeagueFlagProps) {
-  // Single source of truth: lib/country-flags handles GB-ENG/GB-SCT/GB-WLS
-  // (England/Scotland/Wales) plus EU and continental fallbacks.
-  // The previous implementation here stripped the subdivision so every
-  // English & Scottish league showed the Union Jack — that is fixed by
-  // delegating directly to countryCodeToFlag.
-  const getFlag = (code: string): string => countryCodeToFlag(code)
-  
-  const flagSizeClasses = {
-    xs: 'text-sm',
-    sm: 'text-base',
-    md: 'text-xl',
-    lg: 'text-2xl',
+  // Render real flag images via flagcdn.com (with subdivision support for
+  // GB-ENG/SCT/WLS/NIR). Replaces the older emoji output that displayed
+  // inconsistently across platforms (notably country codes like ES, TR, IN
+  // were rendered as plain text on some devices).
+  // Map our internal sizes onto FlagIcon's sizing.
+  const sizeMap: Record<typeof size, 'xs' | 'sm' | 'md' | 'lg'> = {
+    xs: 'xs', sm: 'sm', md: 'md', lg: 'lg',
   }
-  
-  return (
-    <span className={cn(flagSizeClasses[size], className)} role="img" aria-label={countryCode}>
-      {getFlag(countryCode)}
-    </span>
-  )
+  return <FlagIcon countryCode={countryCode} size={sizeMap[size]} className={className} />
 }

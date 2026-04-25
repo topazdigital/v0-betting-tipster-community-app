@@ -9,7 +9,7 @@ import { Spinner } from "@/components/ui/spinner"
 import { MatchCardNew } from "@/components/matches/match-card-new"
 import { ALL_SPORTS, getSportIcon } from "@/lib/sports-data"
 import { useLiveMatches } from "@/lib/hooks/use-matches"
-import { countryCodeToFlag } from "@/lib/country-flags"
+import { FlagIcon } from "@/components/ui/flag-icon"
 
 // Priority order for sports (football first, then by popularity)
 const SPORT_PRIORITY: Record<number, number> = {
@@ -156,7 +156,7 @@ export default function LivePage() {
                     <div className="flex min-w-0 items-center gap-2">
                       <span className="text-base leading-none">{getSportIcon(group.sportSlug)}</span>
                       {group.countryCode && (
-                        <span className="text-sm leading-none">{countryCodeToFlag(group.countryCode)}</span>
+                        <FlagIcon countryCode={group.countryCode} size="sm" />
                       )}
                       <h2 className="truncate text-sm font-semibold">{group.leagueName}</h2>
                       {group.country && (

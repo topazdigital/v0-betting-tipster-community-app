@@ -142,11 +142,41 @@ function buildStandings(summary: ESPNSummaryResponse) {
   const groups = summary.standings.groups.map(g => ({
     header: g.header,
     rows: (g.standings?.entries || []).map((e: unknown) => {
-      const ent = e as { team?: unknown; id?: string; logo?: string; stats?: Array<{ name?: string; abbreviation?: string; value?: number; displayValue?: string }> };
-      const teamObj = typeof ent.team === 'object' && ent.team !== null ? ent.team as { id?: string; displayName?: string; logo?: string } : null;
+      const ent = e as {
+        team?: unknown;
+        id?: string;
+        logo?: string;
+        logos?: Array<{ href?: string; rel?: string[] }>;
+        stats?: Array<{ name?: string; abbreviation?: string; value?: number; displayValue?: string }>;
+      };
+      const teamObj = typeof ent.team === 'object' && ent.team !== null
+        ? ent.team as {
+            id?: string;
+            displayName?: string;
+            logo?: string;
+            logos?: Array<{ href?: string; rel?: string[] }>;
+            abbreviation?: string;
+          }
+        : null;
       const teamName = teamObj?.displayName || (typeof ent.team === 'string' ? ent.team : '');
       const teamId = teamObj?.id || ent.id;
-      const teamLogo = teamObj?.logo || ent.logo;
+      // ESPN sometimes nests the logo URL under team.logos[]; pick the first
+      // default/full logo so the standings table shows real crests instead of
+      // coloured fallback circles.
+      const pickLogo = (arr?: Array<{ href?: string; rel?: string[] }>): string | undefined => {
+        if (!arr || arr.length === 0) return undefined;
+        return (
+          arr.find(l => l.rel?.includes('default'))?.href ||
+          arr.find(l => l.rel?.includes('full'))?.href ||
+          arr[0]?.href
+        );
+      };
+      const teamLogo =
+        teamObj?.logo ||
+        ent.logo ||
+        pickLogo(teamObj?.logos) ||
+        pickLogo(ent.logos) ||
+        (teamId ? `https://a.espncdn.com/i/teamlogos/soccer/500/${teamId}.png` : undefined);
       const stat = (key: string) => ent.stats?.find(s => s.name === key || s.abbreviation === key);
       return {
         teamId,

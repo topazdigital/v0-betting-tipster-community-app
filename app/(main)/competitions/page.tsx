@@ -22,6 +22,7 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { FlagIcon } from '@/components/ui/flag-icon';
 import { SidebarNew } from '@/components/layout/sidebar-new';
 import { cn } from '@/lib/utils';
 import { ALL_LEAGUES, getSportIcon } from '@/lib/sports-data';
@@ -94,29 +95,6 @@ const SPORT_ICON_BY_ID: Record<number, string> = {
   27: 'mma',
 };
 
-// Country flag helper
-function getCountryFlag(countryCode: string): string {
-  const codeMap: Record<string, string> = {
-    'GB-ENG': '\u{1F3F4}\u{E0067}\u{E0062}\u{E0065}\u{E006E}\u{E0067}\u{E007F}',
-    'GB-SCT': '\u{1F3F4}\u{E0067}\u{E0062}\u{E0073}\u{E0063}\u{E0074}\u{E007F}',
-    'EU': '\u{1F1EA}\u{1F1FA}',
-    'WO': '\u{1F30D}',
-    'AF': '\u{1F30D}',
-  };
-  
-  const mapped = codeMap[countryCode];
-  if (mapped) return mapped;
-  
-  try {
-    const codePoints = countryCode.substring(0, 2)
-      .toUpperCase()
-      .split('')
-      .map(char => 127397 + char.charCodeAt(0));
-    return String.fromCodePoint(...codePoints);
-  } catch {
-    return '\u{1F3C6}';
-  }
-}
 
 export default function CompetitionsPage() {
   const [activeTab, setActiveTab] = useState('outrights');
@@ -370,7 +348,7 @@ function OutrightCard({ league }: { league: typeof ALL_LEAGUES[number] }) {
         <CardTitle className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <span className="text-xl">{sportIcon}</span>
-            <span className="text-sm">{getCountryFlag(league.countryCode)}</span>
+            <FlagIcon countryCode={league.countryCode} size="sm" />
             <span>{league.name}</span>
           </div>
           <Link href={`/leagues/${league.slug}`}>

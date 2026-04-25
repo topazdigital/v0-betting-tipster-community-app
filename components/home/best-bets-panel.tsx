@@ -6,7 +6,7 @@ import { Sparkles, Flame, TrendingUp, Trophy, Star, ChevronRight } from "lucide-
 import { cn } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
 import { TeamLogo } from "@/components/ui/team-logo"
-import { countryCodeToFlag } from "@/lib/country-flags"
+import { FlagIcon } from "@/components/ui/flag-icon"
 
 interface MatchLite {
   id: string
@@ -77,7 +77,7 @@ export function BestBetsPanel({ matches }: BestBetsPanelProps) {
             Top Pick
           </Badge>
           <span className="text-[10px] text-muted-foreground truncate">
-            {countryCodeToFlag(featured.match.league.countryCode)} {featured.match.league.name}
+            <FlagIcon countryCode={featured.match.league.countryCode} size="xs" className="mr-1.5 inline-block align-middle" /> {featured.match.league.name}
           </span>
         </div>
         <Link

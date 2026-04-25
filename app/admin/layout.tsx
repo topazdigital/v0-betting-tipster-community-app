@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation"
 import { 
   LayoutDashboard, Users, Trophy, Calendar, Settings, 
   Bell, LogOut, Menu, X, ChevronDown, Search,
-  BarChart3, Shield, MessageSquare, Newspaper, Wallet
+  BarChart3, Shield, MessageSquare, Newspaper, Wallet, Mail
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -22,6 +22,8 @@ const adminNavItems = [
   { href: "/admin/comments", label: "Comments", icon: MessageSquare },
   { href: "/admin/news", label: "News", icon: Newspaper },
   { href: "/admin/payments", label: "Payments", icon: Wallet },
+  { href: "/admin/subscribers", label: "Subscribers", icon: Mail },
+  { href: "/admin/notifications", label: "Notifications", icon: Bell },
   { href: "/admin/settings", label: "Settings", icon: Settings },
 ]
 

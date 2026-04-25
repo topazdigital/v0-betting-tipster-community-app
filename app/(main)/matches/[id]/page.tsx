@@ -21,7 +21,7 @@ import { Spinner } from "@/components/ui/spinner"
 import { TeamLogo } from "@/components/ui/team-logo"
 import { cn } from "@/lib/utils"
 import { formatTime, formatDate, getBrowserTimezone, getDayLabel } from "@/lib/utils/timezone"
-import { countryCodeToFlag } from "@/lib/country-flags"
+import { FlagIcon } from "@/components/ui/flag-icon"
 import { liveStatusLabel } from "@/lib/utils/live-status"
 import { AIMatchPrediction } from "@/components/ai/ai-match-prediction"
 import { AIMultiMarket } from "@/components/ai/ai-multi-market"
@@ -689,7 +689,7 @@ export default function MatchDetailPage({ params }: PageProps) {
           <div className="flex items-center justify-between px-5 py-3 border-b border-white/10">
             <div className="flex items-center gap-2 min-w-0">
               <span className="text-lg shrink-0" aria-hidden>{SPORT_EMOJI[sport] || '🏆'}</span>
-              <span className="text-base shrink-0" aria-hidden title={match.league.country}>{countryCodeToFlag(match.league.countryCode)}</span>
+              <FlagIcon countryCode={match.league.countryCode} size="sm" className="shrink-0" title={match.league.country} />
               <span className="text-sm font-semibold text-white/90 truncate">{match.league.name}</span>
               <span className="text-xs text-white/40 shrink-0 hidden sm:inline">• {match.league.country}</span>
             </div>
@@ -1756,7 +1756,7 @@ function MatchInfoRail({
               <Trophy className="h-4 w-4 text-muted-foreground shrink-0" />
               <span className="font-medium truncate">{match.league.name}</span>
               {match.league.countryCode && (
-                <span className="text-base leading-none">{countryCodeToFlag(match.league.countryCode)}</span>
+                <FlagIcon countryCode={match.league.countryCode} size="sm" />
               )}
             </div>
           )}

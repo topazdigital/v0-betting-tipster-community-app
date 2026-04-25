@@ -15,6 +15,7 @@ import { SidebarNew } from "@/components/layout/sidebar-new"
 import { MatchCardNew } from "@/components/matches/match-card-new"
 import { Spinner } from "@/components/ui/spinner"
 import { TeamLogo } from "@/components/ui/team-logo"
+import { FlagIcon } from "@/components/ui/flag-icon"
 import { cn } from "@/lib/utils"
 import { ALL_LEAGUES, getSportIcon } from "@/lib/sports-data"
 import { useMatches } from "@/lib/hooks/use-matches"
@@ -54,25 +55,6 @@ const SPORT_ICON_BY_ID: Record<number, string> = {
   27: 'mma',
 }
 
-function getCountryFlag(countryCode: string): string {
-  const codeMap: Record<string, string> = {
-    'GB-ENG': '\u{1F3F4}\u{E0067}\u{E0062}\u{E0065}\u{E006E}\u{E0067}\u{E007F}',
-    'GB-SCT': '\u{1F3F4}\u{E0067}\u{E0062}\u{E0073}\u{E0063}\u{E0074}\u{E007F}',
-    'EU': '\u{1F1EA}\u{1F1FA}',
-    'WO': '\u{1F30D}',
-    'AF': '\u{1F30D}',
-  }
-  const mapped = codeMap[countryCode]
-  if (mapped) return mapped
-  try {
-    const codePoints = countryCode.substring(0, 2).toUpperCase().split('')
-      .map(char => 127397 + char.charCodeAt(0))
-    return String.fromCodePoint(...codePoints)
-  } catch {
-    return '\u{1F3C6}'
-  }
-}
-
 function EmptyState({ icon: Icon, title, hint }: { icon: any; title: string; hint?: string }) {
   return (
     <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed border-border bg-muted/20 p-6 text-center">
@@ -94,7 +76,21 @@ function LoadingBox() {
 export default function LeaguePage({ params }: PageProps) {
   const { slug } = use(params)
 
-  const league = ALL_LEAGUES.find(l => l.slug === slug)
+  // Accept both friendly slugs (premier-league) and ESPN-style codes (eng-1)
+  // so older links from the matches page keep working after the slug fix.
+  const espnAliasMap: Record<string, string> = {
+    'eng-1': 'premier-league',
+    'esp-1': 'la-liga',
+    'ita-1': 'serie-a',
+    'ger-1': 'bundesliga',
+    'fra-1': 'ligue-1',
+    'por-1': 'primeira-liga',
+    'ned-1': 'eredivisie',
+    'uefa-champions': 'champions-league',
+    'uefa-europa': 'europa-league',
+  }
+  const normalisedSlug = espnAliasMap[slug] || slug
+  const league = ALL_LEAGUES.find(l => l.slug === normalisedSlug || l.slug === slug)
 
   // Live matches feed for this league
   const { matches, isLoading: matchesLoading } = useMatches(
@@ -167,7 +163,7 @@ export default function LeaguePage({ params }: PageProps) {
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
-                    <span className="text-xl">{getCountryFlag(league.countryCode)}</span>
+                    <FlagIcon countryCode={league.countryCode} size="md" />
                     <h1 className="truncate text-xl font-bold sm:text-2xl">{league.name}</h1>
                   </div>
                   <p className="text-sm text-muted-foreground">{league.country}</p>
