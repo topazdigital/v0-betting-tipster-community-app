@@ -264,6 +264,9 @@ export async function GET(request: NextRequest) {
       );
     } else if (status === 'finished' || status === 'results') {
       matches = matches.filter(m => m.status === 'finished');
+    } else if (status === 'today') {
+      // Today bucket — same logic used by stats below.
+      matches = matches.filter(m => getDayBucket(new Date(m.kickoffTime), tzOffsetMin) === 0);
     } else if (status && status !== 'all') {
       matches = matches.filter(m => m.status === status);
     } else {

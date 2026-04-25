@@ -5,6 +5,7 @@ import {
   listEmailSubscribers,
   listPushSubscriptions,
 } from '@/lib/notification-store';
+import { sendBulkMail } from '@/lib/mailer';
 
 export const dynamic = 'force-dynamic';
 
@@ -48,13 +49,29 @@ export async function POST(req: Request) {
     }
   }
 
+  let emailResult: { sent: number; failed: number; skipped?: boolean } | null = null;
   if (audience === 'all' || audience === 'email') {
     const emailSubs = (await listEmailSubscribers()).filter((s) => s.active);
-    count += emailSubs.length;
-    // Email delivery is queued by the email-store/email worker. We log the
-    // intent here; actual SMTP send happens out-of-process when configured.
-    console.log(`[broadcast] queued email to ${emailSubs.length} subscribers: ${title}`);
+    const recipients = emailSubs.map((s) => s.email);
+    const html = `<div style="font-family:system-ui,sans-serif;max-width:600px;margin:0 auto;padding:24px;background:#fff;color:#111">
+        <h1 style="margin:0 0 12px;font-size:22px">${escapeHtml(title)}</h1>
+        <div style="font-size:15px;line-height:1.5;color:#333">${escapeHtml(body).replace(/\n/g, '<br/>')}</div>
+        ${data.link ? `<p style="margin-top:24px"><a href="${escapeAttr(data.link)}" style="background:#10B981;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;display:inline-block">Open</a></p>` : ''}
+        <hr style="margin:32px 0;border:none;border-top:1px solid #eee"/>
+        <p style="font-size:11px;color:#999">You received this because you subscribed to Betcheza updates.</p>
+      </div>`;
+    emailResult = await sendBulkMail(recipients, title, html, body);
+    count += emailResult.sent;
   }
 
-  return NextResponse.json({ ok: true, count, audience });
+  return NextResponse.json({ ok: true, count, audience, email: emailResult });
+}
+
+function escapeHtml(s: string): string {
+  return s.replace(/[&<>"']/g, (c) =>
+    c === '&' ? '&amp;' : c === '<' ? '&lt;' : c === '>' ? '&gt;' : c === '"' ? '&quot;' : '&#39;'
+  );
+}
+function escapeAttr(s: string): string {
+  return escapeHtml(s);
 }

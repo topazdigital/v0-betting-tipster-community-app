@@ -1,16 +1,18 @@
 'use client';
 
 import * as React from 'react';
-import Image from 'next/image';
 import { cn } from '@/lib/utils';
 import { countryCodeToFlag } from '@/lib/country-flags';
 
+// flagcdn.com only supports specific widths: 20, 40, 80, 160, 320, 640, 1280, 2560.
+// `cdnW` MUST be one of those values, otherwise the request returns 404 and the
+// flag silently fails to render.
 const SIZE_MAP = {
-  xs: { w: 14, h: 10, twW: 'w-3.5', twH: 'h-2.5' },
-  sm: { w: 18, h: 13, twW: 'w-[18px]', twH: 'h-[13px]' },
-  md: { w: 24, h: 18, twW: 'w-6', twH: 'h-[18px]' },
-  lg: { w: 32, h: 24, twW: 'w-8', twH: 'h-6' },
-  xl: { w: 48, h: 36, twW: 'w-12', twH: 'h-9' },
+  xs: { w: 14, h: 10, cdnW: 40, twW: 'w-3.5', twH: 'h-2.5' },
+  sm: { w: 18, h: 13, cdnW: 40, twW: 'w-[18px]', twH: 'h-[13px]' },
+  md: { w: 24, h: 18, cdnW: 80, twW: 'w-6', twH: 'h-[18px]' },
+  lg: { w: 32, h: 24, cdnW: 80, twW: 'w-8', twH: 'h-6' },
+  xl: { w: 48, h: 36, cdnW: 160, twW: 'w-12', twH: 'h-9' },
 };
 
 const SUBDIVISION_FLAGS: Record<string, string> = {
@@ -79,16 +81,17 @@ export function FlagIcon({
   }
 
   // Subdivision flags (England, Scotland, Wales, NI)
-  const subdivision = SUBDIVISION_FLAGS[upper];
+  const subdivision = dim.cdnW >= 80 ? SUBDIVISION_FLAGS_HD[upper] : SUBDIVISION_FLAGS[upper];
   if (subdivision) {
     return (
-      <Image
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
         src={subdivision}
         alt={alt || upper}
         title={title || alt || upper}
         width={dim.w}
         height={dim.h}
-        unoptimized
+        loading="lazy"
         className={cn(
           'inline-block object-cover shadow-sm',
           rounded && 'rounded-[2px]',
@@ -103,15 +106,20 @@ export function FlagIcon({
   // Standard ISO-2 country code
   if (upper.length === 2 && /^[A-Z]{2}$/.test(upper)) {
     const lower = upper.toLowerCase();
-    const src = `https://flagcdn.com/w${dim.w * 2}/${lower}.png`;
+    const src = `https://flagcdn.com/w${dim.cdnW}/${lower}.png`;
+    // Use a plain <img> tag here instead of next/image to bypass the remote
+    // image allow-list (Next.js still validates the hostname for some loader
+    // setups even with unoptimized=true). flagcdn.com is a static CDN, so a
+    // plain <img> renders reliably across all environments.
     return (
-      <Image
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
         src={src}
         alt={alt || upper}
         title={title || alt || upper}
         width={dim.w}
         height={dim.h}
-        unoptimized
+        loading="lazy"
         className={cn(
           'inline-block object-cover shadow-sm',
           rounded && 'rounded-[2px]',

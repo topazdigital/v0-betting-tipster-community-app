@@ -53,17 +53,40 @@ export interface TSDBLeagueConfig {
 }
 
 export const TSDB_LEAGUES: TSDBLeagueConfig[] = [
-  // ─── East African football (the user explicitly mentioned Kenya) ───
+  // ─── East / Southern African football ───
   { tsdbId: '4504', leagueId: 5001, leagueName: 'Kenyan Premier League', sportId: 1, sportType: 'soccer', country: 'Kenya', countryCode: 'KE', tier: 2 },
   { tsdbId: '4621', leagueId: 5002, leagueName: 'Tanzanian Premier League', sportId: 1, sportType: 'soccer', country: 'Tanzania', countryCode: 'TZ', tier: 3 },
   { tsdbId: '4422', leagueId: 5003, leagueName: 'Ugandan Premier League', sportId: 1, sportType: 'soccer', country: 'Uganda', countryCode: 'UG', tier: 3 },
   { tsdbId: '4623', leagueId: 5004, leagueName: 'Rwandan Premier League', sportId: 1, sportType: 'soccer', country: 'Rwanda', countryCode: 'RW', tier: 3 },
-  // ─── Other small/under-covered leagues ───
+  { tsdbId: '4486', leagueId: 5020, leagueName: 'South African Premier Division', sportId: 1, sportType: 'soccer', country: 'South Africa', countryCode: 'ZA', tier: 2 },
+  { tsdbId: '4488', leagueId: 5021, leagueName: 'Egyptian Premier League', sportId: 1, sportType: 'soccer', country: 'Egypt', countryCode: 'EG', tier: 2 },
+  { tsdbId: '4567', leagueId: 5022, leagueName: 'Moroccan Botola Pro', sportId: 1, sportType: 'soccer', country: 'Morocco', countryCode: 'MA', tier: 2 },
+  { tsdbId: '4583', leagueId: 5023, leagueName: 'Algerian Ligue 1', sportId: 1, sportType: 'soccer', country: 'Algeria', countryCode: 'DZ', tier: 3 },
+  { tsdbId: '4489', leagueId: 5024, leagueName: 'Tunisian Ligue 1', sportId: 1, sportType: 'soccer', country: 'Tunisia', countryCode: 'TN', tier: 3 },
+  { tsdbId: '4585', leagueId: 5025, leagueName: 'Nigerian Professional League', sportId: 1, sportType: 'soccer', country: 'Nigeria', countryCode: 'NG', tier: 2 },
+  { tsdbId: '4587', leagueId: 5026, leagueName: 'Ghanaian Premier League', sportId: 1, sportType: 'soccer', country: 'Ghana', countryCode: 'GH', tier: 3 },
+  // ─── European small / under-covered ───
   { tsdbId: '4423', leagueId: 5005, leagueName: 'Cypriot First Division', sportId: 1, sportType: 'soccer', country: 'Cyprus', countryCode: 'CY', tier: 3 },
   { tsdbId: '4521', leagueId: 5006, leagueName: 'Maltese Premier League', sportId: 1, sportType: 'soccer', country: 'Malta', countryCode: 'MT', tier: 4 },
   { tsdbId: '4549', leagueId: 5007, leagueName: 'Albanian Superliga', sportId: 1, sportType: 'soccer', country: 'Albania', countryCode: 'AL', tier: 3 },
   { tsdbId: '4485', leagueId: 5008, leagueName: 'Latvian Virsliga', sportId: 1, sportType: 'soccer', country: 'Latvia', countryCode: 'LV', tier: 3 },
   { tsdbId: '4424', leagueId: 5009, leagueName: 'Estonian Meistriliiga', sportId: 1, sportType: 'soccer', country: 'Estonia', countryCode: 'EE', tier: 3 },
+  { tsdbId: '4524', leagueId: 5010, leagueName: 'Lithuanian A Lyga', sportId: 1, sportType: 'soccer', country: 'Lithuania', countryCode: 'LT', tier: 4 },
+  { tsdbId: '4486', leagueId: 5011, leagueName: 'Romanian Liga I', sportId: 1, sportType: 'soccer', country: 'Romania', countryCode: 'RO', tier: 3 },
+  { tsdbId: '4509', leagueId: 5012, leagueName: 'Bulgarian First League', sportId: 1, sportType: 'soccer', country: 'Bulgaria', countryCode: 'BG', tier: 3 },
+  { tsdbId: '4419', leagueId: 5013, leagueName: 'Czech First League', sportId: 1, sportType: 'soccer', country: 'Czechia', countryCode: 'CZ', tier: 3 },
+  { tsdbId: '4525', leagueId: 5014, leagueName: 'Slovak Super Liga', sportId: 1, sportType: 'soccer', country: 'Slovakia', countryCode: 'SK', tier: 4 },
+  { tsdbId: '4490', leagueId: 5015, leagueName: 'Croatian HNL', sportId: 1, sportType: 'soccer', country: 'Croatia', countryCode: 'HR', tier: 3 },
+  { tsdbId: '4496', leagueId: 5016, leagueName: 'Serbian SuperLiga', sportId: 1, sportType: 'soccer', country: 'Serbia', countryCode: 'RS', tier: 3 },
+  { tsdbId: '4669', leagueId: 5017, leagueName: 'Hungarian NB I', sportId: 1, sportType: 'soccer', country: 'Hungary', countryCode: 'HU', tier: 3 },
+  { tsdbId: '4498', leagueId: 5018, leagueName: 'Polish Ekstraklasa', sportId: 1, sportType: 'soccer', country: 'Poland', countryCode: 'PL', tier: 3 },
+  // ─── Americas (extra coverage) ───
+  { tsdbId: '4346', leagueId: 5030, leagueName: 'Chilean Primera División', sportId: 1, sportType: 'soccer', country: 'Chile', countryCode: 'CL', tier: 3 },
+  { tsdbId: '4347', leagueId: 5031, leagueName: 'Colombian Categoría Primera A', sportId: 1, sportType: 'soccer', country: 'Colombia', countryCode: 'CO', tier: 3 },
+  { tsdbId: '4348', leagueId: 5032, leagueName: 'Peruvian Liga 1', sportId: 1, sportType: 'soccer', country: 'Peru', countryCode: 'PE', tier: 4 },
+  { tsdbId: '4349', leagueId: 5033, leagueName: 'Uruguayan Primera División', sportId: 1, sportType: 'soccer', country: 'Uruguay', countryCode: 'UY', tier: 3 },
+  { tsdbId: '4350', leagueId: 5034, leagueName: 'Ecuadorian Serie A', sportId: 1, sportType: 'soccer', country: 'Ecuador', countryCode: 'EC', tier: 4 },
+  { tsdbId: '4351', leagueId: 5035, leagueName: 'Paraguayan Primera División', sportId: 1, sportType: 'soccer', country: 'Paraguay', countryCode: 'PY', tier: 4 },
 ];
 
 // Simple in-memory cache (15 min)

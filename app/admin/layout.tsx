@@ -24,6 +24,7 @@ const adminNavItems = [
   { href: "/admin/payments", label: "Payments", icon: Wallet },
   { href: "/admin/subscribers", label: "Subscribers", icon: Mail },
   { href: "/admin/notifications", label: "Notifications", icon: Bell },
+  { href: "/admin/email-config", label: "Email Setup", icon: Mail },
   { href: "/admin/settings", label: "Settings", icon: Settings },
 ]
 
