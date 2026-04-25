@@ -772,4 +772,41 @@ INSERT IGNORE INTO seo_presets (name, page_type, title_template, description_tem
 INSERT IGNORE INTO users (id, email, username, display_name, password_hash, role, is_verified, timezone) VALUES
 (1, 'admin@betcheza.co.ke', 'admin', 'Admin', '$2a$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/X4Ydse/BxnXMVNaQW', 'admin', TRUE, 'Africa/Nairobi');
 
+-- ─── Community Feed ─────────────────────────────────
+CREATE TABLE IF NOT EXISTS feed_posts (
+  id VARCHAR(64) PRIMARY KEY,
+  user_id INT NOT NULL,
+  author_name VARCHAR(120) NOT NULL,
+  author_avatar VARCHAR(255),
+  content TEXT NOT NULL,
+  match_id VARCHAR(64),
+  match_title VARCHAR(255),
+  pick VARCHAR(120),
+  odds DECIMAL(8,2),
+  image_url VARCHAR(255),
+  likes INT NOT NULL DEFAULT 0,
+  comment_count INT NOT NULL DEFAULT 0,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_feed_posts_created (created_at),
+  INDEX idx_feed_posts_user (user_id)
+);
+
+CREATE TABLE IF NOT EXISTS feed_comments (
+  id VARCHAR(64) PRIMARY KEY,
+  post_id VARCHAR(64) NOT NULL,
+  user_id INT NOT NULL,
+  author_name VARCHAR(120) NOT NULL,
+  author_avatar VARCHAR(255),
+  content TEXT NOT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_feed_comments_post (post_id, created_at)
+);
+
+CREATE TABLE IF NOT EXISTS feed_post_likes (
+  post_id VARCHAR(64) NOT NULL,
+  user_id INT NOT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (post_id, user_id)
+);
+
 -- End of schema

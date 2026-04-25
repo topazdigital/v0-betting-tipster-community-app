@@ -18,6 +18,7 @@ import { TeamLogo } from "@/components/ui/team-logo"
 import { FlagIcon } from "@/components/ui/flag-icon"
 import { cn } from "@/lib/utils"
 import { ALL_LEAGUES, getSportIcon } from "@/lib/sports-data"
+import { resolveLeagueSlug } from "@/lib/league-aliases"
 import { useMatches } from "@/lib/hooks/use-matches"
 
 interface PageProps {
@@ -76,21 +77,10 @@ function LoadingBox() {
 export default function LeaguePage({ params }: PageProps) {
   const { slug } = use(params)
 
-  // Accept both friendly slugs (premier-league) and ESPN-style codes (eng-1)
-  // so older links from the matches page keep working after the slug fix.
-  const espnAliasMap: Record<string, string> = {
-    'eng-1': 'premier-league',
-    'esp-1': 'la-liga',
-    'ita-1': 'serie-a',
-    'ger-1': 'bundesliga',
-    'fra-1': 'ligue-1',
-    'por-1': 'primeira-liga',
-    'ned-1': 'eredivisie',
-    'uefa-champions': 'champions-league',
-    'uefa-europa': 'europa-league',
-  }
-  const normalisedSlug = espnAliasMap[slug] || slug
-  const league = ALL_LEAGUES.find(l => l.slug === normalisedSlug || l.slug === slug)
+  // Accept both friendly slugs (premier-league) and ESPN-style codes (eng-1,
+  // ken-1, usa-1, …) so older links from the matches page keep working.
+  const normalisedSlug = resolveLeagueSlug(slug) || slug
+  const league = ALL_LEAGUES.find(l => l.slug === normalisedSlug)
 
   // Live matches feed for this league
   const { matches, isLoading: matchesLoading } = useMatches(

@@ -287,15 +287,17 @@ function FormationPitch({ home, away }: { home: TeamRoster | null; away: TeamRos
     return result
   }
 
-  // Home columns (left → right): GK, then formation back→front
+  // Both teams use [GK, defence, midfield, attack] columns from back→front.
+  // The roster API now returns starters sorted GK-first, so distributing into
+  // [1, ...formation] always puts the goalkeeper alone in the first column.
   const homeRows = home ? [1, ...parseFormation(home.formation)] : []
-  // Away columns (left → right): formation front→back, then GK on right
-  const awayRows = away ? [...parseFormation(away.formation), 1] : []
+  const awayRows = away ? [1, ...parseFormation(away.formation)] : []
 
   const homeStarters = home ? getStarters(home) : []
   const awayStarters = away ? getStarters(away) : []
   const homeColumns = home ? distributeToRows(homeStarters, homeRows) : []
-  // Reverse so leftmost away column is the attack line that meets the home defense
+  // Reverse the away columns so its goalkeeper sits on the right (back) of the
+  // away half, with the attack line meeting the home defence in the middle.
   const awayColumns = away ? distributeToRows(awayStarters, awayRows).reverse() : []
 
   return (

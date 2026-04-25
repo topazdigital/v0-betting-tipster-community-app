@@ -68,6 +68,30 @@ function buildBookmakerOdds(summary: ESPNSummaryResponse, hasDraw: boolean) {
 
 type RosterEntry = NonNullable<ESPNSummaryResponse['rosters']>[number];
 
+// Position priority for sorting starters back-to-front:
+// 0 = goalkeeper, 1 = defender, 2 = midfielder, 3 = forward.
+function positionRank(pos?: string): number {
+  if (!pos) return 9;
+  const p = pos.toUpperCase();
+  if (p === 'G' || p === 'GK' || p === 'GOALKEEPER' || p.startsWith('GK')) return 0;
+  if (
+    p === 'D' || p === 'DF' || p.startsWith('CB') || p.startsWith('LB') ||
+    p.startsWith('RB') || p.startsWith('LWB') || p.startsWith('RWB') ||
+    p.startsWith('SW') || p.includes('DEFEND') || p.includes('BACK')
+  ) return 1;
+  if (
+    p === 'M' || p === 'MF' || p.startsWith('CM') || p.startsWith('DM') ||
+    p.startsWith('CDM') || p.startsWith('CAM') || p.startsWith('AM') ||
+    p.startsWith('LM') || p.startsWith('RM') || p.includes('MID')
+  ) return 2;
+  if (
+    p === 'F' || p === 'FW' || p === 'ST' || p === 'CF' || p.startsWith('LW') ||
+    p.startsWith('RW') || p.startsWith('SS') || p.includes('FORWARD') ||
+    p.includes('STRIK') || p.includes('WING')
+  ) return 3;
+  return 5;
+}
+
 function mapRoster(r: RosterEntry | undefined) {
   if (!r) return null;
   const players = (r.roster || []).map(p => ({
@@ -78,13 +102,26 @@ function mapRoster(r: RosterEntry | undefined) {
     starter: !!p.starter,
     headshot: p.athlete?.headshot,
   }));
+  // Sort starters back→front so the goalkeeper is first, then defenders,
+  // then midfielders, then forwards. This matches how the FormationPitch
+  // component slices players into [GK, defence, midfield, attack] columns.
+  const starting = players
+    .filter(p => p.starter)
+    .map((p, idx) => ({ ...p, _idx: idx }))
+    .sort((a, b) => {
+      const ra = positionRank(a.position);
+      const rb = positionRank(b.position);
+      if (ra !== rb) return ra - rb;
+      return a._idx - b._idx;
+    })
+    .map(({ _idx, ...rest }) => rest);
   return {
     teamId: r.team?.id,
     teamName: r.team?.displayName,
     teamLogo: r.team?.logo,
     formation: r.formation,
     coach: r.coach?.[0] ? (r.coach[0].displayName || `${r.coach[0].firstName || ''} ${r.coach[0].lastName || ''}`.trim()) : undefined,
-    starting: players.filter(p => p.starter),
+    starting,
     bench: players.filter(p => !p.starter),
   };
 }
