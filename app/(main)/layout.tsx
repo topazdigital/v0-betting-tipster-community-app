@@ -20,6 +20,7 @@ import {
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/contexts/auth-context"
 import { ThemeToggle } from "@/components/theme-toggle"
+import { NotificationBell } from "@/components/notifications/notification-bell"
 import { BottomNav } from "@/components/layout/bottom-nav"
 import { useMatchStats } from "@/lib/hooks/use-matches"
 
@@ -161,9 +162,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
 
           <div className="ml-auto flex items-center gap-2">
             <ThemeToggle />
-            <Button variant="ghost" size="icon">
-              <Bell className="h-5 w-5" />
-            </Button>
+            <NotificationBell />
             <Button variant="ghost" size="icon">
               <Bookmark className="h-5 w-5" />
             </Button>

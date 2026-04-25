@@ -3,6 +3,8 @@
 // global state (consistent with the rest of the codebase).
 
 import { query } from './db';
+import { dispatchNotification, dispatchToMany } from './notification-dispatcher';
+import { listFollowersOfTipster } from './follows-store';
 
 export interface FeedPost {
   id: string;
@@ -132,11 +134,23 @@ export async function createPost(input: Omit<FeedPost, 'id' | 'likes' | 'comment
   s.posts.set(post.id, post);
   s.comments.set(post.id, []);
   s.likes.set(post.id, new Set());
+  // Fan-out: notify everyone who follows this author (best-effort).
+  try {
+    const followers = await listFollowersOfTipster(post.userId);
+    if (followers.length > 0) {
+      void dispatchToMany(followers, {
+        type: 'tipster_post',
+        title: `${post.authorName} posted`,
+        content: post.content.length > 140 ? `${post.content.slice(0, 140)}…` : post.content,
+        link: `/feed#${post.id}`,
+      });
+    }
+  } catch (e) { console.warn('[feed] post fan-out failed', e); }
   return post;
 }
 
 // ─── LIKES ───────────────────────────────────────
-export async function toggleLike(postId: string, userId: number): Promise<{ liked: boolean; likes: number }> {
+export async function toggleLike(postId: string, userId: number, likerName?: string): Promise<{ liked: boolean; likes: number }> {
   let liked = false;
   let likes = 0;
   if (hasDb()) {
@@ -174,6 +188,16 @@ export async function toggleLike(postId: string, userId: number): Promise<{ like
   if (post) {
     post.likes = set.size;
     likes = post.likes;
+  }
+  // Notify post author when someone likes (and it's not their own).
+  if (liked && post && post.userId !== userId) {
+    void dispatchNotification({
+      userId: post.userId,
+      type: 'post_like',
+      title: `${likerName || 'Someone'} liked your post`,
+      content: post.content.length > 100 ? `${post.content.slice(0, 100)}…` : post.content,
+      link: `/feed#${post.id}`,
+    }).catch(e => console.warn('[feed] like notify failed', e));
   }
   return { liked, likes };
 }
@@ -229,6 +253,30 @@ export async function createComment(input: Omit<FeedComment, 'id' | 'createdAt'>
   s.comments.set(c.postId, arr);
   const post = s.posts.get(c.postId);
   if (post) post.commentCount = arr.length;
+  // Notify post author (if it's not their own comment).
+  if (post && post.userId !== c.userId) {
+    void dispatchNotification({
+      userId: post.userId,
+      type: 'post_comment',
+      title: `${c.authorName} commented on your post`,
+      content: c.content.length > 140 ? `${c.content.slice(0, 140)}…` : c.content,
+      link: `/feed#${post.id}`,
+    }).catch(e => console.warn('[feed] comment notify failed', e));
+  }
+  // Notify previous commenters (thread participants), excluding the new commenter & post author (already notified).
+  const earlier = arr.slice(0, -1);
+  const participants = new Set<number>();
+  for (const x of earlier) {
+    if (x.userId !== c.userId && (!post || x.userId !== post.userId)) participants.add(x.userId);
+  }
+  if (participants.size > 0) {
+    void dispatchToMany(Array.from(participants), {
+      type: 'comment_reply',
+      title: `${c.authorName} replied in a thread you're in`,
+      content: c.content.length > 140 ? `${c.content.slice(0, 140)}…` : c.content,
+      link: `/feed#${c.postId}`,
+    });
+  }
   return c;
 }
 

@@ -1,38 +1,57 @@
-// Sends an in-app + push + email notification, respecting user preferences.
-// Used by the match-reminders cron and any future notification trigger.
+// Multi-channel notification dispatcher.
+// Fans-out to in-app + push + email respecting user prefs.
 
-import { createNotification, getPreferences, listPushSubscriptions, listEmailSubscribers } from './notification-store';
+import { createNotification, getPreferences, listPushSubscriptions, NotificationType } from './notification-store';
 import { sendMail } from './mailer';
 
-interface DispatchInput {
+export interface DispatchInput {
   userId: number;
   email?: string | null;
-  type: 'team_match_starting' | 'team_result' | 'tipster_new_tip' | 'system';
+  type: NotificationType | string;
   title: string;
   content: string;
   link?: string | null;
 }
 
+// Map notification type → which preference family controls it.
+function familyOf(type: string): 'team' | 'tipster' | 'odds' | 'system' {
+  if (type.startsWith('team_') || type === 'match_lineup') return 'team';
+  if (type.startsWith('tipster_') || type.startsWith('feed_') || type === 'comment_reply' || type === 'post_like' || type === 'post_comment' || type === 'follow_new') return 'tipster';
+  if (type === 'odds_drop') return 'odds';
+  return 'system';
+}
+
 export async function dispatchNotification(input: DispatchInput): Promise<void> {
   const prefs = await getPreferences(input.userId);
+  const family = familyOf(input.type);
 
-  // 1. Always create an in-app notification (unless user disabled team
-  //    updates for that family).
-  const teamRelated = input.type === 'team_match_starting' || input.type === 'team_result';
-  const wantsInApp = teamRelated ? prefs.inappTeamUpdates : true;
-  if (wantsInApp) {
-    await createNotification({
-      userId: input.userId,
-      type: input.type,
-      title: input.title,
-      content: input.content,
-      link: input.link || null,
-      channel: 'inapp',
-    });
+  // 1. In-app
+  const inappOk =
+    family === 'team' ? prefs.inappTeamUpdates :
+    family === 'tipster' ? prefs.inappTipsterUpdates :
+    true;
+  if (inappOk) {
+    try {
+      await createNotification({
+        userId: input.userId,
+        type: input.type,
+        title: input.title,
+        content: input.content,
+        link: input.link || null,
+        channel: 'inapp',
+      });
+    } catch (e) {
+      console.warn('[notify] inapp create failed', e);
+    }
   }
 
-  // 2. Push (only if user has subscribed and prefs allow).
-  if (prefs.pushTeamUpdates) {
+  // 2. Push
+  const pushOk =
+    family === 'team' ? prefs.pushTeamUpdates :
+    family === 'tipster' ? prefs.pushTipsterUpdates :
+    family === 'odds' ? prefs.pushOddsAlerts :
+    false;
+  if (pushOk) {
     try {
       const subs = await listPushSubscriptions(input.userId);
       for (const sub of subs) {
@@ -43,27 +62,43 @@ export async function dispatchNotification(input: DispatchInput): Promise<void> 
     }
   }
 
-  // 3. Email (best-effort).
-  const wantsEmail = teamRelated ? prefs.emailTeamUpdates : false;
-  if (wantsEmail && input.email) {
+  // 3. Email
+  const emailOk =
+    family === 'team' ? prefs.emailTeamUpdates :
+    family === 'tipster' ? prefs.emailTipsterUpdates :
+    false;
+  if (emailOk && input.email) {
     try {
       await sendMail({
         to: input.email,
         subject: input.title,
         text: `${input.content}${input.link ? `\n\nView: ${input.link}` : ''}`,
-        html: `<div style="font-family:system-ui,sans-serif;max-width:560px;padding:16px">
-          <h2 style="margin:0 0 8px 0;color:#0ea5e9">${escapeHtml(input.title)}</h2>
-          <p style="color:#334155;line-height:1.5">${escapeHtml(input.content)}</p>
-          ${input.link ? `<p><a href="${escapeHtml(input.link)}" style="display:inline-block;background:#0ea5e9;color:#fff;padding:10px 16px;border-radius:8px;text-decoration:none">Open BetTips Pro</a></p>` : ''}
-          <p style="color:#94a3b8;font-size:12px;margin-top:24px">You can manage your reminders in the BetTips Pro app.</p>
-        </div>`,
+        html: emailHtml(input),
       });
     } catch (e) {
       console.warn('[notify] email send failed', e);
     }
   }
+}
 
-  void listEmailSubscribers; // keep import alive for future broadcast use
+// Fan-out helper: dispatch the same notification to many users.
+export async function dispatchToMany(userIds: number[], input: Omit<DispatchInput, 'userId' | 'email'>): Promise<void> {
+  await Promise.all(
+    Array.from(new Set(userIds)).map(uid =>
+      dispatchNotification({ ...input, userId: uid }).catch(e =>
+        console.warn('[notify] fan-out failed for', uid, e),
+      ),
+    ),
+  );
+}
+
+function emailHtml(input: DispatchInput): string {
+  return `<div style="font-family:system-ui,sans-serif;max-width:560px;padding:16px">
+    <h2 style="margin:0 0 8px 0;color:#0ea5e9">${escapeHtml(input.title)}</h2>
+    <p style="color:#334155;line-height:1.5">${escapeHtml(input.content)}</p>
+    ${input.link ? `<p><a href="${escapeHtml(input.link)}" style="display:inline-block;background:#0ea5e9;color:#fff;padding:10px 16px;border-radius:8px;text-decoration:none">Open BetTips Pro</a></p>` : ''}
+    <p style="color:#94a3b8;font-size:12px;margin-top:24px">Manage notifications in your BetTips Pro settings.</p>
+  </div>`;
 }
 
 function escapeHtml(s: string): string {
@@ -71,11 +106,8 @@ function escapeHtml(s: string): string {
 }
 
 async function sendBrowserPush(endpoint: string, _title: string, _body: string, _link: string): Promise<void> {
-  // We don't have a VAPID-signed web-push pipeline configured (no
-  // `web-push` dependency). To keep this lightweight and dependency-free
-  // we simply log the intent — when the user adds VAPID keys, hook the
-  // real `web-push` library in here.
+  // Web-push is opt-in via VAPID; without keys we just log the intent.
   if (process.env.DEBUG_NOTIFY) {
-    console.log('[notify] would send push to', endpoint.slice(0, 64) + '…');
+    console.log('[notify] would push to', endpoint.slice(0, 64) + '…');
   }
 }

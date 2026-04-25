@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getCurrentUser } from '@/lib/auth';
 import { followTipster, unfollowTipster, isFollowingTipster } from '@/lib/follows-store';
+import { dispatchNotification } from '@/lib/notification-dispatcher';
 
 export const dynamic = 'force-dynamic';
 
@@ -27,6 +28,17 @@ export async function POST(
   const tipsterId = Number(id);
   if (!Number.isFinite(tipsterId)) return NextResponse.json({ error: 'Invalid tipster id' }, { status: 400 });
   await followTipster(user.userId, tipsterId);
+  // Notify the tipster that someone followed them.
+  const followerName = (user as unknown as { username?: string; email?: string }).username
+    || (user as unknown as { username?: string; email?: string }).email
+    || `user_${user.userId}`;
+  void dispatchNotification({
+    userId: tipsterId,
+    type: 'follow_new',
+    title: 'New follower',
+    content: `${followerName} just started following you`,
+    link: `/users/${user.userId}`,
+  }).catch(() => {});
   return NextResponse.json({ success: true });
 }
 

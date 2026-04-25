@@ -161,3 +161,39 @@ export async function listFollowedTipsters(userId: number): Promise<number[]> {
   }
   return Array.from(stores.tipsters.get(userId) || []);
 }
+
+// Returns follower userIds for a given tipster (reverse lookup).
+export async function listFollowersOfTipster(tipsterId: number): Promise<number[]> {
+  if (hasDb()) {
+    try {
+      const r = await query<{ follower_id: number }>(
+        `SELECT follower_id FROM follows WHERE following_id = ?`,
+        [tipsterId]
+      );
+      if (r.rows.length > 0) return r.rows.map(x => x.follower_id);
+    } catch {}
+  }
+  const out: number[] = [];
+  for (const [uid, set] of stores.tipsters) {
+    if (set.has(tipsterId)) out.push(uid);
+  }
+  return out;
+}
+
+// Returns userIds of everyone following the given team.
+export async function listFollowersOfTeam(teamId: string): Promise<number[]> {
+  if (hasDb()) {
+    try {
+      const r = await query<{ user_id: number }>(
+        `SELECT user_id FROM team_follows WHERE team_id = ?`,
+        [teamId]
+      );
+      if (r.rows.length > 0) return r.rows.map(x => x.user_id);
+    } catch {}
+  }
+  const out: number[] = [];
+  for (const [uid, m] of stores.teams) {
+    if (m.has(teamId)) out.push(uid);
+  }
+  return out;
+}

@@ -436,6 +436,8 @@ CREATE TABLE IF NOT EXISTS comments (
   INDEX idx_comment_status (status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- Notifications: covers ALL site activity (likes, comments, replies, follows,
+-- tipster posts, match starting, lineups, results, news, odds drops, broadcasts).
 CREATE TABLE IF NOT EXISTS notifications (
   id INT AUTO_INCREMENT PRIMARY KEY,
   user_id INT NOT NULL,
@@ -443,74 +445,69 @@ CREATE TABLE IF NOT EXISTS notifications (
   title VARCHAR(200),
   content TEXT NOT NULL,
   link VARCHAR(500),
-  channel ENUM('in_app','push','email') DEFAULT 'in_app',
+  channel ENUM('inapp','push','email') DEFAULT 'inapp',
   is_read BOOLEAN DEFAULT FALSE,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
   INDEX idx_notification_user (user_id),
-  INDEX idx_notification_read (is_read),
-  INDEX idx_notification_channel (channel)
+  INDEX idx_notification_unread (user_id, is_read),
+  INDEX idx_notification_type (type),
+  INDEX idx_notification_created (created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================
--- Follows / Notifications / Push & Email Subs
+-- Follows / Notification prefs / Push & Email Subs
 -- ============================================
 
 CREATE TABLE IF NOT EXISTS team_follows (
   user_id INT NOT NULL,
-  team_id INT NOT NULL,
+  team_id VARCHAR(64) NOT NULL,
   team_name VARCHAR(200),
   team_logo VARCHAR(500),
   league_id INT,
+  league_slug VARCHAR(100),
   league_name VARCHAR(200),
-  notify_fixtures BOOLEAN DEFAULT TRUE,
-  notify_results BOOLEAN DEFAULT TRUE,
-  notify_tips BOOLEAN DEFAULT TRUE,
+  sport_slug VARCHAR(40),
+  country_code VARCHAR(8),
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (user_id, team_id),
-  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
   INDEX idx_team_follow_team (team_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS notification_preferences (
   user_id INT NOT NULL PRIMARY KEY,
-  push_enabled BOOLEAN DEFAULT FALSE,
-  email_enabled BOOLEAN DEFAULT TRUE,
-  in_app_enabled BOOLEAN DEFAULT TRUE,
-  notify_match_start BOOLEAN DEFAULT TRUE,
-  notify_match_result BOOLEAN DEFAULT TRUE,
-  notify_new_tip BOOLEAN DEFAULT TRUE,
-  notify_tipster_post BOOLEAN DEFAULT TRUE,
-  notify_promotions BOOLEAN DEFAULT FALSE,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+  inapp_team_updates BOOLEAN DEFAULT TRUE,
+  inapp_tipster_updates BOOLEAN DEFAULT TRUE,
+  email_team_updates BOOLEAN DEFAULT TRUE,
+  email_tipster_updates BOOLEAN DEFAULT FALSE,
+  email_daily_digest BOOLEAN DEFAULT FALSE,
+  push_team_updates BOOLEAN DEFAULT FALSE,
+  push_tipster_updates BOOLEAN DEFAULT FALSE,
+  push_odds_alerts BOOLEAN DEFAULT FALSE,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS push_subscriptions (
-  id INT AUTO_INCREMENT PRIMARY KEY,
+  id VARCHAR(64) PRIMARY KEY,
   user_id INT NULL,
   endpoint VARCHAR(500) NOT NULL UNIQUE,
   p256dh VARCHAR(255) NOT NULL,
-  auth_key VARCHAR(255) NOT NULL,
-  user_agent VARCHAR(500),
+  auth VARCHAR(255) NOT NULL,
   topics JSON,
+  country_code VARCHAR(8),
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  last_seen_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL,
   INDEX idx_push_user (user_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS email_subscribers (
-  id INT AUTO_INCREMENT PRIMARY KEY,
+  id VARCHAR(64) PRIMARY KEY,
   email VARCHAR(255) NOT NULL UNIQUE,
-  user_id INT NULL,
-  source VARCHAR(50) DEFAULT 'web',
   topics JSON,
-  is_verified BOOLEAN DEFAULT FALSE,
-  unsubscribed_at TIMESTAMP NULL,
+  country_code VARCHAR(8),
+  unsubscribe_token VARCHAR(64) NOT NULL UNIQUE,
+  active BOOLEAN DEFAULT TRUE,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL,
-  INDEX idx_email_sub_user (user_id)
+  INDEX idx_email_sub_email (email),
+  INDEX idx_email_sub_active (active)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================

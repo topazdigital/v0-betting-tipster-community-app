@@ -8,6 +8,9 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ success: false, error: 'Sign in to like posts.' }, { status: 401 });
   const { id } = await params;
-  const r = await toggleLike(id, user.userId);
+  const liker = (user as unknown as { username?: string; email?: string }).username
+    || (user as unknown as { username?: string; email?: string }).email
+    || `user_${user.userId}`;
+  const r = await toggleLike(id, user.userId, liker);
   return NextResponse.json({ success: true, ...r });
 }

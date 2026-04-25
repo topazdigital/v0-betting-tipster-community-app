@@ -7,8 +7,15 @@ export type NotificationType =
   | 'team_news'
   | 'tipster_new_tip'
   | 'tipster_tip_won'
+  | 'tipster_post'
   | 'match_lineup'
   | 'odds_drop'
+  | 'post_like'
+  | 'post_comment'
+  | 'comment_reply'
+  | 'follow_new'
+  | 'feed_mention'
+  | 'admin_broadcast'
   | 'system';
 
 export interface NotificationPreferences {
