@@ -621,9 +621,15 @@ export function getEspnEventIdFromMatchId(matchId: string): string | null {
   return m ? m[1] : null;
 }
 
-async function fetchESPN(sport: string, league: string, endpoint: string = 'scoreboard'): Promise<ESPNScoreboardResponseFull | null> {
-  const url = `${ESPN_BASE_URL}/${sport}/${league}/${endpoint}`;
-  
+async function fetchESPN(
+  sport: string,
+  league: string,
+  endpoint: string = 'scoreboard',
+  dates?: string,
+): Promise<ESPNScoreboardResponseFull | null> {
+  const base = `${ESPN_BASE_URL}/${sport}/${league}/${endpoint}`;
+  const url = dates ? `${base}?dates=${dates}` : base;
+
   try {
     const response = await fetch(url, {
       headers: { 'Accept': 'application/json' },
@@ -637,12 +643,34 @@ async function fetchESPN(sport: string, league: string, endpoint: string = 'scor
 
     apiStatus.espn.working = true;
     apiStatus.espn.lastCheck = Date.now();
-    
+
     return await response.json();
   } catch (error) {
     apiStatus.espn.lastError = String(error);
     return null;
   }
+}
+
+// Leagues we always fetch a multi-day window for (so today + a week of fixtures
+// always show up regardless of ESPN's default "next game day" behaviour).
+const PRIORITY_LEAGUE_KEYS = new Set<string>([
+  'eng.1', 'eng.2', 'eng.fa', 'eng.league_cup',
+  'esp.1', 'esp.2', 'esp.copa_del_rey',
+  'ger.1', 'ger.2', 'ger.dfb_pokal',
+  'ita.1', 'ita.2', 'ita.coppa_italia',
+  'fra.1', 'fra.2',
+  'ned.1', 'por.1', 'sco.1', 'bel.1', 'tur.1',
+  'uefa.champions', 'uefa.europa', 'uefa.europa.conf', 'uefa.nations',
+  'usa.1', 'mex.1', 'bra.1', 'arg.1',
+  'sau.1', 'jpn.1', 'aus.1',
+  'nba', 'nfl', 'mlb', 'nhl', 'ufc',
+]);
+
+function formatYYYYMMDD(d: Date): string {
+  const y = d.getUTCFullYear();
+  const m = String(d.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(d.getUTCDate()).padStart(2, '0');
+  return `${y}${m}${day}`;
 }
 
 // ============================================
@@ -692,17 +720,21 @@ interface ESPNScoreboardResponseFull extends ESPNScoreboardResponse {
 }
 
 export function extractEspnOdds(rawOddsList: ESPNOddsRaw[] | undefined, hasDraw: boolean = true): { odds?: MatchOdds; markets?: Market[] } {
-  if (!rawOddsList || rawOddsList.length === 0) return {};
+  if (!rawOddsList || !Array.isArray(rawOddsList) || rawOddsList.length === 0) return {};
+
+  // ESPN sometimes returns null entries in the odds array — strip them first.
+  const cleanList = rawOddsList.filter((x): x is ESPNOddsRaw => x != null);
+  if (cleanList.length === 0) return {};
 
   // Try to find provider with moneyline data — support BOTH ESPN formats:
   // Old: homeTeamOdds.moneyLine (number)
   // New (2024+): moneyline.home.close.odds (string like "+180")
-  const o = rawOddsList.find(x =>
+  const o = cleanList.find(x =>
     x.homeTeamOdds?.moneyLine !== undefined ||
     x.awayTeamOdds?.moneyLine !== undefined ||
     x.moneyline?.home?.close?.odds !== undefined ||
     x.moneyline?.away?.close?.odds !== undefined
-  ) || rawOddsList[0];
+  ) || cleanList[0];
   if (!o) return {};
 
   // Extract moneyline: prefer new format, fallback to old
@@ -1351,13 +1383,35 @@ function generateSportSpecificData(sportType: ESPNLeagueConfig['sportType'], sta
   }
 }
 
-// Generic ESPN match fetcher
+// Generic ESPN match fetcher.
+// For priority leagues, fetch a multi-day window so today + the upcoming week
+// always show up — ESPN's default scoreboard otherwise only returns the
+// nearest active game-day for that league (e.g. EPL midweek matches were missing).
 async function getESPNMatches(config: ESPNLeagueConfig): Promise<UnifiedMatch[]> {
   const cacheKey = `espn-${config.sport}-${config.league}`;
   const cached = getCached<UnifiedMatch[]>(cacheKey, CACHE_DURATION.live);
   if (cached) return cached;
 
-  const data = await fetchESPN(config.sport, config.league);
+  const isPriority = PRIORITY_LEAGUE_KEYS.has(config.league);
+  let data: ESPNScoreboardResponseFull | null = null;
+
+  if (isPriority) {
+    // Fetch yesterday + next 7 days as a single date range for this league.
+    const now = new Date();
+    const start = new Date(now);
+    start.setUTCDate(start.getUTCDate() - 1);
+    const end = new Date(now);
+    end.setUTCDate(end.getUTCDate() + 7);
+    const range = `${formatYYYYMMDD(start)}-${formatYYYYMMDD(end)}`;
+    data = await fetchESPN(config.sport, config.league, 'scoreboard', range);
+    // Fall back to default endpoint if range request fails or returns nothing
+    if (!data?.events?.length) {
+      data = await fetchESPN(config.sport, config.league);
+    }
+  } else {
+    data = await fetchESPN(config.sport, config.league);
+  }
+
   if (!data?.events) return [];
 
   // Sports without draws (basketball, baseball, mma, tennis etc.)

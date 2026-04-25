@@ -27,7 +27,7 @@ const fetcher = (url: string) => fetch(url).then(r => r.json())
 
 interface StandingRow {
   position: number
-  team: { id: string; name: string; logo?: string }
+  team: { id: string; name: string; logo?: string; href?: string | null }
   played: number
   won: number
   drawn: number
@@ -339,10 +339,20 @@ export default function LeaguePage({ params }: PageProps) {
                                 </span>
                               </td>
                               <td className="py-2">
-                                <div className="flex items-center gap-2">
-                                  <TeamLogo teamName={row.team.name} logoUrl={row.team.logo} size="xs" />
-                                  <span className="truncate font-medium">{row.team.name}</span>
-                                </div>
+                                {row.team.href ? (
+                                  <Link
+                                    href={row.team.href}
+                                    className="group flex items-center gap-2 hover:text-primary"
+                                  >
+                                    <TeamLogo teamName={row.team.name} logoUrl={row.team.logo} size="xs" />
+                                    <span className="truncate font-medium group-hover:underline">{row.team.name}</span>
+                                  </Link>
+                                ) : (
+                                  <div className="flex items-center gap-2">
+                                    <TeamLogo teamName={row.team.name} logoUrl={row.team.logo} size="xs" />
+                                    <span className="truncate font-medium">{row.team.name}</span>
+                                  </div>
+                                )}
                               </td>
                               <td className="py-2 text-center">{row.played}</td>
                               <td className="py-2 text-center text-success">{row.won}</td>
