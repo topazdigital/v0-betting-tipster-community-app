@@ -27,6 +27,7 @@ import { AIMatchPrediction } from "@/components/ai/ai-match-prediction"
 import { AIMultiMarket } from "@/components/ai/ai-multi-market"
 import { AddTipForm } from "@/components/matches/add-tip-form"
 import { useAuth } from "@/contexts/auth-context"
+import { useMatches } from "@/lib/hooks/use-matches"
 
 interface PageProps { params: Promise<{ id: string }> }
 
@@ -271,9 +272,6 @@ function FormationPitch({ home, away }: { home: TeamRoster | null; away: TeamRos
     return f.split('-').map(n => parseInt(n, 10)).filter(n => !isNaN(n))
   }
 
-  const homeRows = home ? [1, ...parseFormation(home.formation)] : []
-  const awayRows = away ? [...parseFormation(away.formation), 1] : []
-
   const getStarters = (roster: TeamRoster) => roster.starting.slice(0, 11)
 
   const distributeToRows = (players: Player[], rows: number[]) => {
@@ -286,76 +284,85 @@ function FormationPitch({ home, away }: { home: TeamRoster | null; away: TeamRos
     return result
   }
 
+  // Home columns (left → right): GK, then formation back→front
+  const homeRows = home ? [1, ...parseFormation(home.formation)] : []
+  // Away columns (left → right): formation front→back, then GK on right
+  const awayRows = away ? [...parseFormation(away.formation), 1] : []
+
   const homeStarters = home ? getStarters(home) : []
   const awayStarters = away ? getStarters(away) : []
-  const homeDistributed = home ? distributeToRows(homeStarters, homeRows) : []
-  const awayDistributed = away ? distributeToRows(awayStarters, awayRows.slice().reverse()) : []
+  const homeColumns = home ? distributeToRows(homeStarters, homeRows) : []
+  // Reverse so leftmost away column is the attack line that meets the home defense
+  const awayColumns = away ? distributeToRows(awayStarters, awayRows).reverse() : []
 
   return (
-    <div className="relative overflow-hidden rounded-xl" style={{ background: 'linear-gradient(180deg, #1a5c2a 0%, #1e7a35 50%, #1a5c2a 100%)' }}>
-      {/* Pitch markings */}
-      <svg className="absolute inset-0 w-full h-full opacity-30" viewBox="0 0 400 600" preserveAspectRatio="none">
+    <div className="relative overflow-hidden rounded-xl" style={{ background: 'linear-gradient(90deg, #1a5c2a 0%, #1e7a35 50%, #1a5c2a 100%)' }}>
+      {/* Horizontal pitch markings (landscape: 600 wide x 400 tall) */}
+      <svg className="absolute inset-0 w-full h-full opacity-30" viewBox="0 0 600 400" preserveAspectRatio="none">
         {/* Outer border */}
-        <rect x="20" y="20" width="360" height="560" fill="none" stroke="white" strokeWidth="2" />
+        <rect x="20" y="20" width="560" height="360" fill="none" stroke="white" strokeWidth="2" />
         {/* Center line */}
-        <line x1="20" y1="300" x2="380" y2="300" stroke="white" strokeWidth="2" />
+        <line x1="300" y1="20" x2="300" y2="380" stroke="white" strokeWidth="2" />
         {/* Center circle */}
-        <circle cx="200" cy="300" r="50" fill="none" stroke="white" strokeWidth="2" />
-        <circle cx="200" cy="300" r="3" fill="white" />
-        {/* Home penalty area */}
-        <rect x="95" y="460" width="210" height="100" fill="none" stroke="white" strokeWidth="1.5" />
-        <rect x="145" y="520" width="110" height="60" fill="none" stroke="white" strokeWidth="1.5" />
-        {/* Away penalty area */}
-        <rect x="95" y="40" width="210" height="100" fill="none" stroke="white" strokeWidth="1.5" />
-        <rect x="145" y="20" width="110" height="60" fill="none" stroke="white" strokeWidth="1.5" />
-        {/* Penalty spots */}
-        <circle cx="200" cy="500" r="3" fill="white" />
-        <circle cx="200" cy="100" r="3" fill="white" />
+        <circle cx="300" cy="200" r="55" fill="none" stroke="white" strokeWidth="2" />
+        <circle cx="300" cy="200" r="3" fill="white" />
+        {/* Home penalty area (LEFT) */}
+        <rect x="20" y="110" width="100" height="180" fill="none" stroke="white" strokeWidth="1.5" />
+        <rect x="20" y="155" width="50" height="90" fill="none" stroke="white" strokeWidth="1.5" />
+        <circle cx="100" cy="200" r="3" fill="white" />
+        {/* Away penalty area (RIGHT) */}
+        <rect x="480" y="110" width="100" height="180" fill="none" stroke="white" strokeWidth="1.5" />
+        <rect x="530" y="155" width="50" height="90" fill="none" stroke="white" strokeWidth="1.5" />
+        <circle cx="500" cy="200" r="3" fill="white" />
       </svg>
 
-      <div className="relative flex flex-col gap-0 py-4 px-2" style={{ minHeight: 480 }}>
-        {/* Away team (top) */}
-        {away && (
-          <div className="flex flex-col gap-2 pb-3">
-            <div className="flex items-center justify-center gap-2 mb-1">
-              <TeamLogo teamName={away.teamName || ''} logoUrl={away.teamLogo} size="sm" />
-              <span className="text-xs font-bold text-white/90">{away.teamName}</span>
-              {away.formation && <span className="text-[10px] text-white/60 bg-black/30 px-1.5 py-0.5 rounded-full">{away.formation}</span>}
-            </div>
-            {awayDistributed.map((row, ri) => (
-              <div key={ri} className="flex justify-center gap-2">
-                {row.map((p, pi) => (
-                  <PitchPlayer key={pi} player={p} color="bg-sky-500" />
-                ))}
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Midfield divider */}
-        <div className="my-1 flex items-center gap-2 opacity-50">
-          <div className="h-px flex-1 bg-white/40" />
-          <div className="h-2 w-2 rounded-full bg-white/60" />
-          <div className="h-px flex-1 bg-white/40" />
-        </div>
-
-        {/* Home team (bottom) */}
-        {home && (
-          <div className="flex flex-col-reverse gap-2 pt-3">
-            <div className="flex items-center justify-center gap-2 mt-1">
+      <div className="relative flex items-stretch gap-1 px-2 py-3" style={{ minHeight: 320 }}>
+        {/* Home (LEFT half) */}
+        <div className="flex-1 flex flex-col">
+          {home && (
+            <div className="flex items-center justify-start gap-2 px-2 pb-2">
               <TeamLogo teamName={home.teamName || ''} logoUrl={home.teamLogo} size="sm" />
-              <span className="text-xs font-bold text-white/90">{home.teamName}</span>
-              {home.formation && <span className="text-[10px] text-white/60 bg-black/30 px-1.5 py-0.5 rounded-full">{home.formation}</span>}
+              <span className="text-xs font-bold text-white/90 truncate">{home.teamName}</span>
+              {home.formation && <span className="text-[10px] text-white/60 bg-black/30 px-1.5 py-0.5 rounded-full shrink-0">{home.formation}</span>}
             </div>
-            {homeDistributed.map((row, ri) => (
-              <div key={ri} className="flex justify-center gap-2">
-                {row.map((p, pi) => (
+          )}
+          <div className="flex flex-1 items-stretch justify-around gap-0.5">
+            {homeColumns.map((col, ci) => (
+              <div key={ci} className="flex flex-1 flex-col justify-around items-center gap-1.5 py-1">
+                {col.map((p, pi) => (
                   <PitchPlayer key={pi} player={p} color="bg-rose-500" />
                 ))}
               </div>
             ))}
           </div>
-        )}
+        </div>
+
+        {/* Halfway divider */}
+        <div className="flex flex-col items-center justify-center opacity-50 px-0.5">
+          <div className="w-px flex-1 bg-white/40" />
+          <div className="h-2 w-2 my-1 rounded-full bg-white/60" />
+          <div className="w-px flex-1 bg-white/40" />
+        </div>
+
+        {/* Away (RIGHT half) */}
+        <div className="flex-1 flex flex-col">
+          {away && (
+            <div className="flex items-center justify-end gap-2 px-2 pb-2">
+              {away.formation && <span className="text-[10px] text-white/60 bg-black/30 px-1.5 py-0.5 rounded-full shrink-0">{away.formation}</span>}
+              <span className="text-xs font-bold text-white/90 truncate">{away.teamName}</span>
+              <TeamLogo teamName={away.teamName || ''} logoUrl={away.teamLogo} size="sm" />
+            </div>
+          )}
+          <div className="flex flex-1 items-stretch justify-around gap-0.5">
+            {awayColumns.map((col, ci) => (
+              <div key={ci} className="flex flex-1 flex-col justify-around items-center gap-1.5 py-1">
+                {col.map((p, pi) => (
+                  <PitchPlayer key={pi} player={p} color="bg-sky-500" />
+                ))}
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     </div>
   )
@@ -930,6 +937,9 @@ export default function MatchDetailPage({ params }: PageProps) {
               awayForm={match.awayTeam.form}
               h2h={data.h2h}
               markets={match.markets || null}
+              homeScore={match.homeScore}
+              awayScore={match.awayScore}
+              status={match.status}
             />
 
             {/* Tips Preview */}
@@ -1080,6 +1090,14 @@ export default function MatchDetailPage({ params }: PageProps) {
                   </div>
                 </CardContent>
               </Card>
+            )}
+
+            {/* Upcoming matches in this league */}
+            {match.league?.name && (
+              <UpcomingMatchesPanel
+                leagueName={match.league.name}
+                excludeMatchId={match.id}
+              />
             )}
 
             {/* News */}
@@ -1363,7 +1381,43 @@ export default function MatchDetailPage({ params }: PageProps) {
               </div>
             )}
 
-            {bookmakerOdds.length === 0 && !match.odds && (
+            {/* All other markets — BTTS, Totals, Double Chance, Half-time, etc. */}
+            {match.markets && match.markets.length > 0 && (
+              <div className="grid gap-4 md:grid-cols-2">
+                {match.markets
+                  .filter((m) => m.key !== 'h2h' && m.outcomes && m.outcomes.length > 0)
+                  .map((mkt) => (
+                    <Card key={mkt.key}>
+                      <CardContent className="p-4">
+                        <h4 className="mb-3 text-sm font-bold flex items-center gap-2">
+                          <BarChart3 className="h-4 w-4 text-primary" />
+                          {mkt.name}
+                        </h4>
+                        <div className="grid gap-2" style={{
+                          gridTemplateColumns: `repeat(${Math.min(mkt.outcomes.length, 3)}, minmax(0,1fr))`,
+                        }}>
+                          {mkt.outcomes.map((o, i) => (
+                            <div
+                              key={i}
+                              className="rounded-lg border border-border/50 bg-muted/40 px-3 py-2.5 text-center hover:bg-muted/60 transition-colors"
+                            >
+                              <p className="text-[10px] text-muted-foreground uppercase tracking-wider truncate">
+                                {o.name}
+                                {o.point !== undefined ? ` ${o.point}` : ''}
+                              </p>
+                              <p className="text-base font-black text-foreground mt-0.5 font-mono tabular-nums">
+                                {o.price.toFixed(2)}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+              </div>
+            )}
+
+            {bookmakerOdds.length === 0 && !match.odds && (!match.markets || match.markets.length === 0) && (
               <Card>
                 <CardContent className="py-12 text-center text-muted-foreground">
                   <TrendingUp className="h-10 w-10 mx-auto mb-3 opacity-30" />
@@ -1578,6 +1632,80 @@ export default function MatchDetailPage({ params }: PageProps) {
         </div>
       </div>
     </div>
+  )
+}
+
+// ===== Upcoming matches in the same league =====
+
+function UpcomingMatchesPanel({
+  leagueName,
+  excludeMatchId,
+}: {
+  leagueName: string
+  excludeMatchId: string
+}) {
+  const { matches, isLoading } = useMatches()
+  const timezone = getBrowserTimezone()
+  const now = Date.now()
+
+  const upcoming = (matches || [])
+    .filter((m) =>
+      m.id !== excludeMatchId &&
+      (m.league?.name === leagueName || (m as { league?: { name?: string } }).league?.name === leagueName) &&
+      new Date(m.kickoffTime).getTime() > now &&
+      m.status !== 'finished' && m.status !== 'live'
+    )
+    .sort((a, b) => new Date(a.kickoffTime).getTime() - new Date(b.kickoffTime).getTime())
+    .slice(0, 5)
+
+  if (isLoading || upcoming.length === 0) return null
+
+  return (
+    <Card>
+      <CardContent className="p-4">
+        <div className="mb-3 flex items-center justify-between">
+          <h3 className="flex items-center gap-2 text-sm font-bold">
+            <Calendar className="h-4 w-4 text-primary" />
+            Upcoming in {leagueName}
+          </h3>
+          <Button asChild variant="ghost" size="sm" className="text-xs h-7">
+            <Link href="/matches">All matches</Link>
+          </Button>
+        </div>
+        <div className="space-y-2">
+          {upcoming.map((m) => {
+            const mAny = m as unknown as {
+              id: string
+              homeTeam: { name: string; logo?: string }
+              awayTeam: { name: string; logo?: string }
+              kickoffTime: string
+            }
+            return (
+              <Link
+                key={mAny.id}
+                href={`/matches/${encodeURIComponent(mAny.id)}`}
+                className="flex items-center gap-3 rounded-xl border border-border/40 bg-muted/30 px-3 py-2.5 hover:bg-muted/50 transition-colors"
+              >
+                <div className="flex flex-1 items-center justify-end gap-2 min-w-0">
+                  <span className="text-xs font-semibold truncate">{mAny.homeTeam.name}</span>
+                  <TeamLogo teamName={mAny.homeTeam.name} logoUrl={mAny.homeTeam.logo} size="sm" />
+                </div>
+                <div className="flex flex-col items-center min-w-[64px]">
+                  <span className="text-[10px] font-bold text-muted-foreground uppercase">
+                    {getDayLabel(mAny.kickoffTime, timezone)}
+                  </span>
+                  <span className="text-xs font-mono">{formatTime(mAny.kickoffTime, timezone)}</span>
+                </div>
+                <div className="flex flex-1 items-center gap-2 min-w-0">
+                  <TeamLogo teamName={mAny.awayTeam.name} logoUrl={mAny.awayTeam.logo} size="sm" />
+                  <span className="text-xs font-semibold truncate">{mAny.awayTeam.name}</span>
+                </div>
+              </Link>
+            )
+          })}
+        </div>
+      </CardContent>
+    </Card>
   )
 }
 

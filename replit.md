@@ -83,3 +83,10 @@ The app degrades gracefully when external services are unavailable:
 - **Auth-aware Add Tip**: `app/(main)/matches/[id]/page.tsx` shows inline `AddTipForm` for logged-in users with REAL `markets[]` from `/api/matches/[id]/details`. POST handler at `app/api/matches/[id]/tips/route.ts`.
 - **Multi-market AI** (`components/ai/ai-multi-market.tsx`): AI picks across 1X2, Double Chance, DNB, BTTS, O/U 1.5/2.5/3.5, HT result, Correct Score — pinned to real bookmaker prices when available.
 - **Today's Best Bets sidebar** (`components/home/best-bets-panel.tsx`): right rail at lg+ on the homepage with featured pick, 2-fold accumulator, and consensus list — all built from real odds.
+- **AI auto-grading** (`components/ai/ai-multi-market.tsx`): when a match's status becomes `finished` and `homeScore/awayScore` are numbers, every AI pick is auto-marked Won / Lost / Void with check/X badge + colored row.
+- **Merged tip-form markets** (`components/matches/add-tip-form.tsx`): real bookmaker markets from the details API are listed first; generated markets (correct score, handicaps, first-to-score, etc.) backfill anything missing — user always sees a wide selection with real prices when available.
+- **Horizontal lineup pitch** (`app/(main)/matches/[id]/page.tsx > FormationPitch`): landscape pitch with home XI on the left half and away XI on the right (rotated formation columns).
+- **Expanded Odds tab**: every market in `match.markets` (BTTS, Double Chance, Totals, Half-time…) renders as its own card alongside the 1X2 + bookmaker comparison.
+- **Upcoming matches in single match view** (`UpcomingMatchesPanel` in `app/(main)/matches/[id]/page.tsx`): overview tab now shows the next 5 fixtures in the same league.
+- **About page** (`app/(main)/about/page.tsx`): full marketing page with hero, stats, story, features, values, responsible-gambling notice and CTA — `metadata` exported for SEO.
+- **Today filter fix** (`app/(main)/matches/page.tsx`): replaced timezone-sensitive `isTodayTz` with `toLocalISODate` comparison so the Today tab matches the API's `tzOffsetMin` behavior.

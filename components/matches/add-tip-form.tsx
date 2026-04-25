@@ -185,12 +185,29 @@ export function AddTipForm({
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
 
-  // Generate or use provided markets
+  // Merge real bookmaker markets with generated markets so the user always sees a
+  // wide selection. Real markets win on price; generated markets fill the gaps
+  // (correct score, handicaps, first-team-to-score, etc.).
   const allMarkets = useMemo(() => {
-    if (providedMarkets && providedMarkets.length > 0) {
-      return providedMarkets
+    const generated = generateMarketsFromOdds(homeTeam, awayTeam, odds)
+    if (!providedMarkets || providedMarkets.length === 0) return generated
+
+    // Map real markets first, in their incoming order
+    const realByKey = new Map<string, MarketOdds>()
+    for (const m of providedMarkets) {
+      if (m && m.outcomes && m.outcomes.length > 0) realByKey.set(m.key, m)
     }
-    return generateMarketsFromOdds(homeTeam, awayTeam, odds)
+
+    // Build merged list: real markets first (in order), then any generated
+    // markets whose key isn't already present
+    const merged: MarketOdds[] = []
+    for (const m of providedMarkets) {
+      if (m && m.outcomes && m.outcomes.length > 0) merged.push(m)
+    }
+    for (const g of generated) {
+      if (!realByKey.has(g.key)) merged.push(g)
+    }
+    return merged
   }, [providedMarkets, homeTeam, awayTeam, odds])
 
   // Get selected market

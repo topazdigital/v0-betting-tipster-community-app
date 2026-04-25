@@ -85,20 +85,19 @@ function MatchesContent() {
     const tz = getBrowserTimezone();
 
     // Date tab filter — applies on top of all other filters
+    // Use local-tz YYYY-MM-DD comparison (works regardless of browser TZ)
+    const todayKey = toLocalISODate(new Date());
     if (dateTab === 'today') {
-      result = result.filter(m => isTodayTz(new Date(m.kickoffTime), tz));
+      result = result.filter(m => toLocalISODate(new Date(m.kickoffTime)) === todayKey);
     } else if (dateTab === 'upcoming') {
-      const startOfTomorrow = new Date();
-      startOfTomorrow.setHours(0, 0, 0, 0);
-      startOfTomorrow.setDate(startOfTomorrow.getDate() + 1);
       result = result.filter(m => {
-        const t = new Date(m.kickoffTime).getTime();
-        return t >= startOfTomorrow.getTime() && m.status === 'scheduled';
+        const k = toLocalISODate(new Date(m.kickoffTime));
+        return k > todayKey && m.status === 'scheduled';
       });
     } else if (dateTab === 'calendar' && calendarDate) {
-      // Compare YYYY-MM-DD in local tz
       result = result.filter(m => toLocalISODate(new Date(m.kickoffTime)) === calendarDate);
     }
+    void tz; void isTodayTz;
 
     // League filter
     if (leagueFilter !== 'all') {

@@ -1,6 +1,6 @@
 "use client"
 
-import { Brain, Sparkles, TrendingUp } from "lucide-react"
+import { Brain, Sparkles, Check, X, MinusCircle } from "lucide-react"
 import { useMemo } from "react"
 import { cn } from "@/lib/utils"
 
@@ -22,6 +22,12 @@ interface AIMultiMarketProps {
     away: { name: string; score?: number }
   }> | null
   markets?: Market[] | null
+  /** Final / current home score — used to auto-mark picks won/lost when status === 'finished' */
+  homeScore?: number | null
+  /** Final / current away score */
+  awayScore?: number | null
+  /** Match status — picks are only auto-marked when this is 'finished' */
+  status?: string
 }
 
 interface MarketPick {
@@ -30,14 +36,22 @@ interface MarketPick {
   odds?: number
   confidence: number
   reason: string
+  /** Internal evaluator key — see evaluatePick(). Optional. */
+  evalKey?: string
+  /** For per-line markets like Over / Under */
+  line?: number
+  /** For 1X2 / DC / DNB / HT — which side this picks */
+  side?: 'home' | 'away' | 'draw' | 'home_or_draw' | 'away_or_draw' | 'home_or_away'
+  /** Correct-score string like "2-1" */
+  scoreLean?: string
 }
+
+type Outcome = 'won' | 'lost' | 'void' | 'pending'
 
 /**
  * AI multi-market predictions block.
- * Generates a pick (with confidence + reasoning) across the most popular
- * football markets — not just 1X2. When real bookmaker `markets` are provided
- * we pin the pick's price to the actual averaged price so the user sees a
- * realistic stake suggestion.
+ * After the match finishes (status === 'finished' && scores are numbers) every pick
+ * is automatically marked won / lost / void with a check or X badge.
  */
 export function AIMultiMarket({
   homeTeam,
@@ -48,13 +62,42 @@ export function AIMultiMarket({
   awayForm,
   h2h,
   markets,
+  homeScore,
+  awayScore,
+  status,
 }: AIMultiMarketProps) {
   const picks = useMemo(
     () => buildMultiMarketPicks({ homeTeam, awayTeam, sportSlug, odds, homeForm, awayForm, h2h, markets: markets || null }),
     [homeTeam, awayTeam, sportSlug, odds, homeForm, awayForm, h2h, markets],
   )
 
+  const isFinal =
+    (status === 'finished' || status === 'final' || status === 'ft' || status === 'ended') &&
+    typeof homeScore === 'number' &&
+    typeof awayScore === 'number'
+
+  const pickWithOutcomes = useMemo(
+    () =>
+      picks.map((p) => ({
+        pick: p,
+        outcome: isFinal ? evaluatePick(p, homeScore as number, awayScore as number) : 'pending' as Outcome,
+      })),
+    [picks, isFinal, homeScore, awayScore],
+  )
+
   if (picks.length === 0) return null
+
+  const summary = isFinal
+    ? pickWithOutcomes.reduce(
+        (acc, x) => {
+          if (x.outcome === 'won') acc.won++
+          else if (x.outcome === 'lost') acc.lost++
+          else if (x.outcome === 'void') acc.void++
+          return acc
+        },
+        { won: 0, lost: 0, void: 0 },
+      )
+    : null
 
   return (
     <div className="rounded-2xl border border-fuchsia-500/30 bg-gradient-to-br from-fuchsia-500/10 via-violet-500/5 to-transparent overflow-hidden">
@@ -67,22 +110,27 @@ export function AIMultiMarket({
           </span>
         </div>
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1.5 flex-wrap">
             <h3 className="text-sm font-bold text-foreground">AI Picks — All Markets</h3>
             <span className="text-[9px] font-bold uppercase tracking-wide bg-gradient-to-r from-fuchsia-500 to-violet-500 text-white px-1.5 py-0.5 rounded">
               Beta
             </span>
+            {isFinal && summary && (
+              <span className="text-[10px] font-bold uppercase tracking-wide bg-emerald-500/15 text-emerald-600 border border-emerald-500/30 px-1.5 py-0.5 rounded">
+                Settled · {summary.won}W / {summary.lost}L{summary.void ? ` / ${summary.void}V` : ''}
+              </span>
+            )}
           </div>
           <p className="text-[11px] text-muted-foreground">
-            One pick per market, ranked by confidence
+            {isFinal ? 'Auto-graded against the final score' : 'One pick per market, ranked by confidence'}
           </p>
         </div>
         <Sparkles className="h-4 w-4 text-fuchsia-400" />
       </div>
 
       <div className="divide-y divide-border/40">
-        {picks.map(p => (
-          <PickRow key={p.market} pick={p} />
+        {pickWithOutcomes.map(({ pick, outcome }) => (
+          <PickRow key={pick.market} pick={pick} outcome={outcome} />
         ))}
       </div>
 
@@ -93,22 +141,49 @@ export function AIMultiMarket({
   )
 }
 
-function PickRow({ pick }: { pick: MarketPick }) {
+function PickRow({ pick, outcome }: { pick: MarketPick; outcome: Outcome }) {
   const conf = pick.confidence
   const confColor = conf >= 70 ? "text-emerald-400" : conf >= 55 ? "text-amber-400" : "text-rose-400"
   const barColor = conf >= 70 ? "bg-emerald-500" : conf >= 55 ? "bg-amber-500" : "bg-rose-500"
 
+  const outcomeBadge =
+    outcome === 'won' ? (
+      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-bold text-emerald-600 border border-emerald-500/30">
+        <Check className="h-3 w-3" />Won
+      </span>
+    ) : outcome === 'lost' ? (
+      <span className="inline-flex items-center gap-1 rounded-full bg-rose-500/15 px-1.5 py-0.5 text-[10px] font-bold text-rose-600 border border-rose-500/30">
+        <X className="h-3 w-3" />Lost
+      </span>
+    ) : outcome === 'void' ? (
+      <span className="inline-flex items-center gap-1 rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-bold text-muted-foreground border border-border">
+        <MinusCircle className="h-3 w-3" />Void
+      </span>
+    ) : null
+
   return (
-    <div className="px-4 py-3">
+    <div className={cn(
+      "px-4 py-3",
+      outcome === 'won' && "bg-emerald-500/5",
+      outcome === 'lost' && "bg-rose-500/5",
+    )}>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <p className="text-[10px] uppercase tracking-wide text-muted-foreground font-semibold">{pick.market}</p>
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <p className="text-[10px] uppercase tracking-wide text-muted-foreground font-semibold">{pick.market}</p>
+            {outcomeBadge}
+          </div>
           <p className="mt-0.5 text-sm font-bold text-foreground line-clamp-1">{pick.pick}</p>
           <p className="mt-1 text-[11px] text-muted-foreground line-clamp-2">{pick.reason}</p>
         </div>
         <div className="text-right shrink-0 flex flex-col items-end gap-0.5">
           {pick.odds !== undefined && (
-            <span className="font-mono text-base font-black text-primary tabular-nums">
+            <span className={cn(
+              "font-mono text-base font-black tabular-nums",
+              outcome === 'won' ? "text-emerald-500" :
+              outcome === 'lost' ? "text-rose-500 line-through opacity-60" :
+              "text-primary"
+            )}>
               {pick.odds.toFixed(2)}
             </span>
           )}
@@ -120,6 +195,49 @@ function PickRow({ pick }: { pick: MarketPick }) {
       </div>
     </div>
   )
+}
+
+// ───────────────────────────────────────────────
+// Outcome evaluator
+// ───────────────────────────────────────────────
+function evaluatePick(p: MarketPick, hs: number, as: number): Outcome {
+  const total = hs + as
+  const homeWin = hs > as
+  const awayWin = as > hs
+  const draw = hs === as
+
+  switch (p.evalKey) {
+    case '1x2':
+      if (p.side === 'home') return homeWin ? 'won' : 'lost'
+      if (p.side === 'away') return awayWin ? 'won' : 'lost'
+      if (p.side === 'draw') return draw ? 'won' : 'lost'
+      return 'void'
+    case 'dc':
+      if (p.side === 'home_or_draw') return (homeWin || draw) ? 'won' : 'lost'
+      if (p.side === 'away_or_draw') return (awayWin || draw) ? 'won' : 'lost'
+      if (p.side === 'home_or_away') return (homeWin || awayWin) ? 'won' : 'lost'
+      return 'void'
+    case 'dnb':
+      if (draw) return 'void'
+      if (p.side === 'home') return homeWin ? 'won' : 'lost'
+      if (p.side === 'away') return awayWin ? 'won' : 'lost'
+      return 'void'
+    case 'btts_yes':
+      return (hs > 0 && as > 0) ? 'won' : 'lost'
+    case 'btts_no':
+      return (hs === 0 || as === 0) ? 'won' : 'lost'
+    case 'over':
+      return total > (p.line ?? 2.5) ? 'won' : 'lost'
+    case 'under':
+      return total < (p.line ?? 2.5) ? 'won' : 'lost'
+    case 'cs_lean':
+      return p.scoreLean === `${hs}-${as}` ? 'won' : 'lost'
+    case 'ht':
+      // Half-time pick — we can't grade without HT score, so leave pending/void
+      return 'void'
+    default:
+      return 'void'
+  }
 }
 
 // ───────────────────────────────────────────────
@@ -199,6 +317,7 @@ function buildMultiMarketPicks(input: EngineInput): MarketPick[] {
   if (odds) {
     const isSoccer = sportSlug === "soccer" || sportSlug === "football"
     const winner = homeP >= awayP ? homeTeam : awayTeam
+    const winnerSide: 'home' | 'away' = homeP >= awayP ? 'home' : 'away'
     const winnerP = Math.max(homeP, awayP)
     const drawIsBest = isSoccer && drawP > homeP && drawP > awayP
     if (drawIsBest) {
@@ -208,6 +327,8 @@ function buildMultiMarketPicks(input: EngineInput): MarketPick[] {
         odds: odds.draw,
         confidence: Math.round(Math.min(82, drawP * 100)),
         reason: "Tightly priced market with both sides closely matched on form and odds.",
+        evalKey: '1x2',
+        side: 'draw',
       })
     } else {
       picks.push({
@@ -216,6 +337,8 @@ function buildMultiMarketPicks(input: EngineInput): MarketPick[] {
         odds: winner === homeTeam ? odds.home : odds.away,
         confidence: Math.round(Math.min(88, Math.max(40, winnerP * 100))),
         reason: `Bookmakers price ${winner} as favourite with the strongest implied probability.`,
+        evalKey: '1x2',
+        side: winnerSide,
       })
     }
 
@@ -223,23 +346,27 @@ function buildMultiMarketPicks(input: EngineInput): MarketPick[] {
     const dc1x = 1 / (homeP + drawP)
     const dcx2 = 1 / (drawP + awayP)
     const dc12 = 1 / (homeP + awayP)
-    const dcBest = [
-      { name: `${homeTeam} or Draw (1X)`, p: homeP + drawP, price: Math.round(dc1x * 100) / 100 },
-      { name: `${awayTeam} or Draw (X2)`, p: drawP + awayP, price: Math.round(dcx2 * 100) / 100 },
-      { name: `${homeTeam} or ${awayTeam} (12)`, p: homeP + awayP, price: Math.round(dc12 * 100) / 100 },
-    ].sort((a, b) => b.p - a.p)[0]
+    const dcOptions: Array<{ name: string; p: number; price: number; side: 'home_or_draw' | 'away_or_draw' | 'home_or_away' }> = [
+      { name: `${homeTeam} or Draw (1X)`, p: homeP + drawP, price: Math.round(dc1x * 100) / 100, side: 'home_or_draw' },
+      { name: `${awayTeam} or Draw (X2)`, p: drawP + awayP, price: Math.round(dcx2 * 100) / 100, side: 'away_or_draw' },
+      { name: `${homeTeam} or ${awayTeam} (12)`, p: homeP + awayP, price: Math.round(dc12 * 100) / 100, side: 'home_or_away' },
+    ]
+    const dcBest = dcOptions.sort((a, b) => b.p - a.p)[0]
     picks.push({
       market: "Double Chance",
       pick: dcBest.name,
       odds: dcBest.price,
       confidence: Math.round(Math.min(94, dcBest.p * 100)),
       reason: "Covers two of the three possible outcomes — lower variance than a straight win bet.",
+      evalKey: 'dc',
+      side: dcBest.side,
     })
 
     // ─── Draw No Bet ───
     if (odds.draw) {
       const dnbWinner = homeP >= awayP ? homeTeam : awayTeam
-      const dnbPrice = dnbWinner === homeTeam
+      const dnbSide: 'home' | 'away' = homeP >= awayP ? 'home' : 'away'
+      const dnbPrice = dnbSide === 'home'
         ? Math.round((1 / (homeP / (homeP + awayP))) * 100) / 100
         : Math.round((1 / (awayP / (homeP + awayP))) * 100) / 100
       picks.push({
@@ -248,6 +375,8 @@ function buildMultiMarketPicks(input: EngineInput): MarketPick[] {
         odds: dnbPrice,
         confidence: Math.round(Math.min(90, (Math.max(homeP, awayP) / (homeP + awayP)) * 100)),
         reason: `Stake refunded if the match ends level — safer way to back ${dnbWinner}.`,
+        evalKey: 'dnb',
+        side: dnbSide,
       })
     }
   }
@@ -267,6 +396,7 @@ function buildMultiMarketPicks(input: EngineInput): MarketPick[] {
       reason: bttsYes
         ? `Both sides have found the net in ${Math.round(bttsRate * 100)}% of recent meetings.`
         : `Defenses have controlled the recent meetings — unders BTTS trending.`,
+      evalKey: bttsYes ? 'btts_yes' : 'btts_no',
     })
   }
 
@@ -287,6 +417,8 @@ function buildMultiMarketPicks(input: EngineInput): MarketPick[] {
       reason: over
         ? `Recent meetings average ${avgGoals.toFixed(1)} goals — comfortably above the ${line} line.`
         : `Recent meetings average ${avgGoals.toFixed(1)} goals — leaning under ${line}.`,
+      evalKey: over ? 'over' : 'under',
+      line,
     })
   }
 
@@ -305,12 +437,12 @@ function buildMultiMarketPicks(input: EngineInput): MarketPick[] {
       reason: htDrawP > 0.42
         ? "First halves tend to be cagey when neither side dominates the odds."
         : `${htWinner} are more likely to start strongly given the bookmaker pricing.`,
+      evalKey: 'ht',
     })
   }
 
   // ─── Correct score lean ───
   if (odds && (sportSlug === "soccer" || sportSlug === "football")) {
-    // very rough guess based on avg goals + winner
     const winner = homeP >= awayP ? "home" : "away"
     let cs = "1-1"
     if (avgGoals < 1.5) cs = winner === "home" ? "1-0" : "0-1"
@@ -320,8 +452,10 @@ function buildMultiMarketPicks(input: EngineInput): MarketPick[] {
     picks.push({
       market: "Correct Score (Lean)",
       pick: cs,
-      confidence: 18 + Math.round(Math.random() * 8), // CS is inherently low confidence
+      confidence: 18 + Math.round(Math.random() * 8),
       reason: `Most-likely scoreline given a ~${avgGoals.toFixed(1)}-goal expectation.`,
+      evalKey: 'cs_lean',
+      scoreLean: cs,
     })
   }
 
