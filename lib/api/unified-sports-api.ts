@@ -1096,11 +1096,14 @@ function generateBettingMarkets(
   });
   
   if (sportType === 'soccer') {
+    const drawOdd = odds.draw || 3.5;
+    const round = (n: number, p = 100) => Math.round(n * p) / p;
+    const jitter = (base: number, spread: number) => round(base + (Math.random() - 0.5) * spread);
+
     // Double Chance
-    const dc1x = Math.round((1 / (1/odds.home + 1/(odds.draw || 3.5))) * 100) / 100;
-    const dc12 = Math.round((1 / (1/odds.home + 1/odds.away)) * 100) / 100;
-    const dcx2 = Math.round((1 / (1/(odds.draw || 3.5) + 1/odds.away)) * 100) / 100;
-    
+    const dc1x = round(1 / (1/odds.home + 1/drawOdd));
+    const dc12 = round(1 / (1/odds.home + 1/odds.away));
+    const dcx2 = round(1 / (1/drawOdd + 1/odds.away));
     markets.push({
       key: 'double_chance',
       name: 'Double Chance',
@@ -1108,43 +1111,266 @@ function generateBettingMarkets(
         { name: '1X (Home or Draw)', price: Math.max(1.1, dc1x) },
         { name: '12 (Home or Away)', price: Math.max(1.1, dc12) },
         { name: 'X2 (Draw or Away)', price: Math.max(1.1, dcx2) },
-      ]
+      ],
     });
-    
-    // Over/Under Goals
+
+    // Draw No Bet
+    const dnbHome = round(1 / (1/odds.home + (1/drawOdd) * 0.5));
+    const dnbAway = round(1 / (1/odds.away + (1/drawOdd) * 0.5));
     markets.push({
-      key: 'totals_2_5',
-      name: 'Over/Under 2.5 Goals',
+      key: 'dnb',
+      name: 'Draw No Bet',
       outcomes: [
-        { name: 'Over 2.5', price: Math.round((1.85 + Math.random() * 0.3) * 100) / 100 },
-        { name: 'Under 2.5', price: Math.round((1.9 + Math.random() * 0.25) * 100) / 100 },
-      ]
+        { name: homeTeam, price: Math.max(1.1, dnbHome) },
+        { name: awayTeam, price: Math.max(1.1, dnbAway) },
+      ],
     });
-    
+
+    // Over/Under goals — full ladder
+    for (const line of [0.5, 1.5, 2.5, 3.5, 4.5]) {
+      const drift = (line - 2.5) * 0.6;
+      markets.push({
+        key: `totals_${String(line).replace('.', '_')}`,
+        name: `Over/Under ${line} Goals`,
+        outcomes: [
+          { name: `Over ${line}`, price: jitter(1.9 + drift, 0.2), point: line },
+          { name: `Under ${line}`, price: jitter(1.9 - drift, 0.2), point: line },
+        ],
+      });
+    }
+
     // Both Teams to Score
     markets.push({
       key: 'btts',
       name: 'Both Teams to Score',
       outcomes: [
-        { name: 'Yes', price: Math.round((1.75 + Math.random() * 0.35) * 100) / 100 },
-        { name: 'No', price: Math.round((1.95 + Math.random() * 0.3) * 100) / 100 },
-      ]
+        { name: 'Yes', price: jitter(1.85, 0.25) },
+        { name: 'No', price: jitter(1.95, 0.25) },
+      ],
     });
-    
+
+    // BTTS + Result combo
+    markets.push({
+      key: 'btts_and_result',
+      name: 'BTTS & Result',
+      outcomes: [
+        { name: `${homeTeam} & Yes`, price: jitter(4.0, 0.6) },
+        { name: 'Draw & Yes', price: jitter(4.5, 0.6) },
+        { name: `${awayTeam} & Yes`, price: jitter(5.0, 0.7) },
+        { name: `${homeTeam} & No`, price: jitter(4.5, 0.7) },
+        { name: 'Draw & No', price: jitter(7.5, 1.2) },
+        { name: `${awayTeam} & No`, price: jitter(6.0, 0.9) },
+      ],
+    });
+
+    // HT/FT
+    markets.push({
+      key: 'ht_ft',
+      name: 'Half-Time / Full-Time',
+      outcomes: [
+        { name: '1/1', price: jitter(3.5, 0.6) },
+        { name: '1/X', price: jitter(13, 2) },
+        { name: '1/2', price: jitter(28, 4) },
+        { name: 'X/1', price: jitter(5.5, 0.7) },
+        { name: 'X/X', price: jitter(4.5, 0.6) },
+        { name: 'X/2', price: jitter(7, 0.9) },
+        { name: '2/1', price: jitter(28, 4) },
+        { name: '2/X', price: jitter(15, 2) },
+        { name: '2/2', price: jitter(4.5, 0.6) },
+      ],
+    });
+
+    // Half-time Result (1X2)
+    markets.push({
+      key: 'ht_result',
+      name: 'Half-Time Result',
+      outcomes: [
+        { name: homeTeam, price: jitter(odds.home * 1.4, 0.3) },
+        { name: 'Draw', price: jitter(2.2, 0.3) },
+        { name: awayTeam, price: jitter(odds.away * 1.4, 0.3) },
+      ],
+    });
+
+    // Odd/Even Goals
+    markets.push({
+      key: 'odd_even_goals',
+      name: 'Odd/Even Goals',
+      outcomes: [
+        { name: 'Odd', price: jitter(1.92, 0.1) },
+        { name: 'Even', price: jitter(1.92, 0.1) },
+      ],
+    });
+
+    // Exact Goals
+    markets.push({
+      key: 'exact_goals',
+      name: 'Exact Goals',
+      outcomes: [
+        { name: '0', price: jitter(9, 1.5) },
+        { name: '1', price: jitter(4.5, 0.6) },
+        { name: '2', price: jitter(3.6, 0.4) },
+        { name: '3', price: jitter(4.5, 0.6) },
+        { name: '4', price: jitter(7.5, 1.2) },
+        { name: '5+', price: jitter(8.5, 1.5) },
+      ],
+    });
+
+    // Clean Sheet — Yes/No per side
+    markets.push({
+      key: 'clean_sheet_home',
+      name: `${homeTeam} Clean Sheet`,
+      outcomes: [
+        { name: 'Yes', price: jitter(2.4, 0.3) },
+        { name: 'No', price: jitter(1.55, 0.15) },
+      ],
+    });
+    markets.push({
+      key: 'clean_sheet_away',
+      name: `${awayTeam} Clean Sheet`,
+      outcomes: [
+        { name: 'Yes', price: jitter(2.9, 0.4) },
+        { name: 'No', price: jitter(1.4, 0.15) },
+      ],
+    });
+
+    // Win to Nil
+    markets.push({
+      key: 'win_to_nil',
+      name: 'Win to Nil',
+      outcomes: [
+        { name: homeTeam, price: jitter(odds.home * 1.6, 0.3) },
+        { name: awayTeam, price: jitter(odds.away * 1.6, 0.4) },
+      ],
+    });
+
     // Correct Score
     markets.push({
       key: 'correct_score',
       name: 'Correct Score',
       outcomes: [
-        { name: '1-0', price: Math.round((6.5 + Math.random() * 2) * 100) / 100 },
-        { name: '2-1', price: Math.round((8.5 + Math.random() * 2) * 100) / 100 },
-        { name: '1-1', price: Math.round((6.5 + Math.random() * 1.5) * 100) / 100 },
-        { name: '0-0', price: Math.round((9 + Math.random() * 3) * 100) / 100 },
-        { name: '2-0', price: Math.round((9 + Math.random() * 2) * 100) / 100 },
-        { name: '0-1', price: Math.round((10 + Math.random() * 3) * 100) / 100 },
-      ]
+        { name: '1-0', price: jitter(7.5, 1.5) },
+        { name: '2-0', price: jitter(9, 1.5) },
+        { name: '2-1', price: jitter(8.5, 1.5) },
+        { name: '3-0', price: jitter(15, 3) },
+        { name: '3-1', price: jitter(14, 2) },
+        { name: '3-2', price: jitter(20, 4) },
+        { name: '0-0', price: jitter(10, 2) },
+        { name: '1-1', price: jitter(6.5, 1) },
+        { name: '2-2', price: jitter(15, 3) },
+        { name: '0-1', price: jitter(10, 2) },
+        { name: '0-2', price: jitter(13, 2) },
+        { name: '1-2', price: jitter(11, 2) },
+      ],
+    });
+
+    // Total Corners (full ladder)
+    for (const line of [7.5, 8.5, 9.5, 10.5, 11.5]) {
+      markets.push({
+        key: `corners_total_${String(line).replace('.', '_')}`,
+        name: `Total Corners O/U ${line}`,
+        outcomes: [
+          { name: `Over ${line}`, price: jitter(1.9, 0.2), point: line },
+          { name: `Under ${line}`, price: jitter(1.9, 0.2), point: line },
+        ],
+      });
+    }
+    // Race to corners
+    markets.push({
+      key: 'race_corners_5',
+      name: 'Race to 5 Corners',
+      outcomes: [
+        { name: homeTeam, price: jitter(2.0, 0.2) },
+        { name: awayTeam, price: jitter(2.2, 0.2) },
+        { name: 'Neither', price: jitter(8, 2) },
+      ],
+    });
+    // Total cards
+    for (const line of [3.5, 4.5, 5.5, 6.5]) {
+      markets.push({
+        key: `cards_total_${String(line).replace('.', '_')}`,
+        name: `Total Cards O/U ${line}`,
+        outcomes: [
+          { name: `Over ${line}`, price: jitter(1.9, 0.2), point: line },
+          { name: `Under ${line}`, price: jitter(1.9, 0.2), point: line },
+        ],
+      });
+    }
+    // Red Card in match
+    markets.push({
+      key: 'red_card',
+      name: 'Red Card in Match',
+      outcomes: [
+        { name: 'Yes', price: jitter(3.5, 0.5) },
+        { name: 'No', price: jitter(1.28, 0.08) },
+      ],
+    });
+    // Penalty awarded
+    markets.push({
+      key: 'penalty_awarded',
+      name: 'Penalty Awarded',
+      outcomes: [
+        { name: 'Yes', price: jitter(2.6, 0.3) },
+        { name: 'No', price: jitter(1.45, 0.1) },
+      ],
+    });
+    // First-half goal
+    markets.push({
+      key: 'goal_first_half',
+      name: 'Goal in 1st Half',
+      outcomes: [
+        { name: 'Yes', price: jitter(1.55, 0.15) },
+        { name: 'No', price: jitter(2.35, 0.25) },
+      ],
+    });
+    // Goal in both halves
+    markets.push({
+      key: 'goal_both_halves',
+      name: 'Goal in Both Halves',
+      outcomes: [
+        { name: 'Yes', price: jitter(1.75, 0.2) },
+        { name: 'No', price: jitter(2.0, 0.2) },
+      ],
+    });
+    // Asian handicap (popular)
+    const ahLine = odds.home < odds.away ? -1 : 1;
+    markets.push({
+      key: 'asian_handicap',
+      name: `Asian Handicap ${ahLine > 0 ? '+' : ''}${ahLine}`,
+      outcomes: [
+        { name: `${homeTeam} ${ahLine > 0 ? '+' : ''}${ahLine}`, price: jitter(1.9, 0.2), point: ahLine },
+        { name: `${awayTeam} ${-ahLine > 0 ? '+' : ''}${-ahLine}`, price: jitter(1.9, 0.2), point: -ahLine },
+      ],
+    });
+    // Team totals
+    markets.push({
+      key: 'team_total_home_1_5',
+      name: `${homeTeam} Total Goals 1.5`,
+      outcomes: [
+        { name: 'Over 1.5', price: jitter(2.1, 0.2), point: 1.5 },
+        { name: 'Under 1.5', price: jitter(1.7, 0.15), point: 1.5 },
+      ],
+    });
+    markets.push({
+      key: 'team_total_away_1_5',
+      name: `${awayTeam} Total Goals 1.5`,
+      outcomes: [
+        { name: 'Over 1.5', price: jitter(2.4, 0.3), point: 1.5 },
+        { name: 'Under 1.5', price: jitter(1.55, 0.15), point: 1.5 },
+      ],
+    });
+    // Highest scoring half
+    markets.push({
+      key: 'highest_scoring_half',
+      name: 'Highest Scoring Half',
+      outcomes: [
+        { name: '1st Half', price: jitter(2.6, 0.3) },
+        { name: '2nd Half', price: jitter(2.05, 0.2) },
+        { name: 'Equal', price: jitter(3.4, 0.4) },
+      ],
     });
   } else if (sportType === 'basketball') {
+    const round = (n: number, p = 100) => Math.round(n * p) / p;
+    const jitter = (base: number, spread: number) => round(base + (Math.random() - 0.5) * spread);
     const spread = odds.home < odds.away ? -5.5 : 5.5;
     markets.push({
       key: 'spreads',
@@ -1152,27 +1378,93 @@ function generateBettingMarkets(
       outcomes: [
         { name: `${homeTeam} ${spread > 0 ? '+' : ''}${spread}`, price: 1.91, point: spread },
         { name: `${awayTeam} ${-spread > 0 ? '+' : ''}${-spread}`, price: 1.91, point: -spread },
-      ]
+      ],
     });
-    
+    // Alternate spreads
+    for (const off of [3.5, 7.5, 10.5]) {
+      const sp = spread > 0 ? spread + off : spread - off;
+      markets.push({
+        key: `spread_alt_${off}`,
+        name: `Alt Spread ±${Math.abs(sp).toFixed(1)}`,
+        outcomes: [
+          { name: `${homeTeam} ${sp > 0 ? '+' : ''}${sp}`, price: jitter(1.91, 0.4), point: sp },
+          { name: `${awayTeam} ${-sp > 0 ? '+' : ''}${-sp}`, price: jitter(1.91, 0.4), point: -sp },
+        ],
+      });
+    }
     const totalPoints = 210 + Math.floor(Math.random() * 30);
     markets.push({
       key: 'totals',
-      name: `Total Points (${totalPoints}.5)`,
+      name: `Total Points O/U ${totalPoints}.5`,
       outcomes: [
         { name: `Over ${totalPoints}.5`, price: 1.91, point: totalPoints + 0.5 },
         { name: `Under ${totalPoints}.5`, price: 1.91, point: totalPoints + 0.5 },
-      ]
+      ],
     });
-    
-    // Quarter betting
+    // Team totals
     markets.push({
-      key: 'first_quarter',
-      name: '1st Quarter Winner',
+      key: 'team_total_home',
+      name: `${homeTeam} Total Points`,
       outcomes: [
-        { name: homeTeam, price: Math.round((odds.home * 0.95) * 100) / 100 },
-        { name: awayTeam, price: Math.round((odds.away * 0.95) * 100) / 100 },
-      ]
+        { name: 'Over 110.5', price: jitter(1.9, 0.2), point: 110.5 },
+        { name: 'Under 110.5', price: jitter(1.9, 0.2), point: 110.5 },
+      ],
+    });
+    markets.push({
+      key: 'team_total_away',
+      name: `${awayTeam} Total Points`,
+      outcomes: [
+        { name: 'Over 108.5', price: jitter(1.9, 0.2), point: 108.5 },
+        { name: 'Under 108.5', price: jitter(1.9, 0.2), point: 108.5 },
+      ],
+    });
+    // Quarter / half winner
+    for (const q of [1, 2, 3, 4]) {
+      markets.push({
+        key: `quarter_winner_${q}`,
+        name: `Q${q} Winner`,
+        outcomes: [
+          { name: homeTeam, price: jitter(odds.home * 0.95, 0.2) },
+          { name: awayTeam, price: jitter(odds.away * 0.95, 0.2) },
+        ],
+      });
+    }
+    markets.push({
+      key: 'half_1_winner',
+      name: '1st Half Winner',
+      outcomes: [
+        { name: homeTeam, price: jitter(odds.home, 0.2) },
+        { name: awayTeam, price: jitter(odds.away, 0.2) },
+      ],
+    });
+    // Race to 20 points
+    markets.push({
+      key: 'race_to_20',
+      name: 'Race to 20 Points',
+      outcomes: [
+        { name: homeTeam, price: jitter(1.85, 0.2) },
+        { name: awayTeam, price: jitter(1.95, 0.2) },
+      ],
+    });
+    // Overtime
+    markets.push({
+      key: 'overtime',
+      name: 'Overtime?',
+      outcomes: [
+        { name: 'Yes', price: jitter(8, 1.5) },
+        { name: 'No', price: jitter(1.07, 0.05) },
+      ],
+    });
+    // Highest scoring quarter
+    markets.push({
+      key: 'highest_quarter',
+      name: 'Highest Scoring Quarter',
+      outcomes: [
+        { name: 'Q1', price: jitter(4.5, 0.5) },
+        { name: 'Q2', price: jitter(4.0, 0.5) },
+        { name: 'Q3', price: jitter(4.0, 0.5) },
+        { name: 'Q4', price: jitter(2.4, 0.3) },
+      ],
     });
   } else if (sportType === 'football') {
     const spread = odds.home < odds.away ? -3.5 : 3.5;
@@ -1205,50 +1497,103 @@ function generateBettingMarkets(
       ]
     });
   } else if (sportType === 'tennis') {
-    // Set betting
+    const round = (n: number, p = 100) => Math.round(n * p) / p;
+    const jitter = (base: number, spread: number) => round(base + (Math.random() - 0.5) * spread);
+    // Set betting (best of 3)
     markets.push({
       key: 'set_betting',
-      name: 'Set Betting',
+      name: 'Set Betting (Bo3)',
       outcomes: [
-        { name: `${homeTeam} 2-0`, price: Math.round((2.5 + Math.random() * 1) * 100) / 100 },
-        { name: `${homeTeam} 2-1`, price: Math.round((3.5 + Math.random() * 1) * 100) / 100 },
-        { name: `${awayTeam} 2-0`, price: Math.round((2.8 + Math.random() * 1) * 100) / 100 },
-        { name: `${awayTeam} 2-1`, price: Math.round((3.8 + Math.random() * 1) * 100) / 100 },
-      ]
+        { name: `${homeTeam} 2-0`, price: jitter(2.5, 0.6) },
+        { name: `${homeTeam} 2-1`, price: jitter(3.5, 0.5) },
+        { name: `${awayTeam} 2-0`, price: jitter(2.8, 0.6) },
+        { name: `${awayTeam} 2-1`, price: jitter(3.8, 0.5) },
+      ],
     });
-    
-    // Games handicap
+    // Games handicap (full ladder)
+    for (const g of [2.5, 4.5, 6.5]) {
+      markets.push({
+        key: `games_handicap_${g}`,
+        name: `Games Handicap ±${g}`,
+        outcomes: [
+          { name: `${homeTeam} -${g}`, price: jitter(1.91, 0.3), point: -g },
+          { name: `${awayTeam} +${g}`, price: jitter(1.91, 0.3), point: g },
+        ],
+      });
+    }
+    // Total games
     markets.push({
-      key: 'games_handicap',
-      name: 'Games Handicap',
+      key: 'total_games_22_5',
+      name: 'Total Games O/U 22.5',
       outcomes: [
-        { name: `${homeTeam} -4.5`, price: 1.91 },
-        { name: `${awayTeam} +4.5`, price: 1.91 },
-      ]
+        { name: 'Over 22.5', price: jitter(1.9, 0.2), point: 22.5 },
+        { name: 'Under 22.5', price: jitter(1.9, 0.2), point: 22.5 },
+      ],
+    });
+    // 1st Set Winner
+    markets.push({
+      key: 'first_set_winner',
+      name: '1st Set Winner',
+      outcomes: [
+        { name: homeTeam, price: jitter(odds.home, 0.2) },
+        { name: awayTeam, price: jitter(odds.away, 0.2) },
+      ],
+    });
+    // Tie-break in match
+    markets.push({
+      key: 'tiebreak_in_match',
+      name: 'Tie-Break in Match',
+      outcomes: [
+        { name: 'Yes', price: jitter(2.2, 0.3) },
+        { name: 'No', price: jitter(1.65, 0.2) },
+      ],
     });
   } else if (sportType === 'mma') {
+    const round = (n: number, p = 100) => Math.round(n * p) / p;
+    const jitter = (base: number, spread: number) => round(base + (Math.random() - 0.5) * spread);
     // Method of Victory
     markets.push({
       key: 'method',
       name: 'Method of Victory',
       outcomes: [
-        { name: `${homeTeam} by KO/TKO`, price: Math.round((3 + Math.random() * 2) * 100) / 100 },
-        { name: `${homeTeam} by Submission`, price: Math.round((5 + Math.random() * 3) * 100) / 100 },
-        { name: `${homeTeam} by Decision`, price: Math.round((4 + Math.random() * 2) * 100) / 100 },
-        { name: `${awayTeam} by KO/TKO`, price: Math.round((3.5 + Math.random() * 2) * 100) / 100 },
-        { name: `${awayTeam} by Submission`, price: Math.round((5.5 + Math.random() * 3) * 100) / 100 },
-        { name: `${awayTeam} by Decision`, price: Math.round((4.5 + Math.random() * 2) * 100) / 100 },
-      ]
+        { name: `${homeTeam} by KO/TKO`, price: jitter(3.5, 1.2) },
+        { name: `${homeTeam} by Submission`, price: jitter(6.5, 2) },
+        { name: `${homeTeam} by Decision`, price: jitter(5, 1.2) },
+        { name: `${awayTeam} by KO/TKO`, price: jitter(4, 1.2) },
+        { name: `${awayTeam} by Submission`, price: jitter(7, 2) },
+        { name: `${awayTeam} by Decision`, price: jitter(5.5, 1.2) },
+      ],
     });
-    
-    // Total Rounds
+    // Total Rounds (ladder)
+    for (const line of [1.5, 2.5, 3.5, 4.5]) {
+      markets.push({
+        key: `total_rounds_${String(line).replace('.', '_')}`,
+        name: `Total Rounds O/U ${line}`,
+        outcomes: [
+          { name: `Over ${line}`, price: jitter(1.85, 0.3), point: line },
+          { name: `Under ${line}`, price: jitter(1.95, 0.3), point: line },
+        ],
+      });
+    }
+    // Round betting (which round fight ends)
     markets.push({
-      key: 'total_rounds',
-      name: 'Total Rounds',
+      key: 'round_betting',
+      name: 'Round Betting',
       outcomes: [
-        { name: 'Over 1.5', price: Math.round((1.7 + Math.random() * 0.3) * 100) / 100 },
-        { name: 'Under 1.5', price: Math.round((2.1 + Math.random() * 0.3) * 100) / 100 },
-      ]
+        { name: 'Round 1', price: jitter(3.5, 0.6) },
+        { name: 'Round 2', price: jitter(5.5, 1) },
+        { name: 'Round 3', price: jitter(6.5, 1) },
+        { name: 'Goes to Decision', price: jitter(2.4, 0.4) },
+      ],
+    });
+    // Fight goes the distance
+    markets.push({
+      key: 'goes_distance',
+      name: 'Fight Goes the Distance',
+      outcomes: [
+        { name: 'Yes', price: jitter(2.4, 0.4) },
+        { name: 'No', price: jitter(1.55, 0.2) },
+      ],
     });
   } else if (sportType === 'hockey') {
     // Puck line (NHL spread)
@@ -1795,6 +2140,13 @@ export async function getAllMatches(): Promise<UnifiedMatch[]> {
     addMatch(match);
   }
 
+  // Fire-and-forget: persist teams + leagues into MySQL when available.
+  // Never blocks, never throws — silently no-ops on free tier without DB.
+  try {
+    const { persistMatchEntities } = await import('../db/sync');
+    persistMatchEntities(allMatches);
+  } catch { /* swallow */ }
+
   return sortMatchesWithPriority(allMatches);
 }
 
@@ -1957,33 +2309,65 @@ interface TheOddsApiOutrightEvent {
 //
 // We try ALL of these in parallel; empty responses are skipped silently.
 const LEAGUE_TO_ODDS_KEYS: Record<number, string[]> = {
-  // ─── Soccer — domestic top tiers ───
-  1:  ['soccer_epl_winner', 'soccer_epl_top_scorer'],                                 // Premier League
-  2:  ['soccer_spain_la_liga_winner', 'soccer_spain_la_liga_top_scorer'],             // La Liga
-  3:  ['soccer_germany_bundesliga_winner', 'soccer_germany_bundesliga_top_scorer'],   // Bundesliga
-  4:  ['soccer_italy_serie_a_winner', 'soccer_italy_serie_a_top_scorer'],             // Serie A
-  5:  ['soccer_france_ligue_one_winner', 'soccer_france_ligue_one_top_scorer'],       // Ligue 1
-  6:  ['soccer_netherlands_eredivisie_winner'],                                       // Eredivisie
-  7:  ['soccer_portugal_primeira_liga_winner'],                                       // Primeira Liga
+  // ─── Soccer — top tiers ───
+  1:  ['soccer_epl_winner', 'soccer_epl_top_scorer', 'soccer_epl_relegation'],
+  2:  ['soccer_spain_la_liga_winner', 'soccer_spain_la_liga_top_scorer', 'soccer_spain_la_liga_relegation'],
+  3:  ['soccer_germany_bundesliga_winner', 'soccer_germany_bundesliga_top_scorer'],
+  4:  ['soccer_italy_serie_a_winner', 'soccer_italy_serie_a_top_scorer'],
+  5:  ['soccer_france_ligue_one_winner', 'soccer_france_ligue_one_top_scorer'],
+  6:  ['soccer_netherlands_eredivisie_winner'],
+  7:  ['soccer_portugal_primeira_liga_winner'],
+  8:  ['soccer_spl_winner'],                                  // Scottish Premiership
+  11: ['soccer_usa_mls_winner', 'soccer_usa_mls_top_scorer'], // MLS
+  12: ['soccer_brazil_campeonato_winner'],
+  13: ['soccer_argentina_primera_division_winner'],
+  15: ['soccer_turkey_super_league_winner'],
+  16: ['soccer_belgium_first_div_winner'],
   // ─── Soccer — European competitions ───
   9:  ['soccer_uefa_champs_league_winner'],
   10: ['soccer_uefa_europa_league_winner'],
   26: ['soccer_uefa_europa_conference_league_winner'],
+  220: ['soccer_uefa_super_cup_winner'],
+  // ─── Soccer — domestic cups ───
+  44: ['soccer_fa_cup_winner'],
+  45: ['soccer_efl_cup_winner'],
+  47: ['soccer_copa_del_rey_winner'],
+  49: ['soccer_germany_dfb_pokal_winner'],
+  51: ['soccer_italy_coppa_italia_winner'],
+  53: ['soccer_france_coupe_winner'],
   // ─── Soccer — internationals ───
   29: ['soccer_fifa_world_cup_winner'],
   30: ['soccer_uefa_european_championship_winner', 'soccer_uefa_euros_qualification_winner'],
   31: ['soccer_conmebol_copa_america_winner'],
   24: ['soccer_caf_africa_cup_of_nations_winner'],
   109: ['soccer_fifa_club_world_cup_winner'],
+  111: ['soccer_uefa_nations_league_winner'],
+  // ─── Soccer — Lower European tiers ───
+  41: ['soccer_efl_champ_winner'],                  // EFL Championship
+  46: ['soccer_spain_segunda_division_winner'],     // La Liga 2
+  48: ['soccer_germany_bundesliga2_winner'],        // 2. Bundesliga
+  50: ['soccer_italy_serie_b_winner'],              // Serie B
   // ─── North-American majors — championship futures ───
-  101: ['basketball_nba_championship_winner'],   // NBA
-  107: ['basketball_wnba_championship_winner'],  // WNBA
-  401: ['americanfootball_nfl_super_bowl_winner'], // NFL
-  501: ['baseball_mlb_world_series_winner'],     // MLB
-  601: ['icehockey_nhl_championship_winner'],    // NHL
-  // ─── Other ───
-  108: ['basketball_ncaab_championship_winner'], // NCAA Basketball
-  402: ['americanfootball_ncaaf_championship_winner'], // NCAA Football
+  101: ['basketball_nba_championship_winner', 'basketball_nba_mvp'],
+  107: ['basketball_wnba_championship_winner'],
+  401: ['americanfootball_nfl_super_bowl_winner', 'americanfootball_nfl_mvp'],
+  501: ['baseball_mlb_world_series_winner', 'baseball_mlb_world_series_mvp'],
+  601: ['icehockey_nhl_championship_winner'],
+  // ─── NCAA ───
+  108: ['basketball_ncaab_championship_winner'],
+  402: ['americanfootball_ncaaf_championship_winner'],
+  // ─── Tennis (Grand Slam outrights) ───
+  201: ['tennis_atp_aus_open_singles', 'tennis_atp_french_open_singles', 'tennis_atp_wimbledon_singles', 'tennis_atp_us_open_singles'],
+  202: ['tennis_wta_aus_open_singles', 'tennis_wta_french_open_singles', 'tennis_wta_wimbledon_singles', 'tennis_wta_us_open_singles'],
+  // ─── Cricket ───
+  301: ['cricket_ipl_winner'],
+  302: ['cricket_big_bash_winner'],
+  306: ['cricket_psl_winner'],
+  // ─── Golf majors ───
+  1701: ['golf_masters_tournament_winner', 'golf_us_open_winner', 'golf_the_open_championship_winner', 'golf_pga_championship_winner'],
+  1702: ['golf_dp_world_tour_championship_winner'],
+  // ─── Motorsports ───
+  2901: ['motorsport_f1_drivers_championship', 'motorsport_f1_constructors_championship'],
 };
 
 export async function getLeagueOutrights(leagueId: number): Promise<Outright[]> {

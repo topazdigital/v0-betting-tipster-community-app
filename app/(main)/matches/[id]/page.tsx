@@ -236,29 +236,32 @@ function EventIcon({ type }: { type: MatchEvent['type'] }) {
 }
 
 // ---- Live Minute Timer ----
-// For soccer / rugby: ticks the clock every 15 s based on kickoff so the
-// displayed minute keeps moving between API polls. For all other sports
-// the ESPN `minute` field actually means "current period" — we just
-// pass it through and let `liveStatusLabel` translate it (Q1 / Set 3 / etc).
-function useLiveMinute(kickoffTime: string, storedMinute: number | undefined, status: string, sportSlug: string = 'soccer') {
+// IMPORTANT: We mirror the match-card behaviour exactly: trust the API's
+// `minute` field as the source of truth (ESPN updates it every poll, our
+// SWR refreshInterval is 20 s). Between polls we tick the clock locally
+// for soccer / football / rugby so the seconds keep moving naturally —
+// but we always anchor to the API value rather than to kickoff time
+// (kickoff-based ticking was wrong for delayed kick-offs, halftime, ET).
+function useLiveMinute(storedMinute: number | undefined, status: string, sportSlug: string = 'soccer') {
   const [minute, setMinute] = useState(storedMinute ?? 0)
-  const isLive = status === 'live' || status === 'halftime' || status === 'extra_time' || status === 'penalties'
+  const isLive = status === 'live' || status === 'extra_time' || status === 'penalties'
   const isHalftime = status === 'halftime'
   const ticksByMinute = sportSlug === 'soccer' || sportSlug === 'football' || sportSlug === 'rugby'
 
+  // Reset local minute whenever the API hands us a fresh value.
+  useEffect(() => { setMinute(storedMinute ?? 0) }, [storedMinute])
+
   useEffect(() => {
-    if (!isLive) { setMinute(storedMinute ?? 0); return }
-    if (!ticksByMinute) { setMinute(storedMinute ?? 0); return }
-    const kick = new Date(kickoffTime).getTime()
-    const compute = () => {
-      if (isHalftime) { setMinute(45); return }
-      const elapsed = Math.floor((Date.now() - kick) / 60000)
-      setMinute(Math.max(storedMinute ?? 0, Math.min(elapsed, 120)))
-    }
-    compute()
-    const id = setInterval(compute, 15000)
+    if (isHalftime) { setMinute(45); return }
+    if (!isLive || !ticksByMinute) return
+    const start = Date.now()
+    const base = storedMinute ?? 0
+    const id = setInterval(() => {
+      const extra = Math.floor((Date.now() - start) / 60000)
+      setMinute(Math.min(base + extra, 120))
+    }, 30000)
     return () => clearInterval(id)
-  }, [isLive, isHalftime, ticksByMinute, kickoffTime, storedMinute])
+  }, [isLive, isHalftime, ticksByMinute, storedMinute])
 
   return minute
 }
@@ -634,7 +637,6 @@ export default function MatchDetailPage({ params }: PageProps) {
   const isFinished = match?.status === 'finished'
   const isHalftime = match?.status === 'halftime'
   const liveMinute = useLiveMinute(
-    match?.kickoffTime || new Date().toISOString(),
     match?.minute,
     match?.status || '',
     match?.sport.slug || 'soccer'
