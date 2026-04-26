@@ -613,12 +613,16 @@ for (const cfg of ESPN_LEAGUES) {
   ESPN_LEAGUE_BY_SLUG.set(cfg.league.replace(/[^a-z0-9]/gi, ''), cfg);
 }
 export function getEspnLeagueConfigForId(matchId: string): ESPNLeagueConfig | null {
-  const m = matchId.match(/^espn_([a-z0-9]+)_(\d+)$/i);
+  // Match `espn_<league>_<eventId>` where <league> may contain dots
+  // (e.g. "ita.1", "uefa.champions", "conmebol.libertadores").
+  const m = matchId.match(/^espn_([a-z0-9.]+)_(\d+)$/i);
   if (!m) return null;
-  return ESPN_LEAGUE_BY_SLUG.get(m[1]) || null;
+  // Try the slugified key first (no dots), then the raw key.
+  const slug = m[1].replace(/[^a-z0-9]/gi, '');
+  return ESPN_LEAGUE_BY_SLUG.get(slug) || ESPN_LEAGUE_BY_SLUG.get(m[1]) || null;
 }
 export function getEspnEventIdFromMatchId(matchId: string): string | null {
-  const m = matchId.match(/^espn_[a-z0-9]+_(\d+)$/i);
+  const m = matchId.match(/^espn_[a-z0-9.]+_(\d+)$/i);
   return m ? m[1] : null;
 }
 
@@ -2671,9 +2675,103 @@ export function sortMatchesWithPriority(matches: UnifiedMatch[]): UnifiedMatch[]
 }
 
 export async function getMatchById(matchId: string): Promise<UnifiedMatch | null> {
+  // 1) Fast path — match is in the current rolling window (today/upcoming/recent).
+  //    Wrapped in its own try so a transient scoreboard error doesn't kill the
+  //    direct-lookup fallback below.
   try {
     const allMatches = await getAllMatches();
-    return allMatches.find(m => m.id === matchId) || null;
+    const found = allMatches.find(m => m.id === matchId);
+    if (found) return found;
+  } catch (error) {
+    console.warn('[API] getAllMatches failed during getMatchById fast-path:', error);
+  }
+
+  try {
+    // 2) Fallback — direct ESPN lookup. This catches:
+    //    • Older / further-future fixtures outside the cached scoreboard window
+    //    • Past H2H meetings linked from the match-detail page
+    //    • Direct/shared/refreshed match URLs after the league cache rotated
+    const cfg = getEspnLeagueConfigForId(matchId);
+    const eventId = getEspnEventIdFromMatchId(matchId);
+    if (!cfg || !eventId) return null;
+
+    const summary = await fetchESPNSummary(cfg.sport, cfg.league, eventId);
+    const competition = summary?.header?.competitions?.[0];
+    if (!competition) return null;
+
+    const homeComp = competition.competitors?.find(c => c.homeAway === 'home');
+    const awayComp = competition.competitors?.find(c => c.homeAway === 'away');
+    if (!homeComp || !awayComp) return null;
+
+    const noDrawSports: ESPNLeagueConfig['sportType'][] = ['basketball', 'baseball', 'mma', 'tennis', 'golf', 'racing'];
+    const hasDraw = !noDrawSports.includes(cfg.sportType);
+    const summaryOddsList = [...(summary?.pickcenter || []), ...(summary?.odds || [])];
+    const { odds, markets } = extractEspnOdds(summaryOddsList, hasDraw);
+
+    // Best-effort kickoff time — ESPN summary doesn't always include `date`,
+    // so we leave it as "now" if absent (the detail page formats it gracefully).
+    const kickoff = (summary as unknown as { header?: { competitions?: Array<{ date?: string }> } })?.header?.competitions?.[0]?.date;
+
+    // Best-effort status — if both competitors have a "winner" flag set,
+    // the game is finished; otherwise we treat it as scheduled.
+    const isFinished = competition.competitors?.some(c => typeof c.winner === 'boolean');
+    const status: UnifiedMatch['status'] = isFinished ? 'finished' : 'scheduled';
+
+    const homeScoreNum = homeComp.score !== undefined && homeComp.score !== null && homeComp.score !== ''
+      ? parseInt(String(homeComp.score), 10) : null;
+    const awayScoreNum = awayComp.score !== undefined && awayComp.score !== null && awayComp.score !== ''
+      ? parseInt(String(awayComp.score), 10) : null;
+
+    const sportMeta = ALL_SPORTS.find(s => s.id === cfg.sportId);
+    const leagueMeta = ALL_LEAGUES.find(l => l.id === cfg.leagueId);
+
+    return {
+      id: matchId,
+      externalId: eventId,
+      source: 'espn',
+      sportId: cfg.sportId,
+      sportKey: `${cfg.sport}_${cfg.league}`,
+      leagueId: cfg.leagueId,
+      leagueKey: cfg.league,
+      homeTeam: {
+        id: homeComp.team?.id || '',
+        name: homeComp.team?.displayName || 'Home',
+        shortName: homeComp.team?.abbreviation || 'HOM',
+        logo: homeComp.team?.logo,
+        form: homeComp.form,
+        record: homeComp.record?.find(r => r.type === 'total' || !r.type)?.summary,
+      },
+      awayTeam: {
+        id: awayComp.team?.id || '',
+        name: awayComp.team?.displayName || 'Away',
+        shortName: awayComp.team?.abbreviation || 'AWY',
+        logo: awayComp.team?.logo,
+        form: awayComp.form,
+        record: awayComp.record?.find(r => r.type === 'total' || !r.type)?.summary,
+      },
+      kickoffTime: kickoff ? new Date(kickoff) : new Date(),
+      status,
+      homeScore: homeScoreNum,
+      awayScore: awayScoreNum,
+      league: {
+        id: cfg.leagueId,
+        name: cfg.leagueName,
+        slug: leagueMeta?.slug || cfg.league.replace(/\./g, '-'),
+        country: cfg.country,
+        countryCode: cfg.countryCode,
+        tier: 1,
+      },
+      sport: {
+        id: cfg.sportId,
+        name: sportMeta?.name || cfg.sport,
+        slug: sportMeta?.slug || cfg.sport,
+        icon: sportMeta?.icon || cfg.sport,
+      },
+      odds,
+      markets,
+      tipsCount: 0,
+      venue: summary?.gameInfo?.venue?.fullName,
+    };
   } catch (error) {
     console.error('[API] Error fetching match by ID:', error);
     return null;

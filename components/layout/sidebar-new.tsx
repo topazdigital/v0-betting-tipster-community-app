@@ -20,8 +20,25 @@ import {
 import { cn } from '@/lib/utils';
 import { ALL_SPORTS, ALL_LEAGUES, BOOKMAKERS, getSportIcon } from '@/lib/sports-data';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { useMatchStats } from '@/lib/hooks/use-matches';
+import { useMatchStats, useUserCountry } from '@/lib/hooks/use-matches';
 import { FlagIcon } from '@/components/ui/flag-icon';
+
+// Map a single user country code to the broader region it belongs to so we can
+// surface neighbouring African / European leagues alongside the user's home
+// league when ordering "Top Leagues".
+const COUNTRY_REGION: Record<string, string[]> = {
+  KE: ['KE', 'UG', 'TZ', 'AF'],
+  UG: ['UG', 'KE', 'TZ', 'AF'],
+  TZ: ['TZ', 'KE', 'UG', 'AF'],
+  NG: ['NG', 'GH', 'AF'],
+  GH: ['GH', 'NG', 'AF'],
+  ZA: ['ZA', 'AF'],
+  EG: ['EG', 'AF'],
+  US: ['US'],
+  MX: ['MX', 'US'],
+  BR: ['BR', 'SA', 'AR'],
+  AR: ['AR', 'SA', 'BR'],
+};
 
 interface SidebarNewProps {
   selectedSportId?: number | null;
@@ -32,6 +49,7 @@ export function SidebarNew({ selectedSportId, onSelectSport }: SidebarNewProps) 
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const stats = useMatchStats();
+  const userCountry = useUserCountry();
 
   // Group sports by category
   const popularSports = ALL_SPORTS.filter(s => s.category === 'popular');
@@ -41,10 +59,31 @@ export function SidebarNew({ selectedSportId, onSelectSport }: SidebarNewProps) 
   const racingSports = ALL_SPORTS.filter(s => s.category === 'racing');
   const otherSports = ALL_SPORTS.filter(s => s.category === 'other');
 
-  // Get top leagues for selected sport
-  const topLeagues = selectedSportId 
-    ? ALL_LEAGUES.filter(l => l.sportId === selectedSportId).slice(0, 10)
-    : ALL_LEAGUES.filter(l => l.tier === 1).slice(0, 10);
+  // Get top leagues for selected sport — pool of candidates first
+  const candidatePool = selectedSportId
+    ? ALL_LEAGUES.filter(l => l.sportId === selectedSportId)
+    : ALL_LEAGUES.filter(l => l.tier === 1);
+
+  // Reorder: user's home league(s) first, then leagues in the same region,
+  // then the rest. So a Kenyan visitor sees Kenya Premier League at the
+  // top, then Uganda/Tanzania/CAF, then EPL/La Liga/etc.
+  const region = COUNTRY_REGION[userCountry] || [userCountry];
+  const localCountryRank = (cc: string): number => {
+    const idx = region.indexOf(cc);
+    if (idx === -1) return 999;
+    return idx; // 0 = exact home country, 1+ = neighbours / continent
+  };
+
+  const topLeagues = [...candidatePool]
+    .sort((a, b) => {
+      const ra = localCountryRank(a.countryCode);
+      const rb = localCountryRank(b.countryCode);
+      if (ra !== rb) return ra - rb;
+      // Within same locality bucket, keep tier-1 ahead and stable league id order
+      if (a.tier !== b.tier) return a.tier - b.tier;
+      return a.id - b.id;
+    })
+    .slice(0, 10);
 
   return (
     <aside className="hidden w-64 shrink-0 border-r border-border bg-sidebar lg:block">

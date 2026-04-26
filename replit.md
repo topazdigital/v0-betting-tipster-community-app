@@ -33,6 +33,14 @@ Key architectural decisions include:
 
 ## Recent Changes
 
+### Locality, Smart AI & Match-Lookup Fixes (April 26, 2026 — later)
+- **"Match not found" eliminated**: Two fixes in `lib/api/unified-sports-api.ts`:
+  1. `getEspnLeagueConfigForId` / `getEspnEventIdFromMatchId` regexes now allow dots in the league key (`[a-z0-9.]+`) so IDs like `espn_ita.1_737118`, `espn_uefa.champions_xxx`, and `espn_conmebol.libertadores_xxx` parse correctly.
+  2. `getMatchById` falls back to `fetchESPNSummary(...)` and reconstructs a `UnifiedMatch` from the summary header when the match isn't in the current rolling scoreboard window — covering older fixtures, distant-future games, and H2H links. Fast-path errors no longer skip the fallback.
+- **Sidebar respects user country**: `components/layout/sidebar-new.tsx` reads `useUserCountry()` and re-orders the top-leagues list using a `COUNTRY_REGION` map (e.g. KE/UG/TZ users see KPL, Uganda Premier, NPFL before EPL/La Liga). Falls back to default tier ranking when country is unknown.
+- **Smarter AI multi-market**: `components/ai/ai-multi-market.tsx` now defaults `mode` to `'smart'` (was `'odds'`) and accepts a `lineups` prop. The smart engine adds a lineup signal `(starters * 0.3) - (injuries * 1.2)` to each side's raw score so confirmed starters / late absences shift confidence — not just odds. The match-detail page passes lineups from `data.lineups`.
+- **AI chat aware of the open match**: `app/api/ai/chat/route.ts` parses the page-context `Viewing match id: …`, calls `getMatchById`, and injects a structured `CURRENT MATCH` block (teams, league, status, kickoff, odds, both forms, both records, venue) into the system prompt. The system prompt also gained explicit "be SMART, not generic" rules: cite real numbers, give concrete reasons, name confidence and market, never tell the user to "check the match page".
+
 ### Match-Detail & Live Section Fixes (April 26, 2026)
 - **Live row no longer flickers**: Added `keepPreviousData: true` to `useLiveMatches` and `useMatches` SWR configs so the home page's "Live Now" section keeps showing the live marquee during the 10-second background refresh instead of flashing to the "no live games right now" empty panel (`lib/hooks/use-matches.ts`).
 - **Sport-specific lineups**: The football pitch graphic in the match detail Lineups tab is now rendered only for soccer/football/rugby. Other sports (basketball, baseball, NFL, NHL, etc.) display roster cards only — the misleading pitch is hidden (`app/(main)/matches/[id]/page.tsx`).

@@ -28,6 +28,11 @@ interface AIMultiMarketProps {
   awayScore?: number | null
   /** Match status — picks are only auto-marked when this is 'finished' */
   status?: string
+  /** Optional lineups — when present we factor starter count + key absences into the smart pick */
+  lineups?: {
+    home?: { starters?: number; injuries?: number }
+    away?: { starters?: number; injuries?: number }
+  } | null
 }
 
 interface MarketPick {
@@ -65,15 +70,18 @@ export function AIMultiMarket({
   homeScore,
   awayScore,
   status,
+  lineups,
 }: AIMultiMarketProps) {
-  const [mode, setMode] = useState<'odds' | 'smart'>('odds')
+  // Default to Smart AI — pure logic on form / H2H / lineups, ignores
+  // bookmaker pricing for the SELECTION (price still shown so users see value).
+  const [mode, setMode] = useState<'odds' | 'smart'>('smart')
 
   const picks = useMemo(
     () =>
       mode === 'smart'
-        ? buildSmartPicks({ homeTeam, awayTeam, sportSlug, odds, homeForm, awayForm, h2h, markets: markets || null })
-        : buildMultiMarketPicks({ homeTeam, awayTeam, sportSlug, odds, homeForm, awayForm, h2h, markets: markets || null }),
-    [mode, homeTeam, awayTeam, sportSlug, odds, homeForm, awayForm, h2h, markets],
+        ? buildSmartPicks({ homeTeam, awayTeam, sportSlug, odds, homeForm, awayForm, h2h, markets: markets || null, lineups: lineups || null })
+        : buildMultiMarketPicks({ homeTeam, awayTeam, sportSlug, odds, homeForm, awayForm, h2h, markets: markets || null, lineups: lineups || null }),
+    [mode, homeTeam, awayTeam, sportSlug, odds, homeForm, awayForm, h2h, markets, lineups],
   )
 
   const isFinal =
@@ -299,6 +307,10 @@ interface EngineInput {
     away: { name: string; score?: number }
   }> | null
   markets: Market[] | null
+  lineups?: {
+    home?: { starters?: number; injuries?: number }
+    away?: { starters?: number; injuries?: number }
+  } | null
 }
 
 function formScore(f?: string) {
@@ -517,7 +529,7 @@ function buildMultiMarketPicks(input: EngineInput): MarketPick[] {
 // that lets a 5.0 underdog beat a 1.x favourite when form / h2h say so.
 // ───────────────────────────────────────────────
 function buildSmartPicks(input: EngineInput): MarketPick[] {
-  const { homeTeam, awayTeam, sportSlug, odds, homeForm, awayForm, h2h, markets } = input
+  const { homeTeam, awayTeam, sportSlug, odds, homeForm, awayForm, h2h, markets, lineups } = input
   const picks: MarketPick[] = []
 
   // ── Score each side from form (last 5) and recent h2h ──
@@ -551,8 +563,21 @@ function buildSmartPicks(input: EngineInput): MarketPick[] {
   const formWeight = 4         // up to 60 pts from form
   const h2hWeight = h2hCount > 0 ? (30 / h2hCount) : 0  // up to ~30 pts
 
-  const homeRaw = hF * formWeight + homeWinsH2h * h2hWeight + homeAdv
-  const awayRaw = aF * formWeight + awayWinsH2h * h2hWeight
+  // Lineup signal: each available starter scores ~0.3, each known injury
+  // costs ~1.2. Standard starting XI for soccer = 11. We only apply this
+  // when the lineup is actually published (not pre-match speculation).
+  const lineupSignal = (side: { starters?: number; injuries?: number } | undefined) => {
+    if (!side) return 0
+    const starters = side.starters ?? 0
+    const injuries = side.injuries ?? 0
+    if (starters === 0 && injuries === 0) return 0
+    return starters * 0.3 - injuries * 1.2
+  }
+  const homeLineupBonus = lineupSignal(lineups?.home)
+  const awayLineupBonus = lineupSignal(lineups?.away)
+
+  const homeRaw = hF * formWeight + homeWinsH2h * h2hWeight + homeAdv + homeLineupBonus
+  const awayRaw = aF * formWeight + awayWinsH2h * h2hWeight + awayLineupBonus
   const drawRaw = drawsH2h * h2hWeight + (Math.abs(hF - aF) <= 2 ? 12 : 0)
 
   const total = homeRaw + awayRaw + drawRaw || 1

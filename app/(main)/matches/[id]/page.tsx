@@ -1154,6 +1154,10 @@ export default function MatchDetailPage({ params }: PageProps) {
               homeScore={match.homeScore}
               awayScore={match.awayScore}
               status={match.status}
+              lineups={data.lineups ? {
+                home: { starters: data.lineups.home?.starting?.length || 0, injuries: 0 },
+                away: { starters: data.lineups.away?.starting?.length || 0, injuries: 0 },
+              } : null}
             />
 
             {/* Tips Preview */}

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
-import { getLiveMatches, getUpcomingMatches } from '@/lib/api/unified-sports-api';
+import { getLiveMatches, getUpcomingMatches, getMatchById } from '@/lib/api/unified-sports-api';
+import { slugToMatchId } from '@/lib/utils/match-url';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -73,6 +74,15 @@ const SYSTEM_BASE = `You are Betcheza AI — the betting copilot inside the Betc
 - You CAN reference today's live and upcoming matches when they appear in the LIVE CONTEXT block below.
 - You CANNOT: place bets, transfer money, predict the future with certainty, give legal/financial advice. If asked, redirect to feature suggestions or general analysis.
 - If asked something off-topic (cooking, code, etc.) — answer briefly and redirect to betting.
+
+# How to answer well (be SMART, not generic)
+- When a CURRENT MATCH block is in your context, ANSWER ABOUT THAT MATCH SPECIFICALLY.
+  Cite the actual numbers: form (WWLDW), recent record, the specific 1X2 odds, kickoff time, venue.
+  Never say "check the match page" — you ARE the match page.
+- When asked "who will win" or "what should I bet": pick a side, give 2 concrete reasons (form, H2H, odds value, home advantage), then state the confidence level honestly (low / medium / high) and the suggested market (1X2, Double Chance, BTTS, O/U).
+- When asked "what's the value bet" on a current match: compare your estimated probability to the implied probability from the odds. If a side priced at 3.0 has ~40% true probability, that's value (33% implied < 40% true).
+- When the user asks about a market (Over 2.5, BTTS, etc.) on the current match, use the H2H goals average if mentioned; otherwise reason from form quality.
+- Never invent stats. If a number isn't in your context, say "I don't have that exact number — based on form…" and reason from what you do have.
 
 # Output rules
 - Plain text. No markdown headings. Use bullets only when listing 3+ short items.
@@ -191,6 +201,47 @@ ${todayLines.length ? `\nToday's upcoming kickoffs (UTC):\n${todayLines.join('\n
   }
 }
 
+// ----- Match-page context helper -----
+// When the user opens chat from a /matches/[id] page, fetch the actual match
+// data (form, odds, H2H, kickoff) and add it as a structured block so the LLM
+// can give a real, specific answer instead of a generic one.
+async function buildMatchContext(pageContext: string): Promise<string> {
+  if (!pageContext) return '';
+  const m = pageContext.match(/Viewing match id:\s*([^\s\n]+)/i);
+  if (!m) return '';
+  const slugOrId = m[1];
+  try {
+    const matchId = slugToMatchId(decodeURIComponent(slugOrId));
+    const match = await getMatchById(matchId);
+    if (!match) return '';
+
+    const ko = new Date(match.kickoffTime);
+    const oddsLine = match.odds
+      ? `Home ${match.odds.home?.toFixed(2)}${match.odds.draw ? ` · Draw ${match.odds.draw.toFixed(2)}` : ''} · Away ${match.odds.away?.toFixed(2)}`
+      : 'odds unavailable';
+    const status = match.status === 'live'
+      ? `LIVE ${match.minute ? match.minute + "'" : ''} score ${match.homeScore ?? 0}-${match.awayScore ?? 0}`
+      : match.status === 'finished'
+        ? `FINAL ${match.homeScore ?? 0}-${match.awayScore ?? 0}`
+        : `kicks off ${ko.toUTCString()}`;
+
+    return [
+      'CURRENT MATCH (the user is on this page — answer questions about it specifically):',
+      `- ${match.homeTeam.name} vs ${match.awayTeam.name}`,
+      `- ${match.league.name} (${match.sport.name})`,
+      `- ${status}`,
+      `- Odds: ${oddsLine}`,
+      match.homeTeam.form ? `- ${match.homeTeam.name} recent form: ${match.homeTeam.form}` : '',
+      match.awayTeam.form ? `- ${match.awayTeam.name} recent form: ${match.awayTeam.form}` : '',
+      match.homeTeam.record ? `- ${match.homeTeam.name} record: ${match.homeTeam.record}` : '',
+      match.awayTeam.record ? `- ${match.awayTeam.name} record: ${match.awayTeam.record}` : '',
+      match.venue ? `- Venue: ${match.venue}` : '',
+    ].filter(Boolean).join('\n');
+  } catch {
+    return '';
+  }
+}
+
 // ----- Lightweight rules-based fallback if the LLM is unreachable -----
 const TIPS_HINTS: Array<{ patterns: RegExp[]; reply: string }> = [
   { patterns: [/over\s*2\.?5/i, /goals\s*over/i],
@@ -230,7 +281,11 @@ export async function POST(request: NextRequest) {
     // (Cached upstream by getLiveMatches/getUpcomingMatches.)
     const liveContext = await buildLiveContext(lastUserText);
 
-    const system = `${SYSTEM_BASE}\n\n${liveContext ? liveContext + '\n\n' : ''}${body.context ? `EXTRA CONTEXT FROM CURRENT PAGE:\n${body.context}\n\n` : ''}Answer the user now.`;
+    // If the user is on a match page, enrich with structured match info so
+    // the LLM can answer "should I bet on Arsenal?" with form, odds, H2H, etc.
+    const matchContext = await buildMatchContext(body.context || '');
+
+    const system = `${SYSTEM_BASE}\n\n${liveContext ? liveContext + '\n\n' : ''}${matchContext ? matchContext + '\n\n' : ''}${body.context ? `EXTRA CONTEXT FROM CURRENT PAGE:\n${body.context}\n\n` : ''}Answer the user now.`;
 
     const openai = getOpenAI();
     if (!openai) {
