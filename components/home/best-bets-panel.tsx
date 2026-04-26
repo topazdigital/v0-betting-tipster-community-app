@@ -241,34 +241,34 @@ function ConfidenceStars({ n }: { n: number }) {
 // Pick generator — uses ONLY real odds, no randomness
 // ───────────────────────────────────────────────
 function buildBestBets(matches: MatchLite[]): Pick[] {
-  const today = new Date().toDateString()
+  const todayDate = new Date()
+  const today = todayDate.toDateString()
+  // End of TODAY in the user's local timezone — anything scheduled after
+  // midnight should fall under tomorrow's panel, not today's.
+  const endOfToday = new Date(todayDate)
+  endOfToday.setHours(23, 59, 59, 999)
+  const endTs = endOfToday.getTime()
   const now = Date.now()
   const candidates: Pick[] = []
-  // Treat anything that should already be over as "stale" — protects against
-  // ESPN-style fixtures that linger as `scheduled` for days after they were
-  // actually played.
-  const STALE_AFTER_MS = 4 * 60 * 60 * 1000 // 4h is the longest realistic match length
 
   for (const m of matches) {
     if (!m.odds) continue
     const status = (m.status || '').toLowerCase()
-    if (
-      status === 'finished' || status === 'final' || status === 'ft' || status === 'ended' ||
-      status === 'cancelled' || status === 'postponed' || status === 'awarded'
-    ) continue
+    // Only true "scheduled / not started" matches are eligible — anything that
+    // has kicked off, ended, was postponed, or is otherwise settled is dropped.
+    // This is what previously caused yesterday's games to leak into Consensus
+    // Picks when their status hadn't been flipped to "finished" yet.
+    if (status && status !== 'scheduled' && status !== 'upcoming' && status !== 'ns') continue
 
     const ko = new Date(m.kickoffTime).getTime()
     if (Number.isNaN(ko)) continue
 
     const koDate = new Date(ko).toDateString()
     if (koDate !== today) continue
-    // Hide anything whose kickoff was more than STALE_AFTER_MS ago — even if
-    // the upstream feed still flags it as "scheduled". This is what causes
-    // games from days ago to wrongly show in Consensus Picks.
-    if (ko + STALE_AFTER_MS < now) continue
-    // Picks are only useful before the whistle. Anything already in-play has
-    // moving odds and a settled storyline — drop it from the picks list.
-    if (ko < now - 2 * 60 * 1000) continue
+    // Strictly future kickoffs only — no in-progress games, no recently-started
+    // games. This is the panel's whole point: tips you can still bet on.
+    if (ko <= now) continue
+    if (ko > endTs) continue
 
     // Implied probabilities
     const hp = 1 / m.odds.home

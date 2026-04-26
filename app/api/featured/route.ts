@@ -86,8 +86,8 @@ function toFeatured(match: UnifiedMatch, pinned: boolean): FeaturedItem {
       id: match.id,
       homeTeam: { name: match.homeTeam.name, shortName: match.homeTeam.shortName, logo: match.homeTeam.logo },
       awayTeam: { name: match.awayTeam.name, shortName: match.awayTeam.shortName, logo: match.awayTeam.logo },
-      kickoffTime: match.kickoffTime,
-      status: match.status,
+      kickoffTime: typeof match.kickoffTime === 'string' ? match.kickoffTime : new Date(match.kickoffTime).toISOString(),
+      status: String(match.status),
       league: { name: match.league.name, country: match.league.country },
       sport: { name: match.sport.name, slug: match.sport.slug },
     },
@@ -101,11 +101,13 @@ export async function GET() {
     return NextResponse.json({ enabled: false, items: [], config });
   }
 
+  const hidden = new Set(config.hiddenMatchIds || []);
+
   // 1. Resolve pinned matches first (they bypass criteria but still must exist).
   const pinned: FeaturedItem[] = [];
   const seen = new Set<string>();
   for (const id of config.pinnedMatchIds) {
-    if (!id || seen.has(id)) continue;
+    if (!id || seen.has(id) || hidden.has(id)) continue;
     try {
       const m = await getMatchById(id);
       if (m) {
@@ -138,14 +140,15 @@ export async function GET() {
     const endTs = endOfDay.getTime();
 
     const filtered = candidates
-      .filter(m => !seen.has(m.id))
+      .filter(m => !seen.has(m.id) && !hidden.has(m.id))
       .filter(m => {
         if (config.sport && m.sport?.slug !== config.sport) return false;
         const ts = new Date(m.kickoffTime).getTime();
         if (!Number.isFinite(ts)) return false;
         if (ts < now - 2 * 60 * 1000) return false;
         if (ts > endTs) return false;
-        if (m.status && m.status !== 'scheduled' && m.status !== 'upcoming' && m.status !== 'NS') return false;
+        const sNorm = String(m.status || '').toLowerCase();
+        if (sNorm && sNorm !== 'scheduled' && sNorm !== 'upcoming' && sNorm !== 'ns') return false;
         return true;
       });
 

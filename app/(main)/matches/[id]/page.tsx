@@ -280,106 +280,295 @@ function useLiveMinute(storedMinute: number | undefined, status: string, sportSl
 }
 
 // ---- Formation Pitch Component ----
+//
+// Player position bucketing — the previous implementation just sliced the
+// starters list into `[1, ...formation]` chunks which only worked when the
+// upstream rank matched the formation segments exactly. That broke for any
+// formation with multiple midfield lines (4-2-3-1, 4-1-2-1-2, 3-4-1-2, …):
+// CDMs ended up next to CAMs, wingers landed in the midfield row, etc.
+//
+// The new approach classifies every starter into a granular role bucket
+// (GK/DEF/DM/CM/AM/WING/FW) using the position abbreviation, then
+// allocates each formation row from its preferred bucket — falling back to
+// neighbouring buckets when a team's lineup doesn't perfectly fit the named
+// shape.
+type Role = 'GK' | 'DEF' | 'DM' | 'CM' | 'AM' | 'WING' | 'FW'
+
+function classifyPlayer(p: Player): Role {
+  const pos = (p.position || '').toUpperCase().trim()
+  if (!pos) return 'CM'
+
+  if (pos === 'G' || pos === 'GK' || pos.startsWith('GOAL')) return 'GK'
+
+  // Specific midfield sub-roles before generic "M" matches.
+  if (/CDM|DMF|^DM\b|DEFENSIVE\s*MID/.test(pos)) return 'DM'
+  if (/CAM|AMF|^AM\b|ATTACK.*MID|SS\b|SECONDARY/.test(pos)) return 'AM'
+  // Wide players (LW/RW + LM/RM) — treated as wingers so they end up in the
+  // attacking band of 4-3-3 / 3-4-3, not in the central midfield row.
+  if (/^LW\b|^RW\b|WING|^LM\b|^RM\b|LWF|RWF/.test(pos)) return 'WING'
+
+  if (/^CM|^MC|MIDFIELD|^M\b|^MF\b/.test(pos)) return 'CM'
+
+  if (/^CB|^LB|^RB|^LWB|^RWB|^SW|DEFEND|BACK|^D\b|^DF\b/.test(pos)) return 'DEF'
+  if (/^ST|^CF|^FW|^F\b|STRIK|FORWARD/.test(pos)) return 'FW'
+  return 'CM'
+}
+
+// For a formation with `n` lines (excluding GK), what role does each line
+// represent from defence to attack?
+function rolesForLines(n: number): Role[] {
+  if (n <= 1) return ['CM']
+  if (n === 2) return ['DEF', 'FW']
+  if (n === 3) return ['DEF', 'CM', 'FW']
+  if (n === 4) return ['DEF', 'DM', 'AM', 'FW']
+  if (n === 5) return ['DEF', 'DM', 'CM', 'AM', 'FW']
+  // Anything more exotic — fall back to generic mid lines between DEF/FW.
+  const out: Role[] = ['DEF']
+  for (let i = 0; i < n - 2; i++) out.push('CM')
+  out.push('FW')
+  return out
+}
+
+// When a row's preferred bucket is empty/short, fall back to neighbouring
+// buckets in priority order. Tuned so wingers can fill an attacking row,
+// CMs can fill a DM gap, etc.
+const FALLBACK: Record<Role, Role[]> = {
+  GK:   ['GK'],
+  DEF:  ['DEF', 'DM'],
+  DM:   ['DM', 'CM', 'DEF'],
+  CM:   ['CM', 'AM', 'DM', 'WING'],
+  AM:   ['AM', 'CM', 'WING'],
+  WING: ['WING', 'AM', 'FW', 'CM'],
+  FW:   ['FW', 'WING', 'AM'],
+}
+
+// L → C → R, so when the column is rendered top-to-bottom it reads as left
+// flank to right flank. Centre players end up in the middle of the column.
+function sideRank(p: Player): number {
+  const pos = (p.position || '').toUpperCase()
+  if (pos.startsWith('L')) return 0
+  if (pos.startsWith('R')) return 2
+  return 1
+}
+
+function parseFormation(f?: string): number[] {
+  if (!f) return [4, 4, 2]
+  const parts = f.split('-').map(n => parseInt(n, 10)).filter(n => !isNaN(n) && n > 0)
+  return parts.length ? parts : [4, 4, 2]
+}
+
+interface PitchData {
+  team: TeamRoster
+  // Columns from defence (back) to attack (front). The first column is the GK.
+  columns: Player[][]
+}
+
+function buildPitchData(roster: TeamRoster | null): PitchData | null {
+  if (!roster) return null
+  const starters = roster.starting.slice(0, 11)
+  const formation = parseFormation(roster.formation)
+
+  // Group starters into role buckets, then sort each bucket by side.
+  const buckets: Record<Role, Player[]> = {
+    GK: [], DEF: [], DM: [], CM: [], AM: [], WING: [], FW: [],
+  }
+  for (const p of starters) buckets[classifyPlayer(p)].push(p)
+  for (const k of Object.keys(buckets) as Role[]) {
+    buckets[k].sort((a, b) => sideRank(a) - sideRank(b))
+  }
+
+  const lineRoles = rolesForLines(formation.length)
+  const roles: Role[] = ['GK', ...lineRoles]
+  const counts: number[] = [1, ...formation]
+
+  const columns: Player[][] = roles.map(() => [])
+
+  // First pass: fill each row from its preferred bucket and fallbacks.
+  for (let i = 0; i < roles.length; i++) {
+    const need = counts[i]
+    for (const fb of FALLBACK[roles[i]]) {
+      while (columns[i].length < need && buckets[fb].length) {
+        columns[i].push(buckets[fb].shift()!)
+      }
+      if (columns[i].length >= need) break
+    }
+  }
+
+  // Second pass: any leftover players (rare — happens when classification
+  // doesn't match the stated formation) get dropped into whichever row still
+  // has the most slack so we never silently lose a starter.
+  const leftovers = (Object.keys(buckets) as Role[]).flatMap(k => buckets[k])
+  for (const p of leftovers) {
+    let best = -1
+    let bestSlack = 0
+    for (let i = 1; i < counts.length; i++) {
+      const slack = counts[i] - columns[i].length
+      if (slack > bestSlack) { best = i; bestSlack = slack }
+    }
+    if (best === -1) best = columns.length - 1 // dump into attack row as a last resort
+    columns[best].push(p)
+  }
+
+  // Re-sort each non-GK row by side after fallback fills so the column reads
+  // L→C→R top-to-bottom.
+  for (let i = 1; i < columns.length; i++) {
+    columns[i].sort((a, b) => sideRank(a) - sideRank(b))
+  }
+
+  return { team: roster, columns }
+}
+
 function FormationPitch({ home, away }: { home: TeamRoster | null; away: TeamRoster | null }) {
   if (!home && !away) return null
-
-  const parseFormation = (f?: string): number[] => {
-    if (!f) return [4, 4, 2]
-    return f.split('-').map(n => parseInt(n, 10)).filter(n => !isNaN(n))
-  }
-
-  const getStarters = (roster: TeamRoster) => roster.starting.slice(0, 11)
-
-  const distributeToRows = (players: Player[], rows: number[]) => {
-    const result: Player[][] = []
-    let idx = 0
-    for (const count of rows) {
-      result.push(players.slice(idx, idx + count))
-      idx += count
-    }
-    return result
-  }
-
-  // Both teams use [GK, defence, midfield, attack] columns from back→front.
-  // The roster API now returns starters sorted GK-first, so distributing into
-  // [1, ...formation] always puts the goalkeeper alone in the first column.
-  const homeRows = home ? [1, ...parseFormation(home.formation)] : []
-  const awayRows = away ? [1, ...parseFormation(away.formation)] : []
-
-  const homeStarters = home ? getStarters(home) : []
-  const awayStarters = away ? getStarters(away) : []
-  const homeColumns = home ? distributeToRows(homeStarters, homeRows) : []
-  // Reverse the away columns so its goalkeeper sits on the right (back) of the
-  // away half, with the attack line meeting the home defence in the middle.
-  const awayColumns = away ? distributeToRows(awayStarters, awayRows).reverse() : []
+  const homeData = buildPitchData(home)
+  const awayData = buildPitchData(away)
 
   return (
-    <div className="relative overflow-hidden rounded-xl" style={{ background: 'linear-gradient(90deg, #1a5c2a 0%, #1e7a35 50%, #1a5c2a 100%)' }}>
-      {/* Horizontal pitch markings (landscape: 600 wide x 400 tall) */}
+    <>
+      {/* Horizontal pitch — desktop / tablet */}
+      <div className="hidden md:block">
+        <HorizontalPitch home={homeData} away={awayData} />
+      </div>
+      {/* Vertical pitch — mobile, gives each player enough room to breathe */}
+      <div className="md:hidden">
+        <VerticalPitch home={homeData} away={awayData} />
+      </div>
+    </>
+  )
+}
+
+function TeamHeader({ team, align }: { team: TeamRoster; align: 'left' | 'right' | 'center' }) {
+  const justify = align === 'left' ? 'justify-start' : align === 'right' ? 'justify-end' : 'justify-center'
+  return (
+    <div className={cn('flex items-center gap-2 px-2 py-1.5', justify)}>
+      {align !== 'right' && <TeamLogo teamName={team.teamName || ''} logoUrl={team.teamLogo} size="sm" />}
+      <span className="text-xs font-bold text-white/90 truncate">{team.teamName}</span>
+      {team.formation && (
+        <span className="text-[10px] text-white/60 bg-black/30 px-1.5 py-0.5 rounded-full shrink-0">
+          {team.formation}
+        </span>
+      )}
+      {align === 'right' && <TeamLogo teamName={team.teamName || ''} logoUrl={team.teamLogo} size="sm" />}
+    </div>
+  )
+}
+
+// Horizontal pitch — home on the left half, away on the right half.
+function HorizontalPitch({ home, away }: { home: PitchData | null; away: PitchData | null }) {
+  // Reverse the away columns so its GK sits on the far right and its attack
+  // meets home's defence in the middle.
+  const awayColumns = away ? [...away.columns].reverse() : []
+  return (
+    <div
+      className="relative overflow-hidden rounded-xl"
+      style={{ background: 'linear-gradient(90deg, #1a5c2a 0%, #1e7a35 50%, #1a5c2a 100%)' }}
+    >
       <svg className="absolute inset-0 w-full h-full opacity-30" viewBox="0 0 600 400" preserveAspectRatio="none">
-        {/* Outer border */}
         <rect x="20" y="20" width="560" height="360" fill="none" stroke="white" strokeWidth="2" />
-        {/* Center line */}
         <line x1="300" y1="20" x2="300" y2="380" stroke="white" strokeWidth="2" />
-        {/* Center circle */}
         <circle cx="300" cy="200" r="55" fill="none" stroke="white" strokeWidth="2" />
         <circle cx="300" cy="200" r="3" fill="white" />
-        {/* Home penalty area (LEFT) */}
         <rect x="20" y="110" width="100" height="180" fill="none" stroke="white" strokeWidth="1.5" />
         <rect x="20" y="155" width="50" height="90" fill="none" stroke="white" strokeWidth="1.5" />
         <circle cx="100" cy="200" r="3" fill="white" />
-        {/* Away penalty area (RIGHT) */}
         <rect x="480" y="110" width="100" height="180" fill="none" stroke="white" strokeWidth="1.5" />
         <rect x="530" y="155" width="50" height="90" fill="none" stroke="white" strokeWidth="1.5" />
         <circle cx="500" cy="200" r="3" fill="white" />
       </svg>
 
-      <div className="relative flex items-stretch gap-1 px-2 py-3" style={{ minHeight: 320 }}>
-        {/* Home (LEFT half) */}
-        <div className="flex-1 flex flex-col">
-          {home && (
-            <div className="flex items-center justify-start gap-2 px-2 pb-2">
-              <TeamLogo teamName={home.teamName || ''} logoUrl={home.teamLogo} size="sm" />
-              <span className="text-xs font-bold text-white/90 truncate">{home.teamName}</span>
-              {home.formation && <span className="text-[10px] text-white/60 bg-black/30 px-1.5 py-0.5 rounded-full shrink-0">{home.formation}</span>}
-            </div>
-          )}
+      <div className="relative flex items-stretch gap-1 px-2 py-3" style={{ minHeight: 360 }}>
+        <div className="flex-1 flex flex-col min-w-0">
+          {home && <TeamHeader team={home.team} align="left" />}
           <div className="flex flex-1 items-stretch justify-around gap-0.5">
-            {homeColumns.map((col, ci) => (
-              <div key={ci} className="flex flex-1 flex-col justify-around items-center gap-1.5 py-1">
-                {col.map((p, pi) => (
-                  <PitchPlayer key={pi} player={p} color="bg-rose-500" />
-                ))}
+            {home?.columns.map((col, ci) => (
+              <div key={ci} className="flex flex-1 flex-col justify-around items-center gap-1.5 py-1 min-w-0">
+                {col.map((p, pi) => <PitchPlayer key={pi} player={p} color="bg-rose-500" />)}
               </div>
             ))}
           </div>
         </div>
 
-        {/* Halfway divider */}
         <div className="flex flex-col items-center justify-center opacity-50 px-0.5">
           <div className="w-px flex-1 bg-white/40" />
           <div className="h-2 w-2 my-1 rounded-full bg-white/60" />
           <div className="w-px flex-1 bg-white/40" />
         </div>
 
-        {/* Away (RIGHT half) */}
-        <div className="flex-1 flex flex-col">
-          {away && (
-            <div className="flex items-center justify-end gap-2 px-2 pb-2">
-              {away.formation && <span className="text-[10px] text-white/60 bg-black/30 px-1.5 py-0.5 rounded-full shrink-0">{away.formation}</span>}
-              <span className="text-xs font-bold text-white/90 truncate">{away.teamName}</span>
-              <TeamLogo teamName={away.teamName || ''} logoUrl={away.teamLogo} size="sm" />
-            </div>
-          )}
+        <div className="flex-1 flex flex-col min-w-0">
+          {away && <TeamHeader team={away.team} align="right" />}
           <div className="flex flex-1 items-stretch justify-around gap-0.5">
             {awayColumns.map((col, ci) => (
-              <div key={ci} className="flex flex-1 flex-col justify-around items-center gap-1.5 py-1">
-                {col.map((p, pi) => (
-                  <PitchPlayer key={pi} player={p} color="bg-sky-500" />
-                ))}
+              <div key={ci} className="flex flex-1 flex-col justify-around items-center gap-1.5 py-1 min-w-0">
+                {col.map((p, pi) => <PitchPlayer key={pi} player={p} color="bg-sky-500" />)}
               </div>
             ))}
           </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Vertical pitch — home on top with attack pointing down, away on bottom
+// with attack pointing up. The two attack lines meet at the centre line.
+function VerticalPitch({ home, away }: { home: PitchData | null; away: PitchData | null }) {
+  // Away rows render top-to-bottom as: FW … DEF, GK. So we don't reverse —
+  // the columns array is already back-to-front, which is exactly what we want
+  // when the away team is on the bottom half.
+  const awayColumnsTopDown = away ? [...away.columns].reverse() : []
+  // Home rows render top-to-bottom as: GK, DEF … FW. The columns array is
+  // already in the right order.
+  const homeColumnsTopDown = home?.columns ?? []
+  return (
+    <div
+      className="relative overflow-hidden rounded-xl"
+      style={{ background: 'linear-gradient(180deg, #1a5c2a 0%, #1e7a35 50%, #1a5c2a 100%)' }}
+    >
+      <svg className="absolute inset-0 w-full h-full opacity-30" viewBox="0 0 400 700" preserveAspectRatio="none">
+        <rect x="20" y="20" width="360" height="660" fill="none" stroke="white" strokeWidth="2" />
+        <line x1="20" y1="350" x2="380" y2="350" stroke="white" strokeWidth="2" />
+        <circle cx="200" cy="350" r="55" fill="none" stroke="white" strokeWidth="2" />
+        <circle cx="200" cy="350" r="3" fill="white" />
+        {/* Home penalty area (TOP) */}
+        <rect x="110" y="20" width="180" height="100" fill="none" stroke="white" strokeWidth="1.5" />
+        <rect x="155" y="20" width="90" height="50" fill="none" stroke="white" strokeWidth="1.5" />
+        <circle cx="200" cy="100" r="3" fill="white" />
+        {/* Away penalty area (BOTTOM) */}
+        <rect x="110" y="580" width="180" height="100" fill="none" stroke="white" strokeWidth="1.5" />
+        <rect x="155" y="630" width="90" height="50" fill="none" stroke="white" strokeWidth="1.5" />
+        <circle cx="200" cy="600" r="3" fill="white" />
+      </svg>
+
+      <div className="relative flex flex-col px-2 py-2" style={{ minHeight: 540 }}>
+        {/* Home — top */}
+        <div className="flex-1 flex flex-col min-h-0">
+          {home && <TeamHeader team={home.team} align="center" />}
+          <div className="flex flex-1 flex-col items-stretch justify-around gap-1">
+            {homeColumnsTopDown.map((row, ri) => (
+              <div key={ri} className="flex justify-around items-center gap-1 px-2">
+                {row.map((p, pi) => <PitchPlayer key={pi} player={p} color="bg-rose-500" />)}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Halfway divider */}
+        <div className="flex items-center justify-center gap-2 py-1 opacity-50">
+          <div className="h-px flex-1 bg-white/40" />
+          <div className="h-2 w-2 rounded-full bg-white/60" />
+          <div className="h-px flex-1 bg-white/40" />
+        </div>
+
+        {/* Away — bottom */}
+        <div className="flex-1 flex flex-col min-h-0">
+          <div className="flex flex-1 flex-col items-stretch justify-around gap-1">
+            {awayColumnsTopDown.map((row, ri) => (
+              <div key={ri} className="flex justify-around items-center gap-1 px-2">
+                {row.map((p, pi) => <PitchPlayer key={pi} player={p} color="bg-sky-500" />)}
+              </div>
+            ))}
+          </div>
+          {away && <TeamHeader team={away.team} align="center" />}
         </div>
       </div>
     </div>

@@ -24,6 +24,8 @@ export interface FeaturedConfig {
   sport: string;
   /** Manually pinned match IDs (always show, in order). */
   pinnedMatchIds: string[];
+  /** Manually hidden match IDs (never show, even if criteria pass). */
+  hiddenMatchIds: string[];
   /** Max items to show. */
   limit: number;
   updatedAt: string;
@@ -37,6 +39,7 @@ export const DEFAULT_FEATURED_CONFIG: FeaturedConfig = {
   topTipsterOnly: false,
   sport: '',
   pinnedMatchIds: [],
+  hiddenMatchIds: [],
   limit: 6,
   updatedAt: new Date().toISOString(),
 };
@@ -92,6 +95,7 @@ export async function saveFeaturedConfig(patch: Partial<FeaturedConfig>): Promis
     ...current,
     ...patch,
     pinnedMatchIds: Array.isArray(patch.pinnedMatchIds) ? patch.pinnedMatchIds : current.pinnedMatchIds,
+    hiddenMatchIds: Array.isArray(patch.hiddenMatchIds) ? patch.hiddenMatchIds : current.hiddenMatchIds,
     updatedAt: new Date().toISOString(),
   };
   g.__featuredConfig = next;

@@ -46,6 +46,14 @@ export async function POST(req: NextRequest) {
         ? raw.split(/[\s,]+/).map(s => s.trim()).filter(Boolean)
         : [];
   }
+  if ('hiddenMatchIds' in patch) {
+    const raw = patch.hiddenMatchIds;
+    coerced.hiddenMatchIds = Array.isArray(raw)
+      ? raw.map(String).map(s => s.trim()).filter(Boolean)
+      : typeof raw === 'string'
+        ? raw.split(/[\s,]+/).map(s => s.trim()).filter(Boolean)
+        : [];
+  }
 
   const next = await saveFeaturedConfig(coerced);
   return NextResponse.json({ success: true, config: next });

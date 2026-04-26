@@ -28,7 +28,7 @@ import { Spinner } from '@/components/ui/spinner';
 import { cn } from '@/lib/utils';
 import { ALL_SPORTS, getSportIcon } from '@/lib/sports-data';
 import { BestBetsPanel } from '@/components/home/best-bets-panel';
-import { FavoritedTipsPanel } from '@/components/home/favorited-tips-panel';
+import { FavoritedTipsPanel, FavoritedTipMarqueeCard, useFavoritedTips, type FeaturedItem } from '@/components/home/favorited-tips-panel';
 import { useAuthModal } from '@/contexts/auth-modal-context';
 
 interface ApiTipster {
@@ -66,6 +66,12 @@ export default function HomePage() {
   // accurate regardless of the currently selected sport.
   const { matches: allMatches } = useMatches();
   const { matches: liveMatches } = useLiveMatches();
+  const { items: favoritedTips } = useFavoritedTips();
+  // When live action is sparse (1-3 games) we mix featured tips into the live
+  // marquee row instead of showing them in a separate panel below.
+  const liveRowTips = liveMatches.length > 0 && liveMatches.length <= 3
+    ? favoritedTips
+    : [];
   const stats = useMatchStats();
 
   // Calculate match counts per sport from the UNFILTERED list.
@@ -237,7 +243,7 @@ export default function HomePage() {
                   </Button>
                 </div>
                 {liveMatches.length > 0 ? (
-                  <LiveMarquee matches={liveMatches} />
+                  <LiveMarquee matches={liveMatches} tips={liveRowTips} />
                 ) : (
                   <div className="rounded-xl border border-dashed border-border bg-card/40 px-4 py-3">
                     <div className="flex flex-wrap items-center justify-between gap-3">
@@ -287,8 +293,10 @@ export default function HomePage() {
                 )}
               </section>
 
-              {/* Favorited Tips — shown when live action is sparse */}
-              {liveMatches.length <= 3 && <FavoritedTipsPanel />}
+              {/* Favorited Tips — shown standalone only when there are zero
+                  live games. When 1-3 are live, the tips are mixed into the
+                  live marquee row instead. */}
+              {liveMatches.length === 0 && <FavoritedTipsPanel />}
 
               {/* Top Tipsters */}
               <section className="mb-5">
@@ -709,16 +717,28 @@ function FeaturedSlide({ matches }: { matches: CarouselMatch[] }) {
 // Pauses on hover so you can read a card. We render the list twice so the
 // CSS animation can loop without a visible jump.
 // ───────────────────────────────────────────────
-function LiveMarquee({ matches }: { matches: Match[] }) {
+type MarqueeEntry =
+  | { kind: 'live'; match: Match }
+  | { kind: 'tip'; tip: FeaturedItem };
+
+function LiveMarquee({ matches, tips = [] }: { matches: Match[]; tips?: FeaturedItem[] }) {
+  // When live action is sparse (1-3 games) we mix featured tips into the same
+  // row so the marquee never looks empty. The cards share the same w-80 width
+  // and stretched height so the row reads as a single continuous strip.
+  const entries: MarqueeEntry[] = [
+    ...matches.map((m) => ({ kind: 'live' as const, match: m })),
+    ...tips.map((t) => ({ kind: 'tip' as const, tip: t })),
+  ];
+
   // Tune speed to the number of cards so a row of 4 doesn't fly past.
-  const cards = matches.length;
+  const cards = entries.length;
   const duration = Math.max(28, cards * 9); // seconds per loop
 
   // Only loop the marquee when there are enough cards to overflow the row
   // (otherwise we'd render the same 1-2 cards twice and look broken).
   const MARQUEE_MIN = 4;
   const shouldLoop = cards >= MARQUEE_MIN;
-  const cardsToRender = shouldLoop ? [...matches, ...matches] : matches;
+  const cardsToRender = shouldLoop ? [...entries, ...entries] : entries;
 
   return (
     <div className="group relative overflow-hidden">
@@ -732,20 +752,26 @@ function LiveMarquee({ matches }: { matches: Match[] }) {
 
       <div
         className={cn(
-          "flex gap-4 pb-2 motion-reduce:animate-none",
+          "flex items-stretch gap-4 pb-2 motion-reduce:animate-none",
           shouldLoop
             ? "animate-marquee group-hover:[animation-play-state:paused]"
             : "flex-wrap",
         )}
         style={shouldLoop ? { animationDuration: `${duration}s` } : undefined}
       >
-        {cardsToRender.map((match, idx) => (
+        {cardsToRender.map((entry, idx) => (
           <div
-            key={`${match.id}-${idx}`}
+            key={
+              entry.kind === 'live'
+                ? `live-${entry.match.id}-${idx}`
+                : `tip-${entry.tip.matchId}-${idx}`
+            }
             className="w-80 shrink-0"
             aria-hidden={shouldLoop && idx >= cards}
           >
-            <MatchCardNew match={match} showSport />
+            {entry.kind === 'live'
+              ? <MatchCardNew match={entry.match} showSport />
+              : <FavoritedTipMarqueeCard item={entry.tip} />}
           </div>
         ))}
       </div>
