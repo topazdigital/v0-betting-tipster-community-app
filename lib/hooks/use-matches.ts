@@ -270,6 +270,9 @@ export function useMatches(filters?: MatchFilters) {
       refreshInterval: 30000, // Refresh every 30 seconds
       revalidateOnFocus: false,
       dedupingInterval: 10000,
+      // Keep showing the previous matches list while a background refresh
+      // is in flight so the UI doesn't flash empty states between polls.
+      keepPreviousData: true,
     }
   );
 
@@ -287,7 +290,12 @@ export function useMatches(filters?: MatchFilters) {
   };
 }
 
-// Hook for live matches only
+// Hook for live matches only.
+// IMPORTANT: We pass `keepPreviousData: true` so the live row never flickers
+// to the "no live games right now" empty state during a background refresh.
+// Without this, every 10-second SWR poll briefly returned `undefined` while
+// the request was in-flight, which caused the home page to oscillate between
+// the live marquee and the upcoming-games fallback.
 export function useLiveMatches() {
   const { data, error, isLoading } = useSWR<Match[]>(
     '/api/matches?status=live',
@@ -295,6 +303,8 @@ export function useLiveMatches() {
     {
       refreshInterval: 10000, // Refresh every 10 seconds for live
       revalidateOnFocus: true,
+      keepPreviousData: true,
+      dedupingInterval: 5000,
     }
   );
 

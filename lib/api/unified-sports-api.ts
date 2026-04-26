@@ -1760,9 +1760,11 @@ async function getESPNMatches(config: ESPNLeagueConfig): Promise<UnifiedMatch[]>
   const start = new Date(now);
   start.setUTCDate(start.getUTCDate() - 1);
   const end = new Date(now);
-  // Priority leagues get a tight 7-day window for freshness; smaller / less-frequent
-  // leagues get a wider 21-day window so a single weekly fixture still shows up.
-  end.setUTCDate(end.getUTCDate() + (isPriority ? 7 : 21));
+  // Priority leagues get a 14-day window so the upcoming fortnight of fixtures
+  // is always visible (was 7 — too tight, EPL midweek + weekend gameweeks were
+  // dropping off the list). Smaller / less-frequent leagues get a wider
+  // 28-day window so even a single monthly fixture still surfaces.
+  end.setUTCDate(end.getUTCDate() + (isPriority ? 14 : 28));
   const range = `${formatYYYYMMDD(start)}-${formatYYYYMMDD(end)}`;
   data = await fetchESPN(config.sport, config.league, 'scoreboard', range);
   // Fall back to the default endpoint if range request fails or returns nothing.

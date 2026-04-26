@@ -59,6 +59,7 @@ interface BookmakerOdd {
   total?: { value: number; overPrice: number; underPrice: number }
 }
 interface H2HGame {
+  matchId?: string
   date: string
   league?: string
   home: { name: string; logo?: string; score?: number }
@@ -80,11 +81,13 @@ interface StandingRow {
 }
 interface StandingsGroup { header?: string; rows: StandingRow[] }
 interface NewsItem {
+  id?: string
   headline?: string
   description?: string
   published?: string
   image?: string
   link?: string
+  source?: string
 }
 interface LeaderItem {
   team?: string
@@ -1672,22 +1675,28 @@ export default function MatchDetailPage({ params }: PageProps) {
                   </Badge>
                 </div>
 
-                {/* Formation Pitch */}
-                <Card className="overflow-hidden">
-                  <div className="px-4 pt-4 pb-3 border-b border-border/50">
-                    <h3 className="flex items-center gap-2 text-sm font-bold">
-                      <Shirt className="h-4 w-4 text-primary" />
-                      {data?.hasLineups ? 'Confirmed Formation' : 'Predicted Formation'}
-                      {lineups.home?.formation && <span className="text-muted-foreground font-normal text-xs">({match.homeTeam.name}: {lineups.home.formation})</span>}
-                      {lineups.away?.formation && <span className="text-muted-foreground font-normal text-xs">({match.awayTeam.name}: {lineups.away.formation})</span>}
-                    </h3>
-                  </div>
-                  <CardContent className="p-4">
-                    <FormationPitch home={lineups.home} away={lineups.away} />
-                  </CardContent>
-                </Card>
+                {/* Formation Pitch — only meaningful for football/soccer
+                    where players occupy formation positions on a pitch. For
+                    other sports (basketball, baseball, hockey, american
+                    football, etc.) the squad list is the right primary view
+                    and the pitch graphic is misleading. */}
+                {(sport === 'soccer' || sport === 'football' || sport === 'rugby') && (
+                  <Card className="overflow-hidden">
+                    <div className="px-4 pt-4 pb-3 border-b border-border/50">
+                      <h3 className="flex items-center gap-2 text-sm font-bold">
+                        <Shirt className="h-4 w-4 text-primary" />
+                        {data?.hasLineups ? 'Confirmed Formation' : 'Predicted Formation'}
+                        {lineups.home?.formation && <span className="text-muted-foreground font-normal text-xs">({match.homeTeam.name}: {lineups.home.formation})</span>}
+                        {lineups.away?.formation && <span className="text-muted-foreground font-normal text-xs">({match.awayTeam.name}: {lineups.away.formation})</span>}
+                      </h3>
+                    </div>
+                    <CardContent className="p-4">
+                      <FormationPitch home={lineups.home} away={lineups.away} />
+                    </CardContent>
+                  </Card>
+                )}
 
-                {/* Squad lists */}
+                {/* Squad lists — shown for every sport. */}
                 <div className="grid gap-4 md:grid-cols-2">
                   {lineups.home && <RosterCard side="Home" roster={lineups.home} isConfirmed={!!data?.hasLineups} />}
                   {lineups.away && <RosterCard side="Away" roster={lineups.away} isConfirmed={!!data?.hasLineups} />}
@@ -2211,6 +2220,7 @@ function H2HRow({ game, timezone, homeName }: { game: H2HGame; timezone: string;
   const homeWon = hs > as_
   const awayWon = as_ > hs
   const isFromCurrent = game.home.name === homeName
+  const detailHref = game.matchId ? `/matches/${matchIdToSlug(game.matchId)}` : null
 
   return (
     <div className="rounded-xl border border-border/40 bg-muted/20 hover:bg-muted/40 transition-colors text-sm overflow-hidden">
@@ -2271,6 +2281,17 @@ function H2HRow({ game, timezone, homeName }: { game: H2HGame; timezone: string;
             <p className="pt-1 border-t border-border/30 text-[10px] italic text-muted-foreground/80">
               Reverse fixture — home/away swapped from current matchup.
             </p>
+          )}
+          {detailHref && (
+            <div className="pt-2 border-t border-border/30">
+              <Link
+                href={detailHref}
+                className="inline-flex items-center gap-1 text-[11px] font-semibold text-primary hover:underline"
+              >
+                View this match&apos;s full details
+                <ChevronRight className="h-3 w-3" />
+              </Link>
+            </div>
           )}
         </div>
       )}
@@ -2377,7 +2398,22 @@ function NewsRow({ item }: { item: NewsItem }) {
       </div>
     </div>
   )
-  return item.link ? <a href={item.link} target="_blank" rel="noopener noreferrer">{inner}</a> : inner
+  // Open the article on our own news reader page instead of jumping to ESPN.
+  // We pass the article metadata as URL params so the reader can render it
+  // inline without an additional roundtrip.
+  if (!item.headline) return inner
+  const params = new URLSearchParams()
+  params.set('headline', item.headline)
+  if (item.description) params.set('description', item.description)
+  if (item.image) params.set('image', item.image)
+  if (item.published) params.set('published', item.published)
+  if (item.link) params.set('source_url', item.link)
+  if (item.source) params.set('source', item.source)
+  return (
+    <Link href={`/news/article?${params.toString()}`}>
+      {inner}
+    </Link>
+  )
 }
 
 // ===== TipCard Component =====

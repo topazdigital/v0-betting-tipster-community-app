@@ -151,6 +151,7 @@ async function buildH2HFallback(
   homeTeamName: string,
   awayTeamName: string,
 ): Promise<Array<{
+  matchId?: string
   date: string
   league?: string
   home: { name: string; logo?: string; score?: number }
@@ -199,11 +200,18 @@ async function buildH2HFallback(
   // Deduplicate by event id and keep only direct meetings.
   const seen = new Set<string>();
   const games: Array<{
+    matchId?: string
     date: string
     league?: string
     home: { name: string; logo?: string; score?: number }
     away: { name: string; logo?: string; score?: number }
   }> = [];
+
+  // The internal match ID format is `espn_{leagueSlug}_{eventId}` where
+  // leagueSlug strips dots from the ESPN league key (e.g. eng.1 → eng1).
+  // Building it here lets the H2H rows link straight into our own match
+  // detail page for any previous meeting.
+  const leagueSlug = league.replace(/[^a-z0-9]/gi, '');
 
   for (const ev of allEvents) {
     if (!ev?.id || seen.has(ev.id)) continue;
@@ -223,6 +231,7 @@ async function buildH2HFallback(
     };
 
     games.push({
+      matchId: leagueSlug ? `espn_${leagueSlug}_${ev.id}` : undefined,
       date: ev.date || '',
       league: ev.league?.abbreviation,
       home: {
@@ -281,7 +290,7 @@ function buildH2H(summary: ESPNSummaryResponse) {
   return games.slice(0, 10);
 }
 
-function buildStandings(summary: ESPNSummaryResponse) {
+function buildStandings(summary: ESPNSummaryResponse, sport: string = 'soccer') {
   if (!summary.standings?.groups || summary.standings.groups.length === 0) return null;
   const groups = summary.standings.groups.map(g => ({
     header: g.header,
@@ -315,12 +324,24 @@ function buildStandings(summary: ESPNSummaryResponse) {
           arr[0]?.href
         );
       };
+      // Sport-specific logo path on the ESPN CDN. Falling back to the soccer
+      // path for non-soccer sports produced 404s and broken crests in the
+      // standings table; map each ESPN sport key to its real logo directory.
+      const logoSportPath: Record<string, string> = {
+        soccer: 'soccer',
+        basketball: 'nba',
+        baseball: 'mlb',
+        football: 'nfl',
+        hockey: 'nhl',
+        cricket: 'cricket',
+      };
+      const sportLogoDir = logoSportPath[sport] || sport || 'soccer';
       const teamLogo =
         teamObj?.logo ||
         ent.logo ||
         pickLogo(teamObj?.logos) ||
         pickLogo(ent.logos) ||
-        (teamId ? `https://a.espncdn.com/i/teamlogos/soccer/500/${teamId}.png` : undefined);
+        (teamId ? `https://a.espncdn.com/i/teamlogos/${sportLogoDir}/500/${teamId}.png` : undefined);
       const stat = (key: string) => ent.stats?.find(s => s.name === key || s.abbreviation === key);
       return {
         teamId,
@@ -510,13 +531,21 @@ function buildSegmentBreakdown(summary: ESPNSummaryResponse, sportType: string):
 
 function buildNews(summary: ESPNSummaryResponse) {
   if (!summary.news?.articles) return [];
-  return summary.news.articles.slice(0, 8).map(a => ({
-    headline: a.headline,
-    description: a.description,
-    published: a.published,
-    image: a.images?.[0]?.url,
-    link: a.links?.web?.href,
-  }));
+  return summary.news.articles.slice(0, 8).map((a, idx) => {
+    // ESPN articles have a stable numeric id at `a.id`, but TypeScript may
+    // not have it on the typed shape. Falling back to the article index keeps
+    // the link unique inside one match's news set.
+    const articleId = String((a as unknown as { id?: string | number }).id || idx);
+    return {
+      id: articleId,
+      headline: a.headline,
+      description: a.description,
+      published: a.published,
+      image: a.images?.[0]?.url,
+      link: a.links?.web?.href,
+      source: 'ESPN',
+    };
+  });
 }
 
 function buildLeaders(summary: ESPNSummaryResponse) {
@@ -760,7 +789,7 @@ export async function GET(_request: NextRequest, context: RouteContext) {
         );
       }
     }
-    const standings = summary ? buildStandings(summary) : null;
+    const standings = summary ? buildStandings(summary, cfg?.sport || 'soccer') : null;
     const news = summary ? buildNews(summary) : [];
     const leaders = summary ? buildLeaders(summary) : [];
     const header = summary ? buildHeader(summary) : null;

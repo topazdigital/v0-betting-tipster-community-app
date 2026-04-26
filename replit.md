@@ -33,6 +33,14 @@ Key architectural decisions include:
 
 ## Recent Changes
 
+### Match-Detail & Live Section Fixes (April 26, 2026)
+- **Live row no longer flickers**: Added `keepPreviousData: true` to `useLiveMatches` and `useMatches` SWR configs so the home page's "Live Now" section keeps showing the live marquee during the 10-second background refresh instead of flashing to the "no live games right now" empty panel (`lib/hooks/use-matches.ts`).
+- **Sport-specific lineups**: The football pitch graphic in the match detail Lineups tab is now rendered only for soccer/football/rugby. Other sports (basketball, baseball, NFL, NHL, etc.) display roster cards only — the misleading pitch is hidden (`app/(main)/matches/[id]/page.tsx`).
+- **News opens on our own site**: News rows in the match detail page link to a new internal article reader at `/news/article` (with metadata passed via URL params) instead of jumping straight to ESPN. The reader still offers a "Read on ESPN" button for the full piece (`app/(main)/news/article/page.tsx`, NewsRow in match detail).
+- **H2H meetings clickable**: Past head-to-head fixtures expose a `matchId` from the API and the expanded H2H row now offers a "View this match's full details" link that opens the previous meeting's match detail page (`app/api/matches/[id]/details/route.ts` buildH2HFallback, H2HRow in match detail).
+- **Standings logos by sport**: The standings table fallback CDN URL is now sport-aware (soccer → soccer, basketball → nba, baseball → mlb, football → nfl, hockey → nhl) so non-soccer leagues stop falling back to placeholder circles.
+- **More matches**: Priority leagues now pull a 14-day window (was 7) and smaller leagues a 28-day window (was 21), so weekly/biweekly fixtures are no longer dropped from the matches list (`lib/api/unified-sports-api.ts`).
+
 ### Pre-launch Fixes (April 2026)
 - **AI Chat**: Fixed model name from non-existent `gpt-5` to `gpt-4o-mini`. Chat now calls OpenAI API via Replit integration.
 - **Lineup Component** (`components/matches/lineups.tsx`): Rebuilt to accept real ESPN data via props instead of hardcoded mock data.
