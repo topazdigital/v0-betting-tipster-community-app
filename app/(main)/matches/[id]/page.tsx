@@ -144,11 +144,24 @@ interface MatchDetails {
   leaders: LeaderItem[]
   matchEvents: MatchEvent[]
   segmentBreakdown: SegmentBreakdown | null
+  teamStats: TeamStatsBlock | null
   hasRealOdds: boolean
   hasLineups: boolean
   hasStandings: boolean
   hasH2H: boolean
   hasEvents: boolean
+  hasTeamStats: boolean
+}
+
+interface TeamStatRow {
+  name: string
+  label: string
+  abbreviation?: string
+  displayValue: string
+}
+interface TeamStatsBlock {
+  home: { team?: { id?: string; displayName?: string; abbreviation?: string; logo?: string }; stats: TeamStatRow[] }
+  away: { team?: { id?: string; displayName?: string; abbreviation?: string; logo?: string }; stats: TeamStatRow[] }
 }
 
 interface TipsterInfo {
@@ -669,7 +682,7 @@ export default function MatchDetailPage({ params }: PageProps) {
     )
   }
 
-  const { bookmakerOdds, lineups, h2h, standings, news, leaders, matchEvents, segmentBreakdown, hasRealOdds } = data
+  const { bookmakerOdds, lineups, h2h, standings, news, leaders, matchEvents, segmentBreakdown, teamStats, hasRealOdds, hasTeamStats } = data
   const sport = match.sport.slug
 
   return (
@@ -900,6 +913,10 @@ export default function MatchDetailPage({ params }: PageProps) {
             <TabsTrigger value="events" className="flex-1 text-xs md:text-sm rounded-lg relative">
               <Zap className="mr-1 h-3.5 w-3.5 hidden sm:inline" />Events
               {isLive && <span className="absolute -top-1 -right-1 h-2 w-2 rounded-full bg-rose-500 animate-pulse" />}
+            </TabsTrigger>
+            <TabsTrigger value="stats" className="flex-1 text-xs md:text-sm rounded-lg relative">
+              <BarChart3 className="mr-1 h-3.5 w-3.5 hidden sm:inline" />Stats
+              {hasTeamStats && isLive && <span className="absolute -top-1 -right-1 h-2 w-2 rounded-full bg-rose-500 animate-pulse" />}
             </TabsTrigger>
             <TabsTrigger value="odds" className="flex-1 text-xs md:text-sm rounded-lg">
               <TrendingUp className="mr-1 h-3.5 w-3.5 hidden sm:inline" />Odds
@@ -1247,6 +1264,19 @@ export default function MatchDetailPage({ params }: PageProps) {
             </Card>
           </TabsContent>
 
+          {/* ══ STATS ══ */}
+          <TabsContent value="stats" className="mt-0 space-y-4">
+            <TeamStatsTab
+              teamStats={teamStats}
+              homeName={match.homeTeam.name}
+              awayName={match.awayTeam.name}
+              homeLogo={match.homeTeam.logo}
+              awayLogo={match.awayTeam.logo}
+              isLive={isLive}
+              isFinished={isFinished}
+            />
+          </TabsContent>
+
           {/* ══ ODDS ══ */}
           <TabsContent value="odds" className="mt-0 space-y-4">
             {/* Summary odds card */}
@@ -1525,11 +1555,26 @@ export default function MatchDetailPage({ params }: PageProps) {
               standings.map((g, i) => {
                 const hasGoals = g.rows.some(r => r.goalsFor !== undefined)
                 const totalRows = g.rows.length
+                const fullTableHref = match.homeTeam.leagueSlug
+                  ? `/leagues/${match.homeTeam.leagueSlug}`
+                  : match.league?.slug
+                  ? `/leagues/${match.league.slug}`
+                  : null
                 return (
                   <Card key={i} className="overflow-hidden">
-                    <div className="px-4 pt-4 pb-3 border-b border-border/50 flex items-center gap-2">
-                      <Trophy className="h-4 w-4 text-warning" />
-                      <h3 className="text-sm font-bold">{g.header || 'League Table'}</h3>
+                    <div className="px-4 pt-4 pb-3 border-b border-border/50 flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <Trophy className="h-4 w-4 text-warning" />
+                        <h3 className="text-sm font-bold">{g.header || 'League Table'}</h3>
+                      </div>
+                      {fullTableHref && (
+                        <Link
+                          href={fullTableHref}
+                          className="text-xs font-medium text-primary hover:underline inline-flex items-center gap-1"
+                        >
+                          View full table <ChevronRight className="h-3 w-3" />
+                        </Link>
+                      )}
                     </div>
                     <CardContent className="p-4">
                       <div className="overflow-x-auto">
@@ -2146,6 +2191,118 @@ function NewsRow({ item }: { item: NewsItem }) {
 }
 
 // ===== TipCard Component =====
+// ─── Team Stats tab (live + finished) ───────────────────────────────────────
+function TeamStatsTab({
+  teamStats, homeName, awayName, homeLogo, awayLogo, isLive, isFinished,
+}: {
+  teamStats: TeamStatsBlock | null
+  homeName: string
+  awayName: string
+  homeLogo?: string
+  awayLogo?: string
+  isLive: boolean
+  isFinished: boolean
+}) {
+  if (!teamStats || (teamStats.home.stats.length === 0 && teamStats.away.stats.length === 0)) {
+    return (
+      <Card>
+        <CardContent className="py-14 text-center text-muted-foreground">
+          <BarChart3 className="h-12 w-12 mx-auto mb-3 opacity-30" />
+          <p className="font-semibold">
+            {isLive || isFinished ? 'No statistics yet' : 'Stats appear once the match starts'}
+          </p>
+          <p className="text-sm mt-1">
+            {isLive || isFinished
+              ? 'The data feed has not published team stats for this fixture.'
+              : 'Live possession, shots and more will show here once the whistle blows.'}
+          </p>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  // Pair up stats by name, preferring labels from the home side.
+  const map = new Map<string, { label: string; home: string; away: string }>()
+  for (const s of teamStats.home.stats) {
+    map.set(s.name, { label: s.label, home: s.displayValue, away: '' })
+  }
+  for (const s of teamStats.away.stats) {
+    const existing = map.get(s.name)
+    if (existing) existing.away = s.displayValue
+    else map.set(s.name, { label: s.label, home: '', away: s.displayValue })
+  }
+  const rows = Array.from(map.values()).filter(r => r.home || r.away)
+
+  return (
+    <Card>
+      <div className="flex items-center justify-between gap-4 px-4 pt-4 pb-3 border-b border-border/50">
+        <div className="flex items-center gap-2">
+          <BarChart3 className="h-4 w-4 text-primary" />
+          <h3 className="text-sm font-bold">Team Stats</h3>
+          {isLive && (
+            <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase text-rose-500">
+              <span className="h-1.5 w-1.5 rounded-full bg-rose-500 animate-pulse" />
+              Live
+            </span>
+          )}
+        </div>
+      </div>
+      <CardContent className="p-4">
+        <div className="mb-4 grid grid-cols-3 items-center gap-2 text-xs font-semibold">
+          <div className="flex items-center gap-2 justify-end text-right">
+            <span className="truncate">{homeName}</span>
+            <TeamLogo teamName={homeName} logoUrl={homeLogo} size="xs" />
+          </div>
+          <div className="text-center text-[10px] uppercase tracking-wider text-muted-foreground">vs</div>
+          <div className="flex items-center gap-2">
+            <TeamLogo teamName={awayName} logoUrl={awayLogo} size="xs" />
+            <span className="truncate">{awayName}</span>
+          </div>
+        </div>
+        <div className="space-y-3">
+          {rows.map((row, i) => <StatComparisonRow key={i} {...row} />)}
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
+function StatComparisonRow({ label, home, away }: { label: string; home: string; away: string }) {
+  // Try to derive bar widths from numeric values when possible.
+  const hNum = parseFloat((home || '').replace(/[^\d.\-]/g, ''))
+  const aNum = parseFloat((away || '').replace(/[^\d.\-]/g, ''))
+  const hasNums = Number.isFinite(hNum) && Number.isFinite(aNum) && (hNum + aNum) > 0
+  const total = hasNums ? hNum + aNum : 1
+  const hPct = hasNums ? Math.max(2, Math.round((hNum / total) * 100)) : 50
+  const aPct = hasNums ? 100 - hPct : 50
+  const hLeads = hasNums && hNum > aNum
+  const aLeads = hasNums && aNum > hNum
+
+  return (
+    <div>
+      <div className="mb-1 grid grid-cols-3 items-center gap-2 text-xs">
+        <span className={cn("text-right font-mono font-bold", hLeads && "text-primary")}>{home || '—'}</span>
+        <span className="text-center text-[10px] uppercase tracking-wider text-muted-foreground">{label}</span>
+        <span className={cn("font-mono font-bold", aLeads && "text-primary")}>{away || '—'}</span>
+      </div>
+      <div className="flex items-center gap-1 h-1.5">
+        <div className="flex-1 bg-muted rounded-l-full overflow-hidden flex justify-end">
+          <div
+            className={cn("h-full transition-all", hLeads ? "bg-primary" : "bg-muted-foreground/40")}
+            style={{ width: `${hPct}%` }}
+          />
+        </div>
+        <div className="flex-1 bg-muted rounded-r-full overflow-hidden">
+          <div
+            className={cn("h-full transition-all", aLeads ? "bg-primary" : "bg-muted-foreground/40")}
+            style={{ width: `${aPct}%` }}
+          />
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function TipCard({ tip }: { tip: MatchTip }) {
   const [likes, setLikes] = useState(tip.likes)
   const [userVote, setUserVote] = useState<'like' | 'dislike' | null>(null)

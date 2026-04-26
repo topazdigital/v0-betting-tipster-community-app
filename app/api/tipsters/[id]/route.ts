@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { listFollowersOfTipster, listFollowedTipsters } from '@/lib/follows-store';
 
 export const dynamic = 'force-dynamic';
 
@@ -391,20 +392,39 @@ function generateSportBreakdown(specialties: string[]) {
 
 export async function GET(request: NextRequest, context: RouteContext) {
   const { id } = await context.params;
-  
-  const tipster = TIPSTERS[id];
-  
-  if (!tipster) {
+
+  const baseTipster = TIPSTERS[id];
+
+  if (!baseTipster) {
     return NextResponse.json(
       { error: 'Tipster not found' },
       { status: 404 }
     );
   }
-  
+
+  // Pull *real* follower / following counts from the follows store so the
+  // numbers match what users actually see when they tap "Follow".
+  // Falls back to the mock baseline when the lookup fails (DB hiccup).
+  const tipsterId = baseTipster.id;
+  const [realFollowers, realFollowing] = await Promise.all([
+    listFollowersOfTipster(tipsterId).catch(() => null),
+    listFollowedTipsters(tipsterId).catch(() => null),
+  ]);
+
+  // We add the existing "baseline" so seeded tipsters don't suddenly drop to
+  // 0 followers in production until the community catches up.
+  const tipster = {
+    ...baseTipster,
+    followers: (realFollowers?.length ?? 0) + baseTipster.followers,
+    following: (realFollowing?.length ?? 0) + baseTipster.following,
+    realFollowers: realFollowers?.length ?? 0,
+    realFollowing: realFollowing?.length ?? 0,
+  };
+
   const { searchParams } = new URL(request.url);
   const includeTips = searchParams.get('includeTips') !== 'false';
   const includeStats = searchParams.get('includeStats') !== 'false';
-  
+
   const response: {
     tipster: typeof tipster;
     recentTips?: ReturnType<typeof generateRecentTips>;
@@ -413,15 +433,15 @@ export async function GET(request: NextRequest, context: RouteContext) {
   } = {
     tipster
   };
-  
+
   if (includeTips) {
     response.recentTips = generateRecentTips(tipster.id);
   }
-  
+
   if (includeStats) {
     response.monthlyStats = generateMonthlyStats(tipster);
     response.sportBreakdown = generateSportBreakdown(tipster.specialties);
   }
-  
+
   return NextResponse.json(response);
 }

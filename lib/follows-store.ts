@@ -45,7 +45,8 @@ export async function listFollowedTeams(userId: number): Promise<FollowedTeam[]>
          FROM team_follows WHERE user_id = ? ORDER BY created_at DESC`,
         [userId]
       );
-      if (r.rows.length > 0) return r.rows;
+      // DB is the source of truth — always return its result, even when empty.
+      return r.rows;
     } catch (e) {
       console.warn('[follows] db read failed, falling back to memory:', e);
     }
@@ -102,7 +103,7 @@ export async function isFollowingTeam(userId: number, teamId: string): Promise<b
         `SELECT COUNT(*) AS c FROM team_follows WHERE user_id = ? AND team_id = ?`,
         [userId, teamId]
       );
-      if (r.rows[0]?.c) return true;
+      return !!(r.rows[0]?.c);
     } catch {}
   }
   return stores.teams.get(userId)?.has(teamId) ?? false;
@@ -143,7 +144,7 @@ export async function isFollowingTipster(userId: number, tipsterId: number): Pro
         `SELECT COUNT(*) AS c FROM follows WHERE follower_id = ? AND following_id = ?`,
         [userId, tipsterId]
       );
-      if (r.rows[0]?.c) return true;
+      return !!(r.rows[0]?.c);
     } catch {}
   }
   return stores.tipsters.get(userId)?.has(tipsterId) ?? false;
@@ -156,7 +157,7 @@ export async function listFollowedTipsters(userId: number): Promise<number[]> {
         `SELECT following_id FROM follows WHERE follower_id = ?`,
         [userId]
       );
-      if (r.rows.length > 0) return r.rows.map(x => x.following_id);
+      return r.rows.map(x => x.following_id);
     } catch {}
   }
   return Array.from(stores.tipsters.get(userId) || []);
@@ -170,7 +171,7 @@ export async function listFollowersOfTipster(tipsterId: number): Promise<number[
         `SELECT follower_id FROM follows WHERE following_id = ?`,
         [tipsterId]
       );
-      if (r.rows.length > 0) return r.rows.map(x => x.follower_id);
+      return r.rows.map(x => x.follower_id);
     } catch {}
   }
   const out: number[] = [];
@@ -188,7 +189,7 @@ export async function listFollowersOfTeam(teamId: string): Promise<number[]> {
         `SELECT user_id FROM team_follows WHERE team_id = ?`,
         [teamId]
       );
-      if (r.rows.length > 0) return r.rows.map(x => x.user_id);
+      return r.rows.map(x => x.user_id);
     } catch {}
   }
   const out: number[] = [];

@@ -340,6 +340,34 @@ function buildStandings(summary: ESPNSummaryResponse) {
   return groups.filter(g => g.rows.length > 0);
 }
 
+/**
+ * Extracts side-by-side team statistics from ESPN's `boxscore.teams[].statistics`.
+ * Returns a normalized array of `{ name, displayValue, abbreviation }` per team
+ * so the frontend can render comparison bars (possession, shots, etc.).
+ */
+function buildTeamStats(summary: ESPNSummaryResponse) {
+  const teams = summary.boxscore?.teams;
+  if (!teams || teams.length === 0) return null;
+  const home = teams.find(t => t.homeAway === 'home') || teams[0];
+  const away = teams.find(t => t.homeAway === 'away') || teams[1];
+  if (!home?.statistics?.length && !away?.statistics?.length) return null;
+
+  const norm = (t: typeof teams[number] | undefined) =>
+    (t?.statistics || [])
+      .filter(s => (s.displayValue ?? '').toString().trim().length > 0)
+      .map(s => ({
+        name: s.name || s.label || s.abbreviation || '',
+        label: s.label || s.name || s.abbreviation || '',
+        abbreviation: s.abbreviation,
+        displayValue: s.displayValue || (s.value !== undefined ? String(s.value) : ''),
+      }));
+
+  return {
+    home: { team: home?.team, stats: norm(home) },
+    away: { team: away?.team, stats: norm(away) },
+  };
+}
+
 function buildHeader(summary: ESPNSummaryResponse) {
   const competition = summary.header?.competitions?.[0];
   if (!competition) return null;
@@ -733,6 +761,7 @@ export async function GET(_request: NextRequest, context: RouteContext) {
     const news = summary ? buildNews(summary) : [];
     const leaders = summary ? buildLeaders(summary) : [];
     const header = summary ? buildHeader(summary) : null;
+    const teamStats = summary ? buildTeamStats(summary) : null;
 
     // Extract home/away team IDs from header competitors for event attribution
     const competition = summary?.header?.competitions?.[0];
@@ -798,11 +827,13 @@ export async function GET(_request: NextRequest, context: RouteContext) {
       leaders,
       matchEvents,
       segmentBreakdown,
+      teamStats,
       hasRealOdds: !!realOdds,
       hasLineups: !!lineups,
       hasStandings: !!standings,
       hasH2H: !!h2h && h2h.length > 0,
       hasEvents: matchEvents.length > 0,
+      hasTeamStats: !!(teamStats && (teamStats.home.stats.length > 0 || teamStats.away.stats.length > 0)),
       timestamp: new Date().toISOString(),
     });
   } catch (error) {

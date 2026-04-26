@@ -28,6 +28,7 @@ import { Spinner } from '@/components/ui/spinner';
 import { cn } from '@/lib/utils';
 import { ALL_SPORTS, getSportIcon } from '@/lib/sports-data';
 import { BestBetsPanel } from '@/components/home/best-bets-panel';
+import { FavoritedTipsPanel } from '@/components/home/favorited-tips-panel';
 import { useAuthModal } from '@/contexts/auth-modal-context';
 
 interface ApiTipster {
@@ -285,6 +286,9 @@ export default function HomePage() {
                   </div>
                 )}
               </section>
+
+              {/* Favorited Tips — shown when live action is sparse */}
+              {liveMatches.length <= 3 && <FavoritedTipsPanel />}
 
               {/* Top Tipsters */}
               <section className="mb-5">

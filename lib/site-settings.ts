@@ -14,6 +14,8 @@ export interface SiteSettings {
   twofa_method: string;
   url_rewrites: string;
   seo_pages: string;
+  maintenance_mode: string;
+  maintenance_message: string;
   [key: string]: string;
 }
 
@@ -31,6 +33,8 @@ const DEFAULTS: SiteSettings = {
   twofa_method: 'email',
   url_rewrites: '[]',
   seo_pages: '[]',
+  maintenance_mode: 'false',
+  maintenance_message: '',
 };
 
 const g = globalThis as { __siteSettingsCache?: { value: SiteSettings; ts: number } };

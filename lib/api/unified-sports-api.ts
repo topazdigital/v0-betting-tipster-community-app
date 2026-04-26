@@ -920,6 +920,20 @@ export interface ESPNSummaryResponse {
     homeScore?: number;
     awayScore?: number;
   }>;
+  boxscore?: {
+    teams?: Array<{
+      team?: { id?: string; displayName?: string; abbreviation?: string; logo?: string };
+      homeAway?: 'home' | 'away';
+      statistics?: Array<{
+        name?: string;
+        abbreviation?: string;
+        displayValue?: string;
+        label?: string;
+        value?: number;
+      }>;
+    }>;
+    players?: unknown;
+  };
 }
 
 export async function fetchESPNSummary(sport: string, league: string, eventId: string): Promise<ESPNSummaryResponse | null> {

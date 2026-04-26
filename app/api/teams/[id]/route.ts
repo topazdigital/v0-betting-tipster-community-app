@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getEspnLeagueConfigForId } from '@/lib/api/unified-sports-api';
 import { ALL_LEAGUES } from '@/lib/sports-data';
+import { listFollowersOfTeam } from '@/lib/follows-store';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 300;
@@ -136,12 +137,13 @@ export async function GET(
 
   const { sport, league, espnTeamId } = parsed;
 
-  const [teamData, scheduleData, rosterData, injuriesData, coachName] = await Promise.all([
+  const [teamData, scheduleData, rosterData, injuriesData, coachName, followers] = await Promise.all([
     fetchTeamInfo(sport, league, espnTeamId),
     fetchTeamSchedule(sport, league, espnTeamId),
     fetchTeamRoster(sport, league, espnTeamId),
     fetchTeamInjuries(sport, league, espnTeamId),
     fetchTeamCoach(sport, league, espnTeamId),
+    listFollowersOfTeam(id).catch(() => [] as number[]),
   ]);
 
   if (!teamData?.team) {
@@ -407,6 +409,7 @@ export async function GET(
     upcoming,
     roster,
     injuries,
+    followersCount: followers.length,
     league: { sport, league },
     timestamp: new Date().toISOString(),
   });

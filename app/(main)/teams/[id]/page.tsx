@@ -172,7 +172,7 @@ export default function TeamPage({ params }: PageProps) {
     );
   }
 
-  const { team, past, upcoming, roster, injuries } = data || {};
+  const { team, past, upcoming, roster, injuries, followersCount } = data || {};
   if (!team) return null;
 
   // Stats from past matches
@@ -226,17 +226,23 @@ export default function TeamPage({ params }: PageProps) {
                   <p className="text-sm text-muted-foreground">{team.nickname}</p>
                 )}
               </div>
-              <FollowTeamButton
-                teamId={id}
-                teamName={team.name}
-                teamLogo={team.logo}
-                leagueId={(team as any).leagueId ?? null}
-                leagueSlug={(team as any).leagueSlug ?? null}
-                leagueName={(team as any).league ?? null}
-                sportSlug={sportSlug ?? null}
-                countryCode={countryCode ?? null}
-                size="md"
-              />
+              <div className="flex flex-col items-end gap-1.5 shrink-0">
+                <FollowTeamButton
+                  teamId={id}
+                  teamName={team.name}
+                  teamLogo={team.logo}
+                  leagueId={(team as any).leagueId ?? null}
+                  leagueSlug={(team as any).leagueSlug ?? null}
+                  leagueName={(team as any).league ?? null}
+                  sportSlug={sportSlug ?? null}
+                  countryCode={countryCode ?? null}
+                  size="md"
+                />
+                <span className="inline-flex items-center gap-1 text-[11px] font-medium text-muted-foreground">
+                  <Users className="h-3 w-3" />
+                  {(followersCount ?? 0).toLocaleString()} {followersCount === 1 ? 'follower' : 'followers'}
+                </span>
+              </div>
             </div>
             <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
               {countryCode && (
