@@ -137,6 +137,112 @@ function buildLineups(summary: ESPNSummaryResponse) {
   };
 }
 
+// Fallback H2H builder — when ESPN's summary endpoint doesn't include
+// `headToHeadGames` we fetch each team's recent league schedule (current,
+// previous and previous-previous seasons) and find the games where both
+// teams played each other. Works for any league/cup ESPN covers, including
+// the small ones that previously showed "no previous records".
+async function buildH2HFallback(
+  sport: string,
+  league: string,
+  homeTeamId: string,
+  awayTeamId: string,
+  homeTeamName: string,
+  awayTeamName: string,
+): Promise<Array<{
+  date: string
+  league?: string
+  home: { name: string; logo?: string; score?: number }
+  away: { name: string; logo?: string; score?: number }
+}> | null> {
+  const ESPN = 'https://site.api.espn.com/apis/site/v2/sports';
+  const year = new Date().getUTCFullYear();
+  const seasons = [year, year - 1, year - 2];
+
+  type SchedEvent = {
+    id?: string;
+    date?: string;
+    name?: string;
+    competitions?: Array<{
+      competitors?: Array<{
+        homeAway?: string;
+        team?: { id?: string; displayName?: string; logo?: string };
+        score?: string | number | { value?: number };
+      }>;
+    }>;
+    league?: { abbreviation?: string };
+  };
+
+  const fetchTeamSched = async (teamId: string, season: number) => {
+    try {
+      const r = await fetch(
+        `${ESPN}/${sport}/${league}/teams/${teamId}/schedule?season=${season}`,
+        { headers: { Accept: 'application/json' }, next: { revalidate: 3600 } },
+      );
+      if (!r.ok) return [] as SchedEvent[];
+      const j = (await r.json()) as { events?: SchedEvent[] };
+      return j.events || [];
+    } catch {
+      return [];
+    }
+  };
+
+  // Pull both teams' schedules across 3 seasons in parallel.
+  const allEvents = (
+    await Promise.all([
+      ...seasons.map(s => fetchTeamSched(homeTeamId, s)),
+      ...seasons.map(s => fetchTeamSched(awayTeamId, s)),
+    ])
+  ).flat();
+
+  // Deduplicate by event id and keep only direct meetings.
+  const seen = new Set<string>();
+  const games: Array<{
+    date: string
+    league?: string
+    home: { name: string; logo?: string; score?: number }
+    away: { name: string; logo?: string; score?: number }
+  }> = [];
+
+  for (const ev of allEvents) {
+    if (!ev?.id || seen.has(ev.id)) continue;
+    const competitors = ev.competitions?.[0]?.competitors || [];
+    if (competitors.length < 2) continue;
+    const ids = competitors.map(c => c.team?.id);
+    if (!ids.includes(homeTeamId) || !ids.includes(awayTeamId)) continue;
+    seen.add(ev.id);
+
+    const home = competitors.find(c => c.homeAway === 'home') || competitors[0];
+    const away = competitors.find(c => c.homeAway === 'away') || competitors[1];
+    const parseScore = (s: string | number | { value?: number } | undefined): number | undefined => {
+      if (s === undefined || s === null) return undefined;
+      if (typeof s === 'object') return typeof s.value === 'number' ? s.value : undefined;
+      const n = typeof s === 'number' ? s : parseInt(String(s), 10);
+      return Number.isFinite(n) ? n : undefined;
+    };
+
+    games.push({
+      date: ev.date || '',
+      league: ev.league?.abbreviation,
+      home: {
+        name: home.team?.displayName || homeTeamName,
+        logo: home.team?.logo,
+        score: parseScore(home.score),
+      },
+      away: {
+        name: away.team?.displayName || awayTeamName,
+        logo: away.team?.logo,
+        score: parseScore(away.score),
+      },
+    });
+  }
+
+  // Newest first
+  games.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+  return games.length > 0 ? games.slice(0, 10) : null;
+}
+
 function buildH2H(summary: ESPNSummaryResponse) {
   if (!summary.headToHeadGames || summary.headToHeadGames.length === 0) return null;
   const seen = new Set<string>();
@@ -605,7 +711,24 @@ export async function GET(_request: NextRequest, context: RouteContext) {
 
     const bookmakerOdds = summary ? buildBookmakerOdds(summary, hasDraw) : [];
     const lineups = summary ? buildLineups(summary) : null;
-    const h2h = summary ? buildH2H(summary) : null;
+    let h2h = summary ? buildH2H(summary) : null;
+    // Fallback: when ESPN's summary doesn't include H2H (common for smaller
+    // leagues, cup ties or international fixtures), pull each team's recent
+    // fixtures and look for direct meetings.
+    if ((!h2h || h2h.length === 0) && cfg && summary) {
+      const homeTeamId = summary.header?.competitions?.[0]?.competitors?.find(c => c.homeAway === 'home')?.team?.id;
+      const awayTeamId = summary.header?.competitions?.[0]?.competitors?.find(c => c.homeAway === 'away')?.team?.id;
+      if (homeTeamId && awayTeamId) {
+        h2h = await buildH2HFallback(
+          cfg.sport,
+          cfg.league,
+          homeTeamId,
+          awayTeamId,
+          match.homeTeam.name,
+          match.awayTeam.name,
+        );
+      }
+    }
     const standings = summary ? buildStandings(summary) : null;
     const news = summary ? buildNews(summary) : [];
     const leaders = summary ? buildLeaders(summary) : [];

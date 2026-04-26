@@ -217,3 +217,21 @@ html {
 .animate-live-pulse {
   animation: live-pulse 1.5s ease-in-out infinite;
 }
+
+/* Live Now marquee — smooth right→left auto-scroll, pauses on hover */
+@keyframes marquee {
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+.animate-marquee {
+  animation: marquee linear infinite;
+  width: max-content;
+  will-change: transform;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-marquee {
+    animation: none;
+  }
+}

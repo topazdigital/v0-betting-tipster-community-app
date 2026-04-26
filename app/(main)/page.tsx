@@ -22,7 +22,7 @@ import { MatchCardNew } from '@/components/matches/match-card-new';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
-import { useMatches, useLiveMatches, useMatchStats } from '@/lib/hooks/use-matches';
+import { useMatches, useLiveMatches, useMatchStats, type Match } from '@/lib/hooks/use-matches';
 import { Spinner } from '@/components/ui/spinner';
 import { cn } from '@/lib/utils';
 import { ALL_SPORTS, getSportIcon } from '@/lib/sports-data';
@@ -65,20 +65,29 @@ export default function HomePage() {
   }, [matches]);
 
   // Today's matches: latest matches across all sports, ordered by kickoff
-  // time ascending. We exclude live matches so they don't overlap with the
-  // dedicated "Live Now" section above.
+  // time ascending. Once a match has kicked off (or finished) it disappears
+  // from this section — live matches have their own dedicated row above, and
+  // finished ones move to /results. A 2-minute grace window catches matches
+  // that haven't had their status flipped to "live" yet.
   const todayMatches = useMemo(() => {
     const today = new Date().toDateString();
-    const liveStatuses = new Set(['live', 'halftime', 'extra_time', 'penalties']);
+    const liveStatuses = new Set([
+      'live', 'in_progress', 'halftime', 'extra_time', 'penalties',
+      'finished', 'final', 'ft', 'ended', 'postponed', 'cancelled',
+    ]);
+    const cutoff = Date.now() - 2 * 60 * 1000;
     return matches
-      .filter(m =>
-        new Date(m.kickoffTime).toDateString() === today &&
-        !liveStatuses.has(m.status),
-      )
+      .filter(m => {
+        if (new Date(m.kickoffTime).toDateString() !== today) return false;
+        if (liveStatuses.has(m.status)) return false;
+        // Hide anything whose kickoff time is already in the past.
+        if (new Date(m.kickoffTime).getTime() <= cutoff) return false;
+        return true;
+      })
       .sort((a, b) =>
         new Date(a.kickoffTime).getTime() - new Date(b.kickoffTime).getTime(),
       )
-      .slice(0, 20);
+      .slice(0, 40);
   }, [matches]);
 
   // Group upcoming by sport for variety display
@@ -181,7 +190,8 @@ export default function HomePage() {
             </div>
           ) : (
             <>
-              {/* Live Matches Section */}
+              {/* Live Matches Section — auto-scrolls right→left so every live
+                  fixture cycles into view, no matter how many there are. */}
               {liveMatches.length > 0 && (
                 <section className="mb-5">
                   <div className="mb-2 flex items-center justify-between">
@@ -200,16 +210,7 @@ export default function HomePage() {
                       </Link>
                     </Button>
                   </div>
-                  <ScrollArea className="w-full whitespace-nowrap">
-                    <div className="flex gap-4 pb-4">
-                      {liveMatches.map(match => (
-                        <div key={match.id} className="w-80 shrink-0">
-                          <MatchCardNew match={match} showSport />
-                        </div>
-                      ))}
-                    </div>
-                    <ScrollBar orientation="horizontal" />
-                  </ScrollArea>
+                  <LiveMarquee matches={liveMatches} />
                 </section>
               )}
 
@@ -602,6 +603,41 @@ function FeaturedSlide({ matches }: { matches: CarouselMatch[] }) {
           <ChevronRight className="ml-1 h-4 w-4" />
         </Link>
       </Button>
+    </div>
+  );
+}
+
+// ───────────────────────────────────────────────
+// LiveMarquee — auto-scrolls live matches right→left in a continuous loop.
+// Pauses on hover so you can read a card. We render the list twice so the
+// CSS animation can loop without a visible jump.
+// ───────────────────────────────────────────────
+function LiveMarquee({ matches }: { matches: Match[] }) {
+  // Tune speed to the number of cards so a row of 4 doesn't fly past.
+  const cards = matches.length;
+  const duration = Math.max(28, cards * 9); // seconds per loop
+
+  return (
+    <div className="group relative overflow-hidden">
+      {/* Fade edges */}
+      <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-12 bg-gradient-to-r from-background to-transparent" />
+      <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-12 bg-gradient-to-l from-background to-transparent" />
+
+      <div
+        className="flex gap-4 pb-2 animate-marquee group-hover:[animation-play-state:paused] motion-reduce:animate-none"
+        style={{ animationDuration: `${duration}s` }}
+      >
+        {/* Render twice so the second copy slides in seamlessly */}
+        {[...matches, ...matches].map((match, idx) => (
+          <div
+            key={`${match.id}-${idx}`}
+            className="w-80 shrink-0"
+            aria-hidden={idx >= cards}
+          >
+            <MatchCardNew match={match} showSport />
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
