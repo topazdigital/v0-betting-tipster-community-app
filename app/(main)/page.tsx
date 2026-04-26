@@ -30,6 +30,7 @@ import { ALL_SPORTS, getSportIcon } from '@/lib/sports-data';
 import { BestBetsPanel } from '@/components/home/best-bets-panel';
 import { FavoritedTipsPanel, FavoritedTipMarqueeCard, useFavoritedTips, type FeaturedItem } from '@/components/home/favorited-tips-panel';
 import { useAuthModal } from '@/contexts/auth-modal-context';
+import { matchIdToSlug } from '@/lib/utils/match-url';
 
 interface ApiTipster {
   id: number;
@@ -269,7 +270,7 @@ export default function HomePage() {
                           return (
                             <Link
                               key={m.id}
-                              href={`/matches/${m.id}`}
+                              href={`/matches/${matchIdToSlug(m.id)}`}
                               className="group flex items-center justify-between gap-2 rounded-lg border border-border bg-card px-3 py-2 transition-colors hover:border-primary/50"
                             >
                               <div className="min-w-0">
@@ -458,7 +459,7 @@ export default function HomePage() {
                           {sportMatches.slice(0, 3).map(match => (
                             <Link 
                               key={match.id}
-                              href={`/matches/${match.id}`}
+                              href={`/matches/${matchIdToSlug(match.id)}`}
                               className="block rounded-lg bg-muted/50 p-2 transition-colors hover:bg-muted"
                             >
                               <div className="flex items-center justify-between text-xs">
@@ -627,7 +628,7 @@ function LiveSlide({ matches, totalCount }: { matches: CarouselMatch[]; totalCou
           return (
             <Link
               key={match.id}
-              href={`/matches/${match.id}`}
+              href={`/matches/${matchIdToSlug(match.id)}`}
               className="block rounded-lg bg-card/50 p-3 transition-colors hover:bg-card"
             >
               <div className="mb-1 flex items-center justify-between text-xs text-muted-foreground">
@@ -674,7 +675,7 @@ function FeaturedSlide({ matches }: { matches: CarouselMatch[] }) {
         {matches.map(match => (
           <Link
             key={match.id}
-            href={`/matches/${match.id}`}
+            href={`/matches/${matchIdToSlug(match.id)}`}
             className="block rounded-lg bg-card/50 p-3 transition-colors hover:bg-card"
           >
             <div className="mb-1 flex items-center justify-between text-xs text-muted-foreground">

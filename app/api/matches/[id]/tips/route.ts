@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getCurrentUser } from '@/lib/auth';
+import { slugToMatchId } from '@/lib/utils/match-url';
 
 export const dynamic = 'force-dynamic';
 
@@ -85,7 +86,8 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { id: matchId } = await params;
+  const { id: rawId } = await params;
+  const matchId = slugToMatchId(decodeURIComponent(rawId));
   const { searchParams } = new URL(request.url);
   const homeTeam = searchParams.get('home') || 'Home Team';
   const awayTeam = searchParams.get('away') || 'Away Team';

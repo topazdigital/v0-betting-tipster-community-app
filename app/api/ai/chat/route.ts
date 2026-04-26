@@ -39,8 +39,8 @@ function getOpenAI(): OpenAI | null {
 }
 
 // Default model — overridable via env so swapping providers requires no code
-// changes (e.g. set OPENAI_MODEL=gpt-4o-mini when not using AI Integrations).
-const MODEL = process.env.OPENAI_MODEL || 'gpt-5';
+// changes (e.g. set OPENAI_MODEL=gpt-4o when not using AI Integrations).
+const MODEL = process.env.OPENAI_MODEL || 'gpt-4o-mini';
 
 // ----- App-knowledge system prompt -----
 // Detailed, opinionated, structured. The LLM answers grounded in this app's

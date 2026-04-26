@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Star, Calendar, TrendingUp, Trophy, Sparkles, ChevronRight, Users, Target } from 'lucide-react';
+import { Star, Calendar, TrendingUp, Trophy, Sparkles, ChevronRight, Users, Target, Wallet } from 'lucide-react';
 import { TeamLogo } from '@/components/ui/team-logo';
 import { FlagIcon } from '@/components/ui/flag-icon';
 import { Spinner } from '@/components/ui/spinner';
@@ -10,6 +10,7 @@ import { useAuth } from '@/contexts/auth-context';
 import { useAuthModal } from '@/contexts/auth-modal-context';
 import { formatDate, formatTime, getBrowserTimezone } from '@/lib/utils/timezone';
 import { cn } from '@/lib/utils';
+import { matchIdToSlug } from '@/lib/utils/match-url';
 
 interface FollowedTeam {
   teamId: string;
@@ -123,9 +124,16 @@ export default function DashboardPage() {
           </h1>
           <p className="text-sm text-muted-foreground">Personalised fixtures, results & AI tips for the teams you follow.</p>
         </div>
-        <Link href="/notifications" className="hidden sm:inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-xs font-semibold hover:bg-muted">
-          Notifications <ChevronRight className="h-3.5 w-3.5" />
-        </Link>
+        <div className="flex items-center gap-2">
+          {(user?.role === 'tipster' || user?.role === 'admin') && (
+            <Link href="/dashboard/payment-settings" className="hidden sm:inline-flex items-center gap-1.5 rounded-lg border border-primary/40 bg-primary/5 text-primary px-3 py-2 text-xs font-semibold hover:bg-primary/10">
+              <Wallet className="h-3.5 w-3.5" /> Payout Settings
+            </Link>
+          )}
+          <Link href="/notifications" className="hidden sm:inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-xs font-semibold hover:bg-muted">
+            Notifications <ChevronRight className="h-3.5 w-3.5" />
+          </Link>
+        </div>
       </header>
 
       {/* Followed Teams */}
@@ -210,7 +218,7 @@ function DashboardMatchRow({ ev, tz, kind }: { ev: DashboardEvent; tz: string; k
   const oppName = ev.opponent?.name || 'Opponent';
   return (
     <Link
-      href={`/matches/${encodeURIComponent(ev.id)}`}
+      href={`/matches/${matchIdToSlug(ev.id)}`}
       className="flex items-center gap-3 rounded-xl border border-border bg-card p-3 hover:border-primary/40 transition-colors"
     >
       <div className="w-14 shrink-0 text-center">
@@ -267,7 +275,7 @@ function AiTipCard({ ev }: { ev: DashboardEvent }) {
   }
   return (
     <Link
-      href={`/matches/${encodeURIComponent(ev.id)}`}
+      href={`/matches/${matchIdToSlug(ev.id)}`}
       className="block rounded-xl border border-amber-500/20 bg-gradient-to-br from-amber-500/5 to-transparent p-3 hover:border-amber-500/40 transition-colors"
     >
       <div className="flex items-center justify-between gap-2">

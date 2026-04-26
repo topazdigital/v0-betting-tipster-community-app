@@ -23,6 +23,7 @@ import { cn } from "@/lib/utils"
 import { formatTime, formatDate, getBrowserTimezone, getDayLabel } from "@/lib/utils/timezone"
 import { FlagIcon } from "@/components/ui/flag-icon"
 import { liveStatusLabel } from "@/lib/utils/live-status"
+import { matchIdToSlug } from "@/lib/utils/match-url"
 import { AIMatchPrediction } from "@/components/ai/ai-match-prediction"
 import { AIMultiMarket } from "@/components/ai/ai-multi-market"
 import { AddTipForm } from "@/components/matches/add-tip-form"
@@ -1961,7 +1962,7 @@ function UpcomingMatchesPanel({
             return (
               <Link
                 key={mAny.id}
-                href={`/matches/${encodeURIComponent(mAny.id)}`}
+                href={`/matches/${matchIdToSlug(mAny.id)}`}
                 className="flex items-center gap-3 rounded-xl border border-border/40 bg-muted/30 px-3 py-2.5 hover:bg-muted/50 transition-colors"
               >
                 <div className="flex flex-1 items-center justify-end gap-2 min-w-0">

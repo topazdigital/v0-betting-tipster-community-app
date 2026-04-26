@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
 import { TeamLogo } from "@/components/ui/team-logo"
 import { FlagIcon } from "@/components/ui/flag-icon"
+import { matchIdToSlug } from "@/lib/utils/match-url"
 
 interface MatchLite {
   id: string
@@ -91,7 +92,7 @@ export function BestBetsPanel({ matches }: BestBetsPanelProps) {
           </span>
         </div>
         <Link
-          href={`/matches/${featured.match.id}`}
+          href={`/matches/${matchIdToSlug(featured.match.id)}`}
           className="block group"
         >
           <p className="text-[10px] uppercase tracking-wide text-muted-foreground font-semibold">
@@ -143,7 +144,7 @@ export function BestBetsPanel({ matches }: BestBetsPanelProps) {
             {acca.map((p, i) => (
               <Link
                 key={i}
-                href={`/matches/${p.match.id}`}
+                href={`/matches/${matchIdToSlug(p.match.id)}`}
                 className="group block rounded-lg bg-background/50 p-2.5 hover:bg-background transition-colors"
               >
                 <div className="flex items-start justify-between gap-2">
@@ -186,7 +187,7 @@ export function BestBetsPanel({ matches }: BestBetsPanelProps) {
             {others.map((p, i) => (
               <li key={i}>
                 <Link
-                  href={`/matches/${p.match.id}`}
+                  href={`/matches/${matchIdToSlug(p.match.id)}`}
                   className="group flex items-center gap-3 px-4 py-3 border-b border-border/30 last:border-b-0 hover:bg-muted/40 transition-colors"
                 >
                   <div className={cn(

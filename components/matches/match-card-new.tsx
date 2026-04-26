@@ -7,6 +7,7 @@ import { formatOdds } from '@/lib/utils/odds-converter';
 import { TeamLogo, SportIcon, LeagueFlag } from '@/components/ui/team-logo';
 import { getBrowserTimezone, formatTime, formatDate, isToday, isTomorrow } from '@/lib/utils/timezone';
 import { liveStatusLabel } from '@/lib/utils/live-status';
+import { matchIdToSlug } from '@/lib/utils/match-url';
 
 // Match type from our API
 interface Match {
@@ -131,7 +132,7 @@ export function MatchCardNew({
         </div>
 
         {/* Teams with logos */}
-        <Link href={`/matches/${match.id}`} className="min-w-0 flex-1 space-y-1">
+        <Link href={`/matches/${matchIdToSlug(match.id)}`} className="min-w-0 flex-1 space-y-1">
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2">
               <TeamLogo teamName={match.homeTeam.name} logoUrl={match.homeTeam.logo} sportSlug={match.sport.slug} size="xs" />
@@ -245,7 +246,7 @@ export function MatchCardNew({
       </div>
 
       {/* Teams and Score with logos */}
-      <Link href={`/matches/${match.id}`} className="block">
+      <Link href={`/matches/${matchIdToSlug(match.id)}`} className="block">
         <div className="mb-3 space-y-2">
           {/* Home Team */}
           <div className="flex items-center justify-between gap-3">
@@ -320,7 +321,7 @@ export function MatchCardNew({
       {/* Footer */}
       <div className="mt-3 flex items-center justify-between text-xs text-muted-foreground">
         <span>{match.tipsCount} tips</span>
-        <Link href={`/matches/${match.id}`} className="opacity-0 transition-opacity group-hover:opacity-100 hover:text-primary">
+        <Link href={`/matches/${matchIdToSlug(match.id)}`} className="opacity-0 transition-opacity group-hover:opacity-100 hover:text-primary">
           View details
         </Link>
       </div>

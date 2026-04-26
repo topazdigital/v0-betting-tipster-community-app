@@ -31,6 +31,19 @@ Key architectural decisions include:
 - **Branding and SEO**: Dynamic site-wide branding and per-page SEO management through an admin interface, with middleware for URL rewrites.
 - **Team and Tipster Following**: Allows users to follow teams and tipsters, personalizing their dashboard experience.
 
+## Recent Changes
+
+### Pre-launch Fixes (April 2026)
+- **AI Chat**: Fixed model name from non-existent `gpt-5` to `gpt-4o-mini`. Chat now calls OpenAI API via Replit integration.
+- **Lineup Component** (`components/matches/lineups.tsx`): Rebuilt to accept real ESPN data via props instead of hardcoded mock data.
+- **Clean Match URLs**: Match IDs (`espn_ita.1_737421`) are now encoded as clean slugs (`ita1-737421`) in all URLs. Utility: `lib/utils/match-url.ts`. All match cards, home page, dashboard, and embedded links updated.
+- **Match URL API resolution**: The `/api/matches/[id]/details` and `/api/matches/[id]/tips` routes both resolve clean slugs back to full ESPN IDs before fetching.
+- **Payment Gateway Admin Page** (`/admin/payment-gateways`): Full admin UI for configuring 9 payment methods (Stripe, PayPal, Mpesa, MTN Mobile Money, Orange Money, Flutterwave, Paystack, Bank Transfer, Crypto) with per-country settings and API credential management. API route: `/api/admin/payment-gateways`.
+- **Admin Navigation**: Added "Payment Gateways" link to the admin sidebar.
+- **Tipster Payout Settings** (`/dashboard/payment-settings`): Full UI for tipsters to add and manage payout methods (PayPal, Bank, Mobile Money, Crypto, Stripe). Link shown in dashboard for tipster/admin users.
+- **Database fix** (`lib/db.ts`): Removed hardcoded `isDevelopment` guard that prevented MySQL connections in dev mode. DB now connects whenever `DATABASE_URL` is set.
+- **Timezone**: Match times already use `getBrowserTimezone()` throughout.
+
 ## External Dependencies
 
 - **OpenAI**: For AI-powered match predictions and conversational AI features.

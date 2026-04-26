@@ -7,6 +7,7 @@ import {
   extractEspnOdds,
   type ESPNSummaryResponse,
 } from '@/lib/api/unified-sports-api';
+import { slugToMatchId } from '@/lib/utils/match-url';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 30;
@@ -707,7 +708,9 @@ function generateComputedOdds(homeTeamName: string, awayTeamName: string, sportT
 }
 
 export async function GET(_request: NextRequest, context: RouteContext) {
-  const { id } = await context.params;
+  const { id: rawId } = await context.params;
+  // Resolve clean URL slugs (e.g. "ita1-737421") to full ESPN IDs ("espn_ita.1_737421")
+  const id = slugToMatchId(decodeURIComponent(rawId));
   try {
     const match = await getMatchById(id);
     if (!match) {

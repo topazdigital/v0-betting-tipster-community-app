@@ -1,24 +1,18 @@
 import mysql from 'mysql2/promise';
 
-// MySQL connection pool for production use
-// For development in v0, we'll use mock data since we can't connect to VPS
-
-const isDevelopment = process.env.NODE_ENV === 'development' || !process.env.DATABASE_URL;
+// MySQL connection pool
+// Connects whenever DATABASE_URL is set, regardless of NODE_ENV.
+// Without a DATABASE_URL the app gracefully falls back to mock data.
 
 let pool: mysql.Pool | null = null;
 
 export function getPool(): mysql.Pool | null {
-  if (isDevelopment) {
+  const dbUrl = process.env.DATABASE_URL;
+  if (!dbUrl) {
     return null;
   }
-  
+
   if (!pool) {
-    const dbUrl = process.env.DATABASE_URL;
-    if (!dbUrl) {
-      console.warn('DATABASE_URL not set, using mock data');
-      return null;
-    }
-    
     pool = mysql.createPool({
       uri: dbUrl,
       waitForConnections: true,
@@ -28,7 +22,7 @@ export function getPool(): mysql.Pool | null {
       keepAliveInitialDelay: 0,
     });
   }
-  
+
   return pool;
 }
 

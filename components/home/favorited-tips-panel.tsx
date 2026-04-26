@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { TeamLogo } from "@/components/ui/team-logo"
 import { cn } from "@/lib/utils"
+import { matchIdToSlug } from "@/lib/utils/match-url"
 
 export interface FeaturedItem {
   matchId: string
@@ -113,7 +114,7 @@ export function FavoritedTipMarqueeCard({ item }: { item: FeaturedItem }) {
 
   return (
     <Link
-      href={`/matches/${match.id}`}
+      href={`/matches/${matchIdToSlug(match.id)}`}
       className={cn(
         // Match the live cards' height by giving the card a minimum height
         // close to MatchCardNew's typical render. The flex column lets the
@@ -195,7 +196,7 @@ function FavoritedTipCard({ item }: { item: FeaturedItem }) {
 
   return (
     <Link
-      href={`/matches/${match.id}`}
+      href={`/matches/${matchIdToSlug(match.id)}`}
       className={cn(
         "group block rounded-xl border bg-card p-3 transition-all hover:border-primary/50 hover:shadow-md",
         pinned ? "border-amber-500/50" : "border-border",
