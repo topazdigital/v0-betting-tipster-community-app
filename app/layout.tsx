@@ -4,6 +4,8 @@ import { Analytics } from '@vercel/analytics/next'
 import { ThemeProvider } from '@/components/theme-provider'
 import { UserSettingsProvider } from '@/contexts/user-settings-context'
 import { AuthProvider } from '@/contexts/auth-context'
+import { AuthModalProvider } from '@/contexts/auth-modal-context'
+import { AuthModal } from '@/components/auth/auth-modal'
 import { AIChatButton } from '@/components/ai/ai-chat-button'
 import { InstallPrompt } from '@/components/install-prompt'
 import './globals.css'
@@ -77,11 +79,14 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           <AuthProvider>
-            <UserSettingsProvider>
-              {children}
-              <AIChatButton />
-              <InstallPrompt />
-            </UserSettingsProvider>
+            <AuthModalProvider>
+              <UserSettingsProvider>
+                {children}
+                <AuthModal />
+                <AIChatButton />
+                <InstallPrompt />
+              </UserSettingsProvider>
+            </AuthModalProvider>
           </AuthProvider>
         </ThemeProvider>
         {process.env.NODE_ENV === 'production' && <Analytics />}

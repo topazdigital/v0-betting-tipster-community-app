@@ -1,7 +1,7 @@
 "use client"
 
-import { Brain, Sparkles, Check, X, MinusCircle } from "lucide-react"
-import { useMemo } from "react"
+import { Brain, Sparkles, Check, X, MinusCircle, TrendingUp, Lightbulb } from "lucide-react"
+import { useMemo, useState } from "react"
 import { cn } from "@/lib/utils"
 
 interface Market {
@@ -66,9 +66,14 @@ export function AIMultiMarket({
   awayScore,
   status,
 }: AIMultiMarketProps) {
+  const [mode, setMode] = useState<'odds' | 'smart'>('odds')
+
   const picks = useMemo(
-    () => buildMultiMarketPicks({ homeTeam, awayTeam, sportSlug, odds, homeForm, awayForm, h2h, markets: markets || null }),
-    [homeTeam, awayTeam, sportSlug, odds, homeForm, awayForm, h2h, markets],
+    () =>
+      mode === 'smart'
+        ? buildSmartPicks({ homeTeam, awayTeam, sportSlug, odds, homeForm, awayForm, h2h, markets: markets || null })
+        : buildMultiMarketPicks({ homeTeam, awayTeam, sportSlug, odds, homeForm, awayForm, h2h, markets: markets || null }),
+    [mode, homeTeam, awayTeam, sportSlug, odds, homeForm, awayForm, h2h, markets],
   )
 
   const isFinal =
@@ -122,10 +127,49 @@ export function AIMultiMarket({
             )}
           </div>
           <p className="text-[11px] text-muted-foreground">
-            {isFinal ? 'Auto-graded against the final score' : 'One pick per market, ranked by confidence'}
+            {isFinal
+              ? 'Auto-graded against the final score'
+              : mode === 'smart'
+                ? 'Pure logic — ignores bookmaker odds, can back underdogs'
+                : 'One pick per market, ranked by confidence'}
           </p>
         </div>
         <Sparkles className="h-4 w-4 text-fuchsia-400" />
+      </div>
+
+      {/* Mode toggle: Odds-based vs Smart (logic-only) */}
+      <div className="flex items-center gap-1 px-3 py-2 border-b border-fuchsia-500/15 bg-background/40">
+        <button
+          type="button"
+          onClick={() => setMode('odds')}
+          className={cn(
+            "flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[11px] font-bold transition-colors",
+            mode === 'odds'
+              ? "bg-fuchsia-500/20 text-fuchsia-700 dark:text-fuchsia-300"
+              : "text-muted-foreground hover:text-foreground",
+          )}
+        >
+          <TrendingUp className="h-3 w-3" />
+          Odds-based
+        </button>
+        <button
+          type="button"
+          onClick={() => setMode('smart')}
+          className={cn(
+            "flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[11px] font-bold transition-colors",
+            mode === 'smart'
+              ? "bg-amber-500/20 text-amber-700 dark:text-amber-300"
+              : "text-muted-foreground hover:text-foreground",
+          )}
+        >
+          <Lightbulb className="h-3 w-3" />
+          Smart AI
+        </button>
+        <span className="ml-auto text-[10px] text-muted-foreground">
+          {mode === 'smart'
+            ? 'Reasoning ignores prices — a 5.0 can beat a 1.x'
+            : 'Mixes prices with form & H2H'}
+        </span>
       </div>
 
       <div className="divide-y divide-border/40">
@@ -460,6 +504,154 @@ function buildMultiMarketPicks(input: EngineInput): MarketPick[] {
   }
 
   // Sort by confidence desc, but always keep Match Result first
+  return picks.sort((a, b) => {
+    if (a.market === "Match Result") return -1
+    if (b.market === "Match Result") return 1
+    return b.confidence - a.confidence
+  })
+}
+
+// ───────────────────────────────────────────────
+// Smart AI engine — pure logical reasoning, ignores odds for the SELECTION
+// (odds are still shown so the user knows the price). This is the engine
+// that lets a 5.0 underdog beat a 1.x favourite when form / h2h say so.
+// ───────────────────────────────────────────────
+function buildSmartPicks(input: EngineInput): MarketPick[] {
+  const { homeTeam, awayTeam, sportSlug, odds, homeForm, awayForm, h2h, markets } = input
+  const picks: MarketPick[] = []
+
+  // ── Score each side from form (last 5) and recent h2h ──
+  const hF = formScore(homeForm)              // 0-15
+  const aF = formScore(awayForm)              // 0-15
+  let homeWinsH2h = 0
+  let awayWinsH2h = 0
+  let drawsH2h = 0
+  let h2hGoals = 0
+  let h2hCount = 0
+  let bothScoredCount = 0
+  if (h2h && h2h.length > 0) {
+    for (const g of h2h.slice(0, 6)) {
+      const hs = g.home.score ?? 0
+      const as = g.away.score ?? 0
+      h2hGoals += hs + as
+      h2hCount++
+      if (hs > 0 && as > 0) bothScoredCount++
+      const homeName = g.home.name?.toLowerCase()
+      const isHomeOurHome = homeName?.includes(homeTeam.toLowerCase().split(' ')[0])
+      if (hs === as) drawsH2h++
+      else if ((hs > as && isHomeOurHome) || (as > hs && !isHomeOurHome)) homeWinsH2h++
+      else awayWinsH2h++
+    }
+  }
+
+  // Composite "logic score" 0-100. Heavy on form, then h2h, with a small
+  // home-advantage nudge for football.
+  const isSoccer = sportSlug === "soccer" || sportSlug === "football"
+  const homeAdv = isSoccer ? 6 : 3
+  const formWeight = 4         // up to 60 pts from form
+  const h2hWeight = h2hCount > 0 ? (30 / h2hCount) : 0  // up to ~30 pts
+
+  const homeRaw = hF * formWeight + homeWinsH2h * h2hWeight + homeAdv
+  const awayRaw = aF * formWeight + awayWinsH2h * h2hWeight
+  const drawRaw = drawsH2h * h2hWeight + (Math.abs(hF - aF) <= 2 ? 12 : 0)
+
+  const total = homeRaw + awayRaw + drawRaw || 1
+  const homeP = homeRaw / total
+  const awayP = awayRaw / total
+  const drawP = drawRaw / total
+
+  const avgGoals = h2hCount > 0 ? h2hGoals / h2hCount : 2.55
+  const bttsRate = h2hCount > 0 ? bothScoredCount / h2hCount : 0.5
+
+  // ── 1X2 — pure logic ──
+  let pickSide: 'home' | 'away' | 'draw' = homeP >= awayP ? 'home' : 'away'
+  let pickP = Math.max(homeP, awayP)
+  if (isSoccer && drawP > pickP) {
+    pickSide = 'draw'
+    pickP = drawP
+  }
+  const pickName = pickSide === 'home' ? homeTeam : pickSide === 'away' ? awayTeam : 'Draw'
+  const pickOdds = pickSide === 'home' ? odds?.home : pickSide === 'away' ? odds?.away : odds?.draw
+
+  // Detect "underdog" — Smart AI overrides the favourite.
+  const isUnderdog =
+    !!odds &&
+    pickSide !== 'draw' &&
+    pickOdds !== undefined &&
+    ((pickSide === 'home' && odds.home > odds.away) ||
+      (pickSide === 'away' && odds.away > odds.home))
+
+  const formText =
+    pickSide === 'home'
+      ? `${homeTeam} are in better recent form (${homeForm || '—'} vs ${awayForm || '—'})`
+      : pickSide === 'away'
+        ? `${awayTeam} are in better recent form (${awayForm || '—'} vs ${homeForm || '—'})`
+        : `Both sides are evenly matched on form and have drawn in past meetings`
+
+  picks.push({
+    market: "Match Result",
+    pick: pickSide === 'draw' ? 'Draw' : `${pickName} to win`,
+    odds: pickOdds,
+    confidence: Math.round(Math.min(90, Math.max(45, pickP * 100))),
+    reason: isUnderdog
+      ? `Smart pick: ${formText}. Bookmakers have them as underdogs at ${pickOdds?.toFixed(2)} — value bet.`
+      : `${formText}${h2hCount > 0 ? `, with ${pickSide === 'home' ? homeWinsH2h : pickSide === 'away' ? awayWinsH2h : drawsH2h}/${h2hCount} of recent meetings going their way` : ''}.`,
+    evalKey: '1x2',
+    side: pickSide,
+  })
+
+  // ── Double Chance — based on logic probabilities ──
+  if (isSoccer) {
+    const dcOptions: Array<{ name: string; p: number; side: 'home_or_draw' | 'away_or_draw' | 'home_or_away' }> = [
+      { name: `${homeTeam} or Draw (1X)`, p: homeP + drawP, side: 'home_or_draw' },
+      { name: `${awayTeam} or Draw (X2)`, p: drawP + awayP, side: 'away_or_draw' },
+      { name: `${homeTeam} or ${awayTeam} (12)`, p: homeP + awayP, side: 'home_or_away' },
+    ]
+    const dcBest = dcOptions.sort((a, b) => b.p - a.p)[0]
+    picks.push({
+      market: "Double Chance",
+      pick: dcBest.name,
+      confidence: Math.round(Math.min(94, dcBest.p * 100)),
+      reason: "Hedges the logical pick — covers two outcomes the model rates highest.",
+      evalKey: 'dc',
+      side: dcBest.side,
+    })
+  }
+
+  // ── BTTS — driven by h2h scoring patterns ──
+  if (isSoccer) {
+    const bttsYes = bttsRate >= 0.45 || (hF >= 6 && aF >= 6)
+    const bttsYesPrice = findMarketPrice(markets, "btts", n => /yes/i.test(n))
+    const bttsNoPrice = findMarketPrice(markets, "btts", n => /^no$/i.test(n))
+    picks.push({
+      market: "Both Teams to Score",
+      pick: bttsYes ? "Yes" : "No",
+      odds: bttsYes ? bttsYesPrice : bttsNoPrice,
+      confidence: Math.round(Math.min(85, Math.max(50, (bttsYes ? bttsRate : 1 - bttsRate) * 100 + 10))),
+      reason: bttsYes
+        ? `Both attacks are firing — ${Math.round(bttsRate * 100)}% BTTS rate in recent meetings.`
+        : `At least one defence has been watertight in the recent run — leaning No.`,
+      evalKey: bttsYes ? 'btts_yes' : 'btts_no',
+    })
+  }
+
+  // ── Goal totals — logic from h2h average ──
+  const line = avgGoals >= 3 ? 2.5 : avgGoals >= 2 ? 2.5 : 1.5
+  const over = avgGoals > line
+  const overPrice = findMarketPrice(markets, "totals", (n, p) => /over/i.test(n) && p === line)
+  const underPrice = findMarketPrice(markets, "totals", (n, p) => /under/i.test(n) && p === line)
+  picks.push({
+    market: `Over / Under ${line}`,
+    pick: over ? `Over ${line} goals` : `Under ${line} goals`,
+    odds: over ? overPrice : underPrice,
+    confidence: Math.round(Math.min(86, 55 + Math.abs(avgGoals - line) * 20)),
+    reason: over
+      ? `Recent meetings average ${avgGoals.toFixed(1)} goals — game projects to be open.`
+      : `Recent meetings average ${avgGoals.toFixed(1)} goals — leaning to a tight, low-scoring affair.`,
+    evalKey: over ? 'over' : 'under',
+    line,
+  })
+
   return picks.sort((a, b) => {
     if (a.market === "Match Result") return -1
     if (b.market === "Match Result") return 1

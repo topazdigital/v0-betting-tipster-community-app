@@ -63,16 +63,19 @@ function MatchesContent() {
     sportId: selectedSportId || undefined,
     status: statusFilter !== 'all' ? statusFilter : undefined,
   });
+  // Unfiltered fetch — used to compute per-sport totals (Oddspedia-style)
+  // so the count badges don't change when a sport tab is selected.
+  const { matches: allMatches } = useMatches();
   const stats = useMatchStats();
 
-  // Calculate match counts per sport
+  // Calculate match counts per sport from the UNFILTERED list.
   const matchCounts = useMemo(() => {
     const counts: Record<number, number> = {};
-    matches.forEach(m => {
+    allMatches.forEach(m => {
       counts[m.sportId] = (counts[m.sportId] || 0) + 1;
     });
     return counts;
-  }, [matches]);
+  }, [allMatches]);
 
   // Get relevant leagues for selected sport
   const relevantLeagues = useMemo(() => {

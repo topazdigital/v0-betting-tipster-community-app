@@ -62,15 +62,68 @@ export const ESPN_LEAGUE_ALIASES: Record<string, string> = {
   // Africa — Kenya
   'ken-1': 'kenya-premier-league',
   'ken.1': 'kenya-premier-league',
+  'ke-1': 'kenya-premier-league',
   'kpl': 'kenya-premier-league',
+  // Ghana
+  'gha-1': 'ghana-premier-league',
+  'gha.1': 'ghana-premier-league',
+  'gh-1': 'ghana-premier-league',
+  'ghpl': 'ghana-premier-league',
+  // Nigeria
+  'nga-1': 'nigerian-premier-league',
+  'nga.1': 'nigerian-premier-league',
+  'ng-1': 'nigerian-premier-league',
+  'npfl': 'nigerian-premier-league',
+  // Tanzania
+  'tan-1': 'tanzanian-premier-league',
+  'tza-1': 'tanzanian-premier-league',
+  'tz-1': 'tanzanian-premier-league',
+  // Uganda
+  'uga-1': 'ugandan-premier-league',
+  'ug-1': 'ugandan-premier-league',
+  'upl': 'ugandan-premier-league',
+  // South Africa
+  'rsa-1': 'south-african-premier-soccer-league',
+  'za-1': 'south-african-premier-soccer-league',
+  'psl': 'south-african-premier-soccer-league',
+  // Morocco
+  'mar-1': 'moroccan-botola-pro',
+  'ma-1': 'moroccan-botola-pro',
+  // Tunisia
+  'tun-1': 'tunisian-ligue-1',
+  'tn-1': 'tunisian-ligue-1',
+  // Algeria
+  'alg-1': 'algerian-ligue-1',
+  'dz-1': 'algerian-ligue-1',
   // Egypt
   'egy-1': 'egyptian-premier-league',
   'egy.1': 'egyptian-premier-league',
+  'eg-1': 'egyptian-premier-league',
   // CAF / continental
   'caf-cl': 'caf-champions-league',
   'caf-champions': 'caf-champions-league',
+  'caf-cc': 'caf-confederation-cup',
+  'caf-confed': 'caf-confederation-cup',
   'afcon': 'afcon',
   'caf-afcon': 'afcon',
+  // England cups / lower
+  'eng-fa': 'fa-cup',
+  'eng-fac': 'fa-cup',
+  'fa-cup': 'fa-cup',
+  'eng-2': 'efl-championship',
+  'efl-ch': 'efl-championship',
+  // Spain cup
+  'esp-cdr': 'copa-del-rey',
+  'copa-del-rey': 'copa-del-rey',
+  // Italy cup
+  'ita-cop': 'coppa-italia',
+  'coppa-italia': 'coppa-italia',
+  // Germany cup
+  'ger-pok': 'dfb-pokal',
+  'dfb-pokal': 'dfb-pokal',
+  // UEFA Conference
+  'uefa-uecl': 'uefa-conference-league',
+  'uefa-conference': 'uefa-conference-league',
   // UEFA / continental
   'uefa-champions': 'champions-league',
   'uefa-cl': 'champions-league',

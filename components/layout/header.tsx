@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { useAuth } from '@/contexts/auth-context';
+import { useAuthModal } from '@/contexts/auth-modal-context';
 import { useUserSettings } from '@/contexts/user-settings-context';
 import { formatOdds } from '@/lib/utils/odds-converter';
 import type { OddsFormat } from '@/lib/types';
@@ -26,6 +27,7 @@ const oddsFormats: { value: OddsFormat; label: string }[] = [
 
 export function Header() {
   const { user, isAuthenticated, logout } = useAuth();
+  const { open: openAuthModal } = useAuthModal();
   const { settings, setOddsFormat } = useUserSettings();
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -179,11 +181,11 @@ export function Header() {
             </>
           ) : (
             <div className="flex items-center gap-2">
-              <Button variant="ghost" size="sm" asChild>
-                <Link href="/login">Login</Link>
+              <Button variant="ghost" size="sm" onClick={() => openAuthModal('login')}>
+                Login
               </Button>
-              <Button size="sm" asChild>
-                <Link href="/register">Sign Up</Link>
+              <Button size="sm" onClick={() => openAuthModal('register')}>
+                Sign Up
               </Button>
             </div>
           )}

@@ -1,288 +1,290 @@
 "use client"
 
 import { useState, useMemo } from "react"
-import Link from "next/link"
-import { format } from "date-fns"
-import { Calendar, CheckCircle2, XCircle, Trophy, TrendingUp, Search, Clock } from "lucide-react"
+import { Calendar, Search, Trophy, TrendingUp } from "lucide-react"
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Badge } from "@/components/ui/badge"
 import { Spinner } from "@/components/ui/spinner"
-import { TeamLogo } from "@/components/ui/team-logo"
-import { cn } from "@/lib/utils"
+import { SidebarNew } from "@/components/layout/sidebar-new"
+import { MatchCardNew } from "@/components/matches/match-card-new"
+import { FlagIcon } from "@/components/ui/flag-icon"
 import { ALL_SPORTS, getSportIcon } from "@/lib/sports-data"
-import { useFinishedMatches, groupMatchesByLeague } from "@/lib/hooks/use-matches"
+import { useFinishedMatches } from "@/lib/hooks/use-matches"
 
 // Sort sports by priority (football first)
 const SPORT_PRIORITY: Record<number, number> = {
-  1: 0,   // Football - highest priority
-  2: 1,   // Basketball
-  3: 2,   // Tennis
-  4: 3,   // Cricket
-  5: 4,   // American Football
-  6: 5,   // Baseball
-  7: 6,   // Ice Hockey
-  8: 7,   // Rugby
-  27: 8,  // MMA
-  26: 9,  // Boxing
-  29: 10, // Formula 1
-  33: 11, // Esports
+  1: 0, 2: 1, 3: 2, 4: 3, 5: 4, 6: 5, 7: 6, 8: 7, 27: 8, 26: 9, 29: 10, 33: 11,
 }
 
-const sortedSports = [...ALL_SPORTS].sort((a, b) => {
-  const priorityA = SPORT_PRIORITY[a.id] ?? 99
-  const priorityB = SPORT_PRIORITY[b.id] ?? 99
-  return priorityA - priorityB
-})
+const DAY_OPTIONS = [
+  { value: "1", label: "Today" },
+  { value: "3", label: "Last 3 days" },
+  { value: "7", label: "Last 7 days" },
+  { value: "14", label: "Last 14 days" },
+  { value: "30", label: "Last 30 days" },
+]
 
 export default function ResultsPage() {
-  const [selectedSport, setSelectedSport] = useState<string>("all")
+  const [selectedSport, setSelectedSport] = useState<number | null>(null)
   const [searchQuery, setSearchQuery] = useState("")
   const [dateRange, setDateRange] = useState("7")
 
+  // Auto-refreshes every 60s — newly finished matches will pop in.
   const { matches: finishedMatches, isLoading } = useFinishedMatches()
 
+  // Date-range filter (in days)
+  const filteredByDate = useMemo(() => {
+    const days = parseInt(dateRange, 10) || 7
+    const cutoff = Date.now() - days * 24 * 60 * 60 * 1000
+    return finishedMatches.filter(m => new Date(m.kickoffTime).getTime() >= cutoff)
+  }, [finishedMatches, dateRange])
+
+  // Apply sport + search filters
   const filteredResults = useMemo(() => {
-    return finishedMatches.filter(match => {
-      if (selectedSport !== "all" && match.sportId.toString() !== selectedSport) return false
-      if (searchQuery && 
-          !match.homeTeam.name.toLowerCase().includes(searchQuery.toLowerCase()) && 
-          !match.awayTeam.name.toLowerCase().includes(searchQuery.toLowerCase())) return false
+    return filteredByDate.filter(match => {
+      if (selectedSport !== null && match.sportId !== selectedSport) return false
+      if (searchQuery) {
+        const q = searchQuery.toLowerCase()
+        if (
+          !match.homeTeam.name.toLowerCase().includes(q) &&
+          !match.awayTeam.name.toLowerCase().includes(q) &&
+          !(match.league?.name || "").toLowerCase().includes(q)
+        ) {
+          return false
+        }
+      }
       return true
     })
-  }, [finishedMatches, selectedSport, searchQuery])
+  }, [filteredByDate, selectedSport, searchQuery])
 
-  // Group results by sport
-  const groupedResults = useMemo(() => {
-    const groups: Record<string, typeof filteredResults> = {}
-    
+  // Sport pills (only sports that have results)
+  const sportCounts = useMemo(() => {
+    const counts = ALL_SPORTS.map(sport => ({
+      ...sport,
+      icon: getSportIcon(sport.slug),
+      count: filteredByDate.filter(m => m.sportId === sport.id).length,
+    })).filter(s => s.count > 0)
+    return counts.sort((a, b) => (SPORT_PRIORITY[a.id] ?? 99) - (SPORT_PRIORITY[b.id] ?? 99))
+  }, [filteredByDate])
+
+  // Group by league. Newest finished match first within each group, and
+  // groups sorted by their most recent kick-off so the freshest results
+  // bubble straight to the top of the page.
+  const groupedMatches = useMemo(() => {
+    type Group = {
+      leagueName: string
+      country: string
+      countryCode?: string
+      sportSlug: string
+      sportId: number
+      latestKickoff: number
+      matches: typeof filteredResults
+    }
+    const groups: Record<string, Group> = {}
+
     filteredResults.forEach(match => {
-      const sportIcon = getSportIcon(match.sport?.slug || 'football')
-      const key = `${sportIcon} ${match.sport?.name || 'Football'}`
-      if (!groups[key]) groups[key] = []
-      groups[key].push(match)
+      const leagueName = match.league?.name || "Other"
+      const key = `${match.sportId}-${leagueName}`
+      const ts = new Date(match.kickoffTime).getTime()
+      if (!groups[key]) {
+        groups[key] = {
+          leagueName,
+          country: match.league?.country || "",
+          countryCode: match.league?.countryCode,
+          sportSlug: match.sport?.slug || "football",
+          sportId: match.sportId,
+          latestKickoff: ts,
+          matches: [],
+        }
+      }
+      groups[key].matches.push(match)
+      groups[key].latestKickoff = Math.max(groups[key].latestKickoff, ts)
     })
-    
-    // Sort groups by sport priority
-    return Object.entries(groups).sort((a, b) => {
-      const sportA = filteredResults.find(m => `${getSportIcon(m.sport?.slug || 'football')} ${m.sport?.name || 'Football'}` === a[0])
-      const sportB = filteredResults.find(m => `${getSportIcon(m.sport?.slug || 'football')} ${m.sport?.name || 'Football'}` === b[0])
-      const priorityA = SPORT_PRIORITY[sportA?.sportId || 99] ?? 99
-      const priorityB = SPORT_PRIORITY[sportB?.sportId || 99] ?? 99
-      return priorityA - priorityB
+
+    // Sort matches inside each group: newest first.
+    Object.values(groups).forEach(g => {
+      g.matches.sort(
+        (a, b) => new Date(b.kickoffTime).getTime() - new Date(a.kickoffTime).getTime(),
+      )
+    })
+
+    // Sort groups: latest kick-off first, with football breaking ties.
+    return Object.values(groups).sort((a, b) => {
+      if (a.latestKickoff !== b.latestKickoff) return b.latestKickoff - a.latestKickoff
+      const pa = SPORT_PRIORITY[a.sportId] ?? 99
+      const pb = SPORT_PRIORITY[b.sportId] ?? 99
+      return pa - pb
     })
   }, [filteredResults])
 
-  // Get sport counts for filter
-  const sportCounts = useMemo(() => {
-    const counts: Record<string, number> = {}
-    finishedMatches.forEach(m => {
-      const id = m.sportId.toString()
-      counts[id] = (counts[id] || 0) + 1
-    })
-    return counts
-  }, [finishedMatches])
-
-  if (isLoading) {
-    return (
-      <div className="flex h-96 items-center justify-center">
-        <Spinner className="h-8 w-8" />
-      </div>
-    )
-  }
+  const totalResults = filteredResults.length
+  const sportsCovered = new Set(filteredResults.map(m => m.sportId)).size
+  const leagueCount = new Set(filteredResults.map(m => m.leagueId)).size
+  const avgGoals =
+    totalResults > 0
+      ? (
+          filteredResults.reduce(
+            (acc, m) => acc + (m.homeScore || 0) + (m.awayScore || 0),
+            0,
+          ) / totalResults
+        ).toFixed(1)
+      : "0"
 
   return (
-    <div className="space-y-3">
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <div>
-          <h1 className="text-lg font-bold text-foreground">Results</h1>
-          <p className="text-muted-foreground">View finished match results across all sports</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <select 
-            value={dateRange}
-            onChange={(e) => setDateRange(e.target.value)}
-            className="h-10 rounded-lg border border-border bg-card px-3 text-sm"
-          >
-            <option value="7">Last 7 days</option>
-            <option value="14">Last 14 days</option>
-            <option value="30">Last 30 days</option>
-            <option value="90">Last 90 days</option>
-          </select>
-        </div>
-      </div>
+    <div className="flex">
+      <SidebarNew selectedSportId={selectedSport} onSelectSport={setSelectedSport} />
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-        <div className="rounded-xl border border-border bg-card p-4">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-              <Trophy className="h-5 w-5 text-primary" />
+      <div className="flex-1 overflow-hidden">
+        <div className="mx-auto max-w-7xl px-3 py-4 md:px-6 md:py-5">
+          {/* Compact header */}
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5">
+              <Trophy className="h-5 w-5 text-success" />
+              <h1 className="text-xl font-bold">Results</h1>
+              <Badge variant="secondary" className="font-bold">{totalResults}</Badge>
             </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Total Results</p>
-              <p className="text-xl font-bold">{filteredResults.length}</p>
-            </div>
-          </div>
-        </div>
-        <div className="rounded-xl border border-border bg-card p-4">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-500/10">
-              <CheckCircle2 className="h-5 w-5 text-emerald-500" />
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Sports Covered</p>
-              <p className="text-xl font-bold text-emerald-500">{Object.keys(sportCounts).length}</p>
-            </div>
-          </div>
-        </div>
-        <div className="rounded-xl border border-border bg-card p-4">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-500/10">
-              <Calendar className="h-5 w-5 text-blue-500" />
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Leagues</p>
-              <p className="text-xl font-bold text-blue-500">
-                {new Set(filteredResults.map(m => m.leagueId)).size}
-              </p>
-            </div>
-          </div>
-        </div>
-        <div className="rounded-xl border border-border bg-card p-4">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-500/10">
-              <TrendingUp className="h-5 w-5 text-amber-500" />
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Avg Goals</p>
-              <p className="text-xl font-bold text-amber-500">
-                {filteredResults.length > 0 
-                  ? (filteredResults.reduce((acc, m) => acc + (m.homeScore || 0) + (m.awayScore || 0), 0) / filteredResults.length).toFixed(1)
-                  : '0'
-                }
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Filters */}
-      <div className="flex flex-col gap-4 rounded-xl border border-border bg-card p-4 md:flex-row md:items-center">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Search teams..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-9"
-          />
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <select
-            value={selectedSport}
-            onChange={(e) => setSelectedSport(e.target.value)}
-            className="h-10 rounded-lg border border-border bg-background px-3 text-sm"
-          >
-            <option value="all">All Sports ({finishedMatches.length})</option>
-            {sortedSports.filter(sport => sportCounts[sport.id.toString()]).map(sport => (
-              <option key={sport.id} value={sport.id.toString()}>
-                {getSportIcon(sport.slug)} {sport.name} ({sportCounts[sport.id.toString()] || 0})
-              </option>
-            ))}
-          </select>
-        </div>
-      </div>
-
-      {/* Results grouped by sport */}
-      {filteredResults.length > 0 ? (
-        <div className="space-y-8">
-          {groupedResults.map(([sportName, matches]) => (
-            <div key={sportName}>
-              <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold">
-                {sportName}
-                <Badge variant="secondary">{matches.length}</Badge>
-              </h2>
-              <div className="space-y-3">
-                {matches.map((match) => (
-                  <Link
-                    key={match.id}
-                    href={`/matches/${match.id}`}
-                    className="block"
-                  >
-                    <div className="rounded-xl border border-border bg-card p-4 transition-all hover:border-primary/50 hover:shadow-md">
-                      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                        <div className="flex items-center gap-4">
-                          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-muted text-2xl">
-                            {getSportIcon(match.sport?.slug || 'football')}
-                          </div>
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <TeamLogo teamName={match.homeTeam.name} logoUrl={match.homeTeam.logo} size="sm" />
-                              <span className="font-semibold">{match.homeTeam.name}</span>
-                              <span className="text-xl font-bold text-primary">{match.homeScore ?? 0}</span>
-                              <span className="text-muted-foreground">-</span>
-                              <span className="text-xl font-bold text-primary">{match.awayScore ?? 0}</span>
-                              <span className="font-semibold">{match.awayTeam.name}</span>
-                              <TeamLogo teamName={match.awayTeam.name} logoUrl={match.awayTeam.logo} size="sm" />
-                            </div>
-                            <div className="mt-1 flex items-center gap-2 text-sm text-muted-foreground">
-                              <span>{match.league?.name || 'League'}</span>
-                              <span>•</span>
-                              <span className="flex items-center gap-1">
-                                <Clock className="h-3 w-3" />
-                                {format(new Date(match.kickoffTime), "MMM d, yyyy HH:mm")}
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                        
-                        <div className="flex items-center gap-4">
-                          <Badge variant="secondary" className="gap-1">
-                            <CheckCircle2 className="h-3 w-3" />
-                            FT
-                          </Badge>
-                          {match.odds && (
-                            <div className="flex gap-2 text-sm">
-                              <span className="rounded bg-muted px-2 py-1">
-                                H: {match.odds.home?.toFixed(2)}
-                              </span>
-                              {match.odds.draw && (
-                                <span className="rounded bg-muted px-2 py-1">
-                                  D: {match.odds.draw.toFixed(2)}
-                                </span>
-                              )}
-                              <span className="rounded bg-muted px-2 py-1">
-                                A: {match.odds.away?.toFixed(2)}
-                              </span>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </Link>
+            <div className="flex flex-wrap items-center gap-2">
+              <select
+                value={dateRange}
+                onChange={(e) => setDateRange(e.target.value)}
+                className="h-8 rounded-md border border-border bg-card px-2 text-xs"
+              >
+                {DAY_OPTIONS.map(o => (
+                  <option key={o.value} value={o.value}>{o.label}</option>
                 ))}
+              </select>
+              <div className="relative w-44 sm:w-56">
+                <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  placeholder="Search teams or league…"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="h-8 pl-8 text-xs"
+                />
               </div>
             </div>
-          ))}
-        </div>
-      ) : (
-        <div className="rounded-xl border border-border bg-card p-6 text-center">
-          <Calendar className="mx-auto h-12 w-12 text-muted-foreground" />
-          <h3 className="mt-4 text-lg font-semibold">No results found</h3>
-          <p className="mt-2 text-sm text-muted-foreground">
-            {searchQuery 
-              ? "Try adjusting your search query"
-              : "No finished matches to display yet"
-            }
-          </p>
-          {searchQuery && (
-            <Button className="mt-4" onClick={() => setSearchQuery('')}>
-              Clear Search
+          </div>
+
+          {/* Compact stats */}
+          <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+            <StatChip icon="🏆" label="Results" value={totalResults} accent="text-success" />
+            <StatChip icon="🎯" label="Sports" value={sportsCovered} accent="text-primary" />
+            <StatChip icon="🏟️" label="Leagues" value={leagueCount} accent="text-blue-500" />
+            <StatChip icon="⚽" label="Avg goals" value={avgGoals} accent="text-amber-500" />
+          </div>
+
+          {/* Sport pills */}
+          <div className="mb-4 flex gap-1.5 overflow-x-auto pb-1 scrollbar-hide">
+            <Button
+              variant={selectedSport === null ? "default" : "outline"}
+              size="sm"
+              onClick={() => setSelectedSport(null)}
+              className="shrink-0 h-8 text-xs"
+            >
+              All
+              <Badge variant="secondary" className="ml-1.5 h-4 px-1 text-[10px]">
+                {filteredByDate.length}
+              </Badge>
             </Button>
+            {sportCounts.map(sport => (
+              <Button
+                key={sport.id}
+                variant={selectedSport === sport.id ? "default" : "outline"}
+                size="sm"
+                onClick={() => setSelectedSport(sport.id)}
+                className="shrink-0 h-8 gap-1.5 text-xs"
+              >
+                <span className="text-sm leading-none">{sport.icon}</span>
+                <span>{sport.name}</span>
+                <Badge variant="secondary" className="h-4 px-1 text-[10px]">{sport.count}</Badge>
+              </Button>
+            ))}
+          </div>
+
+          {/* Loading */}
+          {isLoading ? (
+            <div className="flex h-72 items-center justify-center">
+              <Spinner className="h-8 w-8" />
+            </div>
+          ) : groupedMatches.length > 0 ? (
+            <div className="space-y-3">
+              {groupedMatches.map(group => (
+                <section
+                  key={`${group.sportSlug}-${group.leagueName}`}
+                  className="overflow-hidden rounded-xl border border-border bg-card"
+                >
+                  {/* League header row */}
+                  <header className="flex items-center justify-between gap-2 border-b border-border bg-muted/40 px-3 py-2">
+                    <div className="flex min-w-0 items-center gap-2">
+                      <span className="text-base leading-none">{getSportIcon(group.sportSlug)}</span>
+                      {group.countryCode && <FlagIcon countryCode={group.countryCode} size="sm" />}
+                      <h2 className="truncate text-sm font-semibold">{group.leagueName}</h2>
+                      {group.country && (
+                        <span className="hidden text-xs text-muted-foreground sm:inline">· {group.country}</span>
+                      )}
+                    </div>
+                    <Badge variant="secondary" className="h-5 gap-1 px-1.5 text-[10px] font-bold">
+                      <TrendingUp className="h-3 w-3" />
+                      {group.matches.length}
+                    </Badge>
+                  </header>
+                  {/* Match rows — compact like Live page */}
+                  <div className="divide-y divide-border">
+                    {group.matches.map(match => (
+                      <MatchCardNew key={match.id} match={match} variant="compact" />
+                    ))}
+                  </div>
+                </section>
+              ))}
+            </div>
+          ) : (
+            <div className="flex h-72 flex-col items-center justify-center rounded-xl border border-dashed border-border px-6 text-center">
+              <Calendar className="mb-3 h-10 w-10 text-muted-foreground" />
+              <p className="text-lg font-semibold">No finished matches</p>
+              <p className="mt-1 max-w-md text-sm text-muted-foreground">
+                {searchQuery
+                  ? "Try a different search query or clear your filters."
+                  : "Nothing has finished in the selected window. Try a wider date range."}
+              </p>
+              <div className="mt-4 flex gap-2">
+                {searchQuery && (
+                  <Button size="sm" variant="outline" onClick={() => setSearchQuery("")}>
+                    Clear search
+                  </Button>
+                )}
+                {dateRange !== "30" && (
+                  <Button size="sm" onClick={() => setDateRange("30")}>
+                    Try last 30 days
+                  </Button>
+                )}
+              </div>
+            </div>
           )}
         </div>
-      )}
+      </div>
+    </div>
+  )
+}
+
+function StatChip({
+  icon,
+  label,
+  value,
+  accent,
+}: {
+  icon: string
+  label: string
+  value: string | number
+  accent?: string
+}) {
+  return (
+    <div className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2">
+      <span className="text-base leading-none">{icon}</span>
+      <div className="min-w-0">
+        <p className={`text-sm font-bold ${accent ?? ""}`}>{value}</p>
+        <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</p>
+      </div>
     </div>
   )
 }

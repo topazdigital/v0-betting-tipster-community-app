@@ -42,17 +42,20 @@ export default function HomePage() {
   const { matches, isLoading } = useMatches(
     selectedSportId ? { sportId: selectedSportId } : undefined
   );
+  // Always fetch unfiltered set so per-sport counts (Oddspedia-style) stay
+  // accurate regardless of the currently selected sport.
+  const { matches: allMatches } = useMatches();
   const { matches: liveMatches } = useLiveMatches();
   const stats = useMatchStats();
 
-  // Calculate match counts per sport
+  // Calculate match counts per sport from the UNFILTERED list.
   const matchCounts = useMemo(() => {
     const counts: Record<number, number> = {};
-    matches.forEach(m => {
+    allMatches.forEach(m => {
       counts[m.sportId] = (counts[m.sportId] || 0) + 1;
     });
     return counts;
-  }, [matches]);
+  }, [allMatches]);
 
   // Get featured/upcoming matches
   const upcomingMatches = useMemo(() => {
@@ -61,12 +64,21 @@ export default function HomePage() {
       .slice(0, 12);
   }, [matches]);
 
-  // Get today's matches
+  // Today's matches: latest matches across all sports, ordered by kickoff
+  // time ascending. We exclude live matches so they don't overlap with the
+  // dedicated "Live Now" section above.
   const todayMatches = useMemo(() => {
     const today = new Date().toDateString();
-    return matches.filter(m => 
-      new Date(m.kickoffTime).toDateString() === today
-    ).slice(0, 20);
+    const liveStatuses = new Set(['live', 'halftime', 'extra_time', 'penalties']);
+    return matches
+      .filter(m =>
+        new Date(m.kickoffTime).toDateString() === today &&
+        !liveStatuses.has(m.status),
+      )
+      .sort((a, b) =>
+        new Date(a.kickoffTime).getTime() - new Date(b.kickoffTime).getTime(),
+      )
+      .slice(0, 20);
   }, [matches]);
 
   // Group upcoming by sport for variety display

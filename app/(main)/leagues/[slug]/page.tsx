@@ -74,18 +74,49 @@ function LoadingBox() {
   )
 }
 
+function slugify(s: string) {
+  return s.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
+}
+
+function titleCase(s: string) {
+  return s.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+}
+
 export default function LeaguePage({ params }: PageProps) {
   const { slug } = use(params)
 
   // Accept both friendly slugs (premier-league) and ESPN-style codes (eng-1,
   // ken-1, usa-1, …) so older links from the matches page keep working.
   const normalisedSlug = resolveLeagueSlug(slug) || slug
-  const league = ALL_LEAGUES.find(l => l.slug === normalisedSlug)
+  const knownLeague = ALL_LEAGUES.find(l => l.slug === normalisedSlug)
 
-  // Live matches feed for this league
-  const { matches, isLoading: matchesLoading } = useMatches(
-    league ? { leagueId: league.id } : undefined
+  // Live matches feed — when we don't have a known league id, fetch ALL
+  // matches and filter client-side by slugified league name.
+  const { matches: allMatches, isLoading: matchesLoading } = useMatches(
+    knownLeague ? { leagueId: knownLeague.id } : undefined
   )
+
+  // Filter matches when no known league: match by slug derived from name.
+  const matches = knownLeague
+    ? allMatches
+    : allMatches.filter(m => {
+        const ms = (m.league?.slug || slugify(m.league?.name || '')).toLowerCase()
+        return ms === normalisedSlug || ms === slug.toLowerCase()
+      })
+
+  // Build a synthetic league header from the first match (or the slug) when
+  // the league isn't in our static list — fixes "League not found" for the
+  // long tail of small competitions.
+  const firstMatch = matches[0]
+  const league = knownLeague || (firstMatch ? {
+    id: firstMatch.leagueId,
+    name: firstMatch.league?.name || titleCase(normalisedSlug),
+    slug: normalisedSlug,
+    country: firstMatch.league?.country || '',
+    countryCode: firstMatch.league?.countryCode || 'WO',
+    sportId: firstMatch.sportId || 1,
+    tier: firstMatch.league?.tier ?? 1,
+  } : null)
 
   // Real backend data
   const { data: standingsRes, isLoading: standingsLoading } = useSWR<{ success: boolean; data: StandingRow[] }>(
@@ -105,13 +136,30 @@ export default function LeaguePage({ params }: PageProps) {
   )
 
   if (!league) {
+    // Still loading? Show spinner instead of "not found".
+    if (matchesLoading) {
+      return (
+        <div className="flex">
+          <SidebarNew />
+          <div className="flex-1 flex h-96 items-center justify-center">
+            <Spinner className="h-8 w-8" />
+          </div>
+        </div>
+      )
+    }
+
+    // No matches and unknown slug — show a soft empty state.
     return (
       <div className="flex">
         <SidebarNew />
         <div className="flex-1 p-8 text-center">
-          <h1 className="text-2xl font-bold">League not found</h1>
+          <Trophy className="mx-auto h-12 w-12 text-muted-foreground/60" />
+          <h1 className="mt-4 text-2xl font-bold">{titleCase(normalisedSlug)}</h1>
+          <p className="mt-2 text-sm text-muted-foreground">
+            No matches scheduled or available for this competition right now.
+          </p>
           <Button asChild className="mt-4">
-            <Link href="/matches">Back to Matches</Link>
+            <Link href="/matches">Browse all matches</Link>
           </Button>
         </div>
       </div>
