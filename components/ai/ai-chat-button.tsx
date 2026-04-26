@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
+import { usePathname } from "next/navigation"
 import { Brain, Send, X, Sparkles, MessageSquare } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -32,6 +33,24 @@ export function AIChatButton() {
   const [busy, setBusy] = useState(false)
   const [unread, setUnread] = useState(false)
   const scrollRef = useRef<HTMLDivElement | null>(null)
+  const pathname = usePathname()
+
+  // Build a small "what page am I on" hint so the LLM can answer
+  // questions like "explain this match" with the right context.
+  const buildPageContext = (): string => {
+    if (typeof window === "undefined") return `Path: ${pathname || "/"}`
+    const lines: string[] = [`Path: ${pathname || "/"}`]
+    const matchId = pathname?.match(/^\/matches\/([^/]+)/)?.[1]
+    if (matchId) lines.push(`Viewing match id: ${matchId}`)
+    const tipsterId = pathname?.match(/^\/tipsters\/([^/]+)/)?.[1]
+    if (tipsterId) lines.push(`Viewing tipster id: ${tipsterId}`)
+    // Best-effort: pull the page title (e.g. "Arsenal vs Chelsea — Betcheza")
+    if (document?.title) lines.push(`Page title: ${document.title}`)
+    // First visible <h1> often holds the match heading
+    const h1 = document?.querySelector("h1")?.textContent?.trim()
+    if (h1 && h1.length < 200) lines.push(`Top heading: ${h1}`)
+    return lines.join("\n")
+  }
 
   // Restore chat history on mount
   useEffect(() => {
@@ -69,7 +88,10 @@ export function AIChatButton() {
       const res = await fetch("/api/ai/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: [...msgs, userMsg].map(({ role, content }) => ({ role, content })) }),
+        body: JSON.stringify({
+          messages: [...msgs, userMsg].map(({ role, content }) => ({ role, content })),
+          context: buildPageContext(),
+        }),
       })
       let reply = "I'm here — give me a second and try again."
       try {

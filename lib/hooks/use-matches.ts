@@ -222,6 +222,11 @@ function getUpcomingMatches(matches: Match[]): Match[] {
 function getFinishedMatches(matches: Match[]): Match[] {
   return matches
     .filter(m => m.status === 'finished')
+    // Drop matches that the upstream feed marked finished but never sent a
+    // final score for — they would otherwise render as a misleading 0-0.
+    // We require BOTH scores to be present (0 is a valid score, null is not).
+    .filter(m => m.homeScore !== null && m.homeScore !== undefined
+                 && m.awayScore !== null && m.awayScore !== undefined)
     .sort((a, b) => new Date(b.kickoffTime).getTime() - new Date(a.kickoffTime).getTime());
 }
 

@@ -51,6 +51,9 @@ export function Header() {
           <Link href="/results" className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground">
             Results
           </Link>
+          <Link href="/feed" className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground">
+            Feed
+          </Link>
           <Link href="/tipsters" className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground">
             Tipsters
           </Link>
@@ -219,6 +222,13 @@ export function Header() {
               onClick={() => setIsMobileMenuOpen(false)}
             >
               Results
+            </Link>
+            <Link
+              href="/feed"
+              className="rounded-md px-3 py-2 text-sm font-medium hover:bg-accent"
+              onClick={() => setIsMobileMenuOpen(false)}
+            >
+              Feed
             </Link>
             <Link
               href="/tipsters"

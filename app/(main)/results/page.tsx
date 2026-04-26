@@ -23,22 +23,41 @@ const DAY_OPTIONS = [
   { value: "7", label: "Last 7 days" },
   { value: "14", label: "Last 14 days" },
   { value: "30", label: "Last 30 days" },
+  { value: "custom", label: "Pick a date…" },
 ]
+
+function toIsoDate(d: Date): string {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, "0")
+  const day = String(d.getDate()).padStart(2, "0")
+  return `${y}-${m}-${day}`
+}
 
 export default function ResultsPage() {
   const [selectedSport, setSelectedSport] = useState<number | null>(null)
   const [searchQuery, setSearchQuery] = useState("")
   const [dateRange, setDateRange] = useState("7")
+  const [customDate, setCustomDate] = useState<string>(toIsoDate(new Date()))
 
   // Auto-refreshes every 60s — newly finished matches will pop in.
   const { matches: finishedMatches, isLoading } = useFinishedMatches()
 
-  // Date-range filter (in days)
+  // Date-range filter — supports a "Last N days" rolling window OR a single
+  // calendar day selected via the date picker.
   const filteredByDate = useMemo(() => {
+    if (dateRange === "custom") {
+      // Compare on local-date string so timezones don't shift the result.
+      const target = new Date(customDate + "T00:00:00")
+      if (Number.isNaN(target.getTime())) return []
+      const targetStr = target.toDateString()
+      return finishedMatches.filter(
+        (m) => new Date(m.kickoffTime).toDateString() === targetStr,
+      )
+    }
     const days = parseInt(dateRange, 10) || 7
     const cutoff = Date.now() - days * 24 * 60 * 60 * 1000
     return finishedMatches.filter(m => new Date(m.kickoffTime).getTime() >= cutoff)
-  }, [finishedMatches, dateRange])
+  }, [finishedMatches, dateRange, customDate])
 
   // Apply sport + search filters
   const filteredResults = useMemo(() => {
@@ -149,11 +168,25 @@ export default function ResultsPage() {
                 value={dateRange}
                 onChange={(e) => setDateRange(e.target.value)}
                 className="h-8 rounded-md border border-border bg-card px-2 text-xs"
+                aria-label="Result date range"
               >
                 {DAY_OPTIONS.map(o => (
                   <option key={o.value} value={o.value}>{o.label}</option>
                 ))}
               </select>
+              {dateRange === "custom" && (
+                <div className="flex items-center gap-1 rounded-md border border-border bg-card px-2 py-0.5">
+                  <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
+                  <input
+                    type="date"
+                    value={customDate}
+                    max={toIsoDate(new Date())}
+                    onChange={(e) => setCustomDate(e.target.value)}
+                    className="h-7 bg-transparent text-xs focus:outline-none"
+                    aria-label="Pick date"
+                  />
+                </div>
+              )}
               <div className="relative w-44 sm:w-56">
                 <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
                 <Input
@@ -245,7 +278,9 @@ export default function ResultsPage() {
               <p className="mt-1 max-w-md text-sm text-muted-foreground">
                 {searchQuery
                   ? "Try a different search query or clear your filters."
-                  : "Nothing has finished in the selected window. Try a wider date range."}
+                  : dateRange === "custom"
+                    ? `No matches finished on ${new Date(customDate + "T00:00:00").toDateString()}. Pick another date.`
+                    : "Nothing has finished in the selected window. Try a wider date range."}
               </p>
               <div className="mt-4 flex gap-2">
                 {searchQuery && (
@@ -253,9 +288,14 @@ export default function ResultsPage() {
                     Clear search
                   </Button>
                 )}
-                {dateRange !== "30" && (
+                {dateRange !== "30" && dateRange !== "custom" && (
                   <Button size="sm" onClick={() => setDateRange("30")}>
                     Try last 30 days
+                  </Button>
+                )}
+                {dateRange !== "custom" && (
+                  <Button size="sm" variant="outline" onClick={() => setDateRange("custom")}>
+                    Pick a date
                   </Button>
                 )}
               </div>

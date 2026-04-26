@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useEffect } from 'react';
 import Link from 'next/link';
+import useSWR from 'swr';
 import {
   Flame,
   TrendingUp,
@@ -27,18 +28,36 @@ import { Spinner } from '@/components/ui/spinner';
 import { cn } from '@/lib/utils';
 import { ALL_SPORTS, getSportIcon } from '@/lib/sports-data';
 import { BestBetsPanel } from '@/components/home/best-bets-panel';
+import { useAuthModal } from '@/contexts/auth-modal-context';
 
-// Mock top tipsters data
-const topTipsters = [
-  { id: 1, name: 'KingOfTips', winRate: 68.5, streak: 8, avatar: 'K', roi: 12.4, tips: 342 },
-  { id: 2, name: 'AcePredicts', winRate: 72.1, streak: 12, avatar: 'A', roi: 15.8, tips: 215 },
-  { id: 3, name: 'LuckyStriker', winRate: 65.3, streak: 5, avatar: 'L', roi: 9.2, tips: 178 },
-  { id: 4, name: 'EuroExpert', winRate: 61.8, streak: 3, avatar: 'E', roi: 7.5, tips: 156 },
-];
+interface ApiTipster {
+  id: number;
+  username: string;
+  displayName?: string;
+  winRate: number;
+  streak: number;
+  roi: number;
+  totalTips: number;
+  avatar?: string | null;
+}
+
+const tipstersFetcher = (url: string) =>
+  fetch(url)
+    .then((r) => r.json())
+    .then((d) => (Array.isArray(d?.tipsters) ? (d.tipsters as ApiTipster[]) : []));
 
 export default function HomePage() {
   const [selectedSportId, setSelectedSportId] = useState<number | null>(null);
-  
+  const { open: openAuthModal } = useAuthModal();
+
+  // Real top tipsters (DB-backed; gracefully shows fallback panel when empty)
+  const { data: topTipstersData } = useSWR<ApiTipster[]>(
+    '/api/tipsters?sortBy=winRate&limit=4',
+    tipstersFetcher,
+    { refreshInterval: 5 * 60 * 1000, revalidateOnFocus: false },
+  );
+  const topTipsters = topTipstersData ?? [];
+
   const { matches, isLoading } = useMatches(
     selectedSportId ? { sportId: selectedSportId } : undefined
   );
@@ -125,11 +144,9 @@ export default function HomePage() {
                   Expert predictions across 35+ sports — track performance and compete worldwide.
                 </p>
                 <div className="flex flex-wrap gap-2">
-                  <Button size="sm" asChild>
-                    <Link href="/register">
-                      Get Started Free
-                      <ArrowRight className="ml-2 h-4 w-4" />
-                    </Link>
+                  <Button size="sm" onClick={() => openAuthModal('register')}>
+                    Get Started Free
+                    <ArrowRight className="ml-2 h-4 w-4" />
                   </Button>
                   <Button variant="outline" size="sm" asChild>
                     <Link href="/matches">
@@ -190,29 +207,84 @@ export default function HomePage() {
             </div>
           ) : (
             <>
-              {/* Live Matches Section — auto-scrolls right→left so every live
-                  fixture cycles into view, no matter how many there are. */}
-              {liveMatches.length > 0 && (
-                <section className="mb-5">
-                  <div className="mb-2 flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <span className="relative flex h-3 w-3">
-                        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-live opacity-75"></span>
-                        <span className="relative inline-flex h-3 w-3 rounded-full bg-live"></span>
-                      </span>
-                      <h2 className="text-xl font-bold text-foreground">Live Now</h2>
-                      <Badge variant="destructive">{liveMatches.length}</Badge>
-                    </div>
-                    <Button variant="ghost" size="sm" asChild>
-                      <Link href="/matches?status=live">
-                        View all
-                        <ChevronRight className="ml-1 h-4 w-4" />
-                      </Link>
-                    </Button>
+              {/* Live Matches Section — ALWAYS visible. When no matches are
+                  live, show a friendly "no live games" panel + the next few
+                  scheduled kickoffs so the row never silently disappears. */}
+              <section className="mb-5">
+                <div className="mb-2 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <span className="relative flex h-3 w-3">
+                      <span className={cn(
+                        'absolute inline-flex h-full w-full rounded-full opacity-75',
+                        liveMatches.length > 0 ? 'animate-ping bg-live' : 'bg-muted-foreground/40',
+                      )}></span>
+                      <span className={cn(
+                        'relative inline-flex h-3 w-3 rounded-full',
+                        liveMatches.length > 0 ? 'bg-live' : 'bg-muted-foreground/60',
+                      )}></span>
+                    </span>
+                    <h2 className="text-xl font-bold text-foreground">Live Now</h2>
+                    <Badge variant={liveMatches.length > 0 ? 'destructive' : 'secondary'}>
+                      {liveMatches.length}
+                    </Badge>
                   </div>
+                  <Button variant="ghost" size="sm" asChild>
+                    <Link href="/matches?status=live">
+                      View all
+                      <ChevronRight className="ml-1 h-4 w-4" />
+                    </Link>
+                  </Button>
+                </div>
+                {liveMatches.length > 0 ? (
                   <LiveMarquee matches={liveMatches} />
-                </section>
-              )}
+                ) : (
+                  <div className="rounded-xl border border-dashed border-border bg-card/40 px-4 py-3">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <p className="text-sm text-muted-foreground">
+                        <span className="font-semibold text-foreground">No live games right now.</span>{' '}
+                        We refresh this every 10 seconds — meanwhile, here are the next kickoffs.
+                      </p>
+                      <Button size="sm" variant="outline" asChild>
+                        <Link href="/matches?status=scheduled">
+                          See schedule
+                          <ChevronRight className="ml-1 h-4 w-4" />
+                        </Link>
+                      </Button>
+                    </div>
+                    {upcomingMatches.length > 0 && (
+                      <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                        {upcomingMatches.slice(0, 6).map((m) => {
+                          const t = new Date(m.kickoffTime);
+                          const time = t.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                          const day = t.toDateString() === new Date().toDateString()
+                            ? 'Today'
+                            : t.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
+                          return (
+                            <Link
+                              key={m.id}
+                              href={`/matches/${m.id}`}
+                              className="group flex items-center justify-between gap-2 rounded-lg border border-border bg-card px-3 py-2 transition-colors hover:border-primary/50"
+                            >
+                              <div className="min-w-0">
+                                <p className="truncate text-sm font-medium text-foreground group-hover:text-primary">
+                                  {m.homeTeam.shortName || m.homeTeam.name} vs {m.awayTeam.shortName || m.awayTeam.name}
+                                </p>
+                                <p className="truncate text-[11px] text-muted-foreground">
+                                  {m.league?.name || m.sport?.name}
+                                </p>
+                              </div>
+                              <div className="shrink-0 text-right">
+                                <p className="text-xs font-semibold text-foreground">{time}</p>
+                                <p className="text-[10px] text-muted-foreground">{day}</p>
+                              </div>
+                            </Link>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </section>
 
               {/* Top Tipsters */}
               <section className="mb-5">
@@ -228,57 +300,78 @@ export default function HomePage() {
                     </Link>
                   </Button>
                 </div>
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                  {topTipsters.map((tipster, index) => (
-                    <Link 
-                      key={tipster.id}
-                      href={`/tipsters/${tipster.id}`}
-                      className="group rounded-xl border border-border bg-card p-4 transition-all hover:border-primary/50 hover:shadow-lg"
-                    >
-                      <div className="mb-3 flex items-center gap-3">
-                        <div className="relative">
-                          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary text-lg font-bold text-primary-foreground">
-                            {tipster.avatar}
-                          </div>
-                          {index < 3 && (
-                            <div className={cn(
-                              'absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold',
-                              index === 0 && 'bg-yellow-500 text-yellow-950',
-                              index === 1 && 'bg-gray-300 text-gray-700',
-                              index === 2 && 'bg-amber-700 text-amber-100'
-                            )}>
-                              #{index + 1}
+                {topTipsters.length > 0 ? (
+                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                    {topTipsters.map((tipster, index) => {
+                      const initial = (tipster.displayName || tipster.username || '?').charAt(0).toUpperCase();
+                      return (
+                        <Link
+                          key={tipster.id}
+                          href={`/tipsters/${tipster.id}`}
+                          className="group rounded-xl border border-border bg-card p-4 transition-all hover:border-primary/50 hover:shadow-lg"
+                        >
+                          <div className="mb-3 flex items-center gap-3">
+                            <div className="relative">
+                              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary text-lg font-bold text-primary-foreground">
+                                {initial}
+                              </div>
+                              {index < 3 && (
+                                <div className={cn(
+                                  'absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold',
+                                  index === 0 && 'bg-yellow-500 text-yellow-950',
+                                  index === 1 && 'bg-gray-300 text-gray-700',
+                                  index === 2 && 'bg-amber-700 text-amber-100',
+                                )}>
+                                  #{index + 1}
+                                </div>
+                              )}
                             </div>
-                          )}
-                        </div>
-                        <div>
-                          <div className="font-semibold text-foreground group-hover:text-primary">
-                            {tipster.name}
+                            <div>
+                              <div className="font-semibold text-foreground group-hover:text-primary">
+                                {tipster.displayName || tipster.username}
+                              </div>
+                              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                <span>{tipster.totalTips} tips</span>
+                                {tipster.streak > 0 && (
+                                  <span className="flex items-center gap-0.5 text-success">
+                                    <Flame className="h-3 w-3" />
+                                    {tipster.streak}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
                           </div>
-                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                            <span>{tipster.tips} tips</span>
-                            {tipster.streak > 0 && (
-                              <span className="flex items-center gap-0.5 text-success">
-                                <Flame className="h-3 w-3" />
-                                {tipster.streak}
-                              </span>
-                            )}
+                          <div className="grid grid-cols-2 gap-2 text-center">
+                            <div className="rounded-lg bg-success/10 px-2 py-1.5">
+                              <div className="text-lg font-bold text-success">{tipster.winRate}%</div>
+                              <div className="text-[10px] text-muted-foreground">Win Rate</div>
+                            </div>
+                            <div className="rounded-lg bg-primary/10 px-2 py-1.5">
+                              <div className="text-lg font-bold text-primary">+{tipster.roi}%</div>
+                              <div className="text-[10px] text-muted-foreground">ROI</div>
+                            </div>
                           </div>
-                        </div>
-                      </div>
-                      <div className="grid grid-cols-2 gap-2 text-center">
-                        <div className="rounded-lg bg-success/10 px-2 py-1.5">
-                          <div className="text-lg font-bold text-success">{tipster.winRate}%</div>
-                          <div className="text-[10px] text-muted-foreground">Win Rate</div>
-                        </div>
-                        <div className="rounded-lg bg-primary/10 px-2 py-1.5">
-                          <div className="text-lg font-bold text-primary">+{tipster.roi}%</div>
-                          <div className="text-[10px] text-muted-foreground">ROI</div>
-                        </div>
-                      </div>
-                    </Link>
-                  ))}
-                </div>
+                        </Link>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="rounded-xl border border-dashed border-border bg-card/40 p-6 text-center">
+                    <Users className="mx-auto h-10 w-10 text-muted-foreground" />
+                    <p className="mt-3 font-semibold text-foreground">No verified tipsters yet</p>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      The leaderboard fills up as tipsters post and grade their picks. Check back soon.
+                    </p>
+                    <div className="mt-3 flex justify-center gap-2">
+                      <Button size="sm" variant="outline" asChild>
+                        <Link href="/leaderboard">Open leaderboard</Link>
+                      </Button>
+                      <Button size="sm" onClick={() => openAuthModal('register')}>
+                        Become a tipster
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </section>
 
               {/* Today's Matches by League — with Best Bets right rail */}

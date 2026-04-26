@@ -1802,8 +1802,17 @@ async function getESPNMatches(config: ESPNLeagueConfig): Promise<UnifiedMatch[]>
       },
       kickoffTime: new Date(event.date),
       status,
-      homeScore: homeCompetitor?.score ? parseInt(homeCompetitor.score, 10) : null,
-      awayScore: awayCompetitor?.score ? parseInt(awayCompetitor.score, 10) : null,
+      // ESPN delivers score as a string ("0", "3", etc). Use a strict
+      // null/undefined/'' check so a real "0" is preserved (treating "0" as
+      // falsy here would silently turn 3-0 into 3-null on results pages).
+      homeScore:
+        homeCompetitor?.score !== undefined && homeCompetitor?.score !== null && homeCompetitor.score !== ''
+          ? parseInt(homeCompetitor.score, 10)
+          : null,
+      awayScore:
+        awayCompetitor?.score !== undefined && awayCompetitor?.score !== null && awayCompetitor.score !== ''
+          ? parseInt(awayCompetitor.score, 10)
+          : null,
       minute: extractLiveMinute(event.status, config.sportType) ?? undefined,
       period: event.status.displayClock,
       league: {
