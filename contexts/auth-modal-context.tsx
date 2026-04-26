@@ -1,8 +1,8 @@
 'use client';
 
-import { createContext, useCallback, useContext, useState, type ReactNode } from 'react';
+import { createContext, useContext, useState, useCallback, type ReactNode } from 'react';
 
-type AuthModalView = 'login' | 'register';
+type AuthModalView = 'login' | 'register' | 'forgot' | 'reset';
 
 interface AuthModalContextType {
   isOpen: boolean;
@@ -22,7 +22,6 @@ export function AuthModalProvider({ children }: { children: ReactNode }) {
     setView(next);
     setIsOpen(true);
   }, []);
-
   const close = useCallback(() => setIsOpen(false), []);
 
   return (
