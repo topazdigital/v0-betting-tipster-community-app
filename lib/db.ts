@@ -1,20 +1,51 @@
 import mysql from 'mysql2/promise';
+import fs from 'fs';
+import path from 'path';
 
 // MySQL connection pool
-// Connects whenever DATABASE_URL is set, regardless of NODE_ENV.
-// Without a DATABASE_URL the app gracefully falls back to mock data.
+// Priority: DATABASE_URL env var > admin panel config file > no connection (mock data fallback)
+
+const DB_CONFIG_PATH = path.join(process.cwd(), '.db-config.json');
+
+interface DbFileConfig {
+  host: string;
+  port: number;
+  user: string;
+  password: string;
+  database: string;
+  ssl: boolean;
+}
+
+function getConnectionUrl(): string | null {
+  // 1. Env var takes top priority
+  if (process.env.DATABASE_URL) return process.env.DATABASE_URL;
+
+  // 2. Admin panel saved config
+  try {
+    if (fs.existsSync(DB_CONFIG_PATH)) {
+      const cfg: DbFileConfig = JSON.parse(fs.readFileSync(DB_CONFIG_PATH, 'utf8'));
+      if (cfg.host && cfg.user && cfg.database) {
+        const auth = cfg.password
+          ? `${encodeURIComponent(cfg.user)}:${encodeURIComponent(cfg.password)}`
+          : encodeURIComponent(cfg.user);
+        const sslSuffix = cfg.ssl ? '?ssl=true' : '';
+        return `mysql://${auth}@${cfg.host}:${cfg.port || 3306}/${cfg.database}${sslSuffix}`;
+      }
+    }
+  } catch {}
+
+  return null;
+}
 
 let pool: mysql.Pool | null = null;
 
 export function getPool(): mysql.Pool | null {
-  const dbUrl = process.env.DATABASE_URL;
-  if (!dbUrl) {
-    return null;
-  }
+  const url = getConnectionUrl();
+  if (!url) return null;
 
   if (!pool) {
     pool = mysql.createPool({
-      uri: dbUrl,
+      uri: url,
       waitForConnections: true,
       connectionLimit: 10,
       queueLimit: 0,
