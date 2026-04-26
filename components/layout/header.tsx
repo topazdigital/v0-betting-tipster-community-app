@@ -224,6 +224,26 @@ export function Header() {
             </>
           ) : (
             <div className="flex items-center gap-2">
+              {/* Quick Google sign-in — one click away in the header */}
+              <button
+                type="button"
+                title="Continue with Google"
+                onClick={() => {
+                  const next = typeof window !== 'undefined'
+                    ? window.location.pathname + window.location.search
+                    : '/';
+                  window.location.href = `/api/auth/oauth/google/start?next=${encodeURIComponent(next)}`;
+                }}
+                className="hidden h-9 items-center gap-2 rounded-md border border-border bg-background px-3 text-xs font-medium hover:bg-muted sm:inline-flex"
+              >
+                <svg className="h-4 w-4" viewBox="0 0 24 24" aria-hidden>
+                  <path d="M21.6 12.227c0-.708-.064-1.39-.182-2.045H12v3.868h5.382a4.6 4.6 0 0 1-1.995 3.018v2.51h3.227c1.886-1.736 2.986-4.295 2.986-7.351z" fill="#4285F4"/>
+                  <path d="M12 22c2.7 0 4.964-.895 6.618-2.422l-3.227-2.51c-.895.6-2.04.954-3.391.954-2.604 0-4.81-1.76-5.6-4.122H3.067v2.591A9.997 9.997 0 0 0 12 22z" fill="#34A853"/>
+                  <path d="M6.4 13.9a6.013 6.013 0 0 1 0-3.8V7.51H3.067a10.005 10.005 0 0 0 0 8.98L6.4 13.9z" fill="#FBBC05"/>
+                  <path d="M12 5.977c1.469 0 2.786.504 3.823 1.495l2.864-2.864C16.964 2.99 14.7 2 12 2A9.997 9.997 0 0 0 3.067 7.51L6.4 10.1c.79-2.36 2.996-4.123 5.6-4.123z" fill="#EA4335"/>
+                </svg>
+                <span className="hidden lg:inline">Google</span>
+              </button>
               <Button variant="ghost" size="sm" onClick={() => openAuthModal('login')}>
                 Login
               </Button>

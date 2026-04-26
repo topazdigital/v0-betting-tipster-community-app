@@ -117,7 +117,11 @@ export function MatchCardNew({
               </span>
             </div>
           ) : isFinished ? (
-            <span className="text-xs font-medium text-muted-foreground">FT</span>
+            <div className="text-xs text-muted-foreground">
+              <div className="font-bold text-foreground/80">FT</div>
+              <div className="text-[10px]">{dateStr}</div>
+              <div className="text-[10px]">{timeStr}</div>
+            </div>
           ) : (
             <div className="text-xs text-muted-foreground">
               <div className="font-medium">{timeStr}</div>
@@ -226,7 +230,11 @@ export function MatchCardNew({
               </span>
             </div>
           ) : isFinished ? (
-            <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium">FT</span>
+            <div className="text-right text-xs text-muted-foreground">
+              <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide">FT</span>
+              <div className="mt-1 font-medium text-muted-foreground">{dateStr}</div>
+              <div>{timeStr}</div>
+            </div>
           ) : (
             <div className="text-right text-xs text-muted-foreground">
               <div className="font-medium">{dateStr}</div>

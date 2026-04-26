@@ -232,13 +232,33 @@ function ConfidenceStars({ n }: { n: number }) {
 // ───────────────────────────────────────────────
 function buildBestBets(matches: MatchLite[]): Pick[] {
   const today = new Date().toDateString()
+  const now = Date.now()
   const candidates: Pick[] = []
+  // Treat anything that should already be over as "stale" — protects against
+  // ESPN-style fixtures that linger as `scheduled` for days after they were
+  // actually played.
+  const STALE_AFTER_MS = 4 * 60 * 60 * 1000 // 4h is the longest realistic match length
 
   for (const m of matches) {
     if (!m.odds) continue
-    if (m.status === 'finished' || m.status === 'cancelled' || m.status === 'postponed') continue
-    const koDate = new Date(m.kickoffTime).toDateString()
+    const status = (m.status || '').toLowerCase()
+    if (
+      status === 'finished' || status === 'final' || status === 'ft' || status === 'ended' ||
+      status === 'cancelled' || status === 'postponed' || status === 'awarded'
+    ) continue
+
+    const ko = new Date(m.kickoffTime).getTime()
+    if (Number.isNaN(ko)) continue
+
+    const koDate = new Date(ko).toDateString()
     if (koDate !== today) continue
+    // Hide anything whose kickoff was more than STALE_AFTER_MS ago — even if
+    // the upstream feed still flags it as "scheduled". This is what causes
+    // games from days ago to wrongly show in Consensus Picks.
+    if (ko + STALE_AFTER_MS < now) continue
+    // Picks are only useful before the whistle. Anything already in-play has
+    // moving odds and a settled storyline — drop it from the picks list.
+    if (ko < now - 2 * 60 * 1000) continue
 
     // Implied probabilities
     const hp = 1 / m.odds.home
