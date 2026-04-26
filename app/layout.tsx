@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next'
 import { Geist, Geist_Mono } from 'next/font/google'
+import { headers } from 'next/headers'
 import { Analytics } from '@vercel/analytics/next'
 import { ThemeProvider } from '@/components/theme-provider'
 import { UserSettingsProvider } from '@/contexts/user-settings-context'
@@ -8,6 +9,7 @@ import { AuthModalProvider } from '@/contexts/auth-modal-context'
 import { AuthModal } from '@/components/auth/auth-modal'
 import { AIChatButton } from '@/components/ai/ai-chat-button'
 import { InstallPrompt } from '@/components/install-prompt'
+import { getSiteSettings, parseSeoPages, findSeoForPath } from '@/lib/site-settings'
 import './globals.css'
 
 const geist = Geist({ 
@@ -19,38 +21,64 @@ const geistMono = Geist_Mono({
   variable: '--font-geist-mono',
 });
 
-export const metadata: Metadata = {
-  title: {
-    default: 'Betcheza - Betting Tips Community',
-    template: '%s | Betcheza',
-  },
-  description: 'Your trusted betting tips community. Get expert predictions, track your performance, and compete with other tipsters.',
-  keywords: ['betting tips', 'sports predictions', 'tipster', 'football tips', 'betting community', 'odds comparison'],
-  authors: [{ name: 'Betcheza' }],
-  creator: 'Betcheza',
-  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || 'https://betcheza.co.ke'),
-  openGraph: {
-    type: 'website',
-    locale: 'en_US',
-    url: 'https://betcheza.co.ke',
-    siteName: 'Betcheza',
-    title: 'Betcheza - Betting Tips Community',
-    description: 'Your trusted betting tips community. Get expert predictions, track your performance, and compete with other tipsters.',
-  },
-  twitter: {
-    card: 'summary_large_image',
-    title: 'Betcheza - Betting Tips Community',
-    description: 'Your trusted betting tips community.',
-  },
-  manifest: '/manifest.json',
-  icons: {
-    icon: [
-      { url: '/icon-light-32x32.png', media: '(prefers-color-scheme: light)' },
-      { url: '/icon-dark-32x32.png', media: '(prefers-color-scheme: dark)' },
-      { url: '/icon.svg', type: 'image/svg+xml' },
-    ],
-    apple: '/apple-icon.png',
-  },
+/**
+ * Build metadata dynamically so admin-managed branding (site name,
+ * description, favicon) and per-page SEO overrides apply automatically.
+ */
+export async function generateMetadata(): Promise<Metadata> {
+  const settings = await getSiteSettings();
+  const hdrs = await headers();
+  const pathname = hdrs.get('x-pathname') || '/';
+  const seoEntry = findSeoForPath(parseSeoPages(settings.seo_pages), pathname);
+
+  const fallbackTitle = `${settings.site_name} - Betting Tips Community`;
+  const title = seoEntry?.title || fallbackTitle;
+  const description = seoEntry?.description || settings.site_description;
+  const keywords = seoEntry?.keywords
+    ? seoEntry.keywords.split(',').map((k) => k.trim()).filter(Boolean)
+    : ['betting tips', 'sports predictions', 'tipster', 'football tips', 'betting community', 'odds comparison'];
+
+  // Build the icons list. If the admin uploaded a custom favicon, prefer it.
+  const customFavicon = settings.favicon_url?.trim();
+  const icons: Metadata['icons'] = customFavicon
+    ? { icon: customFavicon, apple: customFavicon }
+    : {
+        icon: [
+          { url: '/icon-light-32x32.png', media: '(prefers-color-scheme: light)' },
+          { url: '/icon-dark-32x32.png', media: '(prefers-color-scheme: dark)' },
+          { url: '/icon.svg', type: 'image/svg+xml' },
+        ],
+        apple: '/apple-icon.png',
+      };
+
+  return {
+    title: {
+      default: title,
+      template: `%s | ${settings.site_name}`,
+    },
+    description,
+    keywords,
+    authors: [{ name: settings.site_name }],
+    creator: settings.site_name,
+    metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || 'https://betcheza.co.ke'),
+    robots: seoEntry?.noIndex ? { index: false, follow: false } : undefined,
+    openGraph: {
+      type: 'website',
+      locale: 'en_US',
+      siteName: settings.site_name,
+      title,
+      description,
+      images: seoEntry?.ogImage ? [{ url: seoEntry.ogImage }] : undefined,
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title,
+      description,
+      images: seoEntry?.ogImage ? [seoEntry.ogImage] : undefined,
+    },
+    manifest: '/manifest.json',
+    icons,
+  };
 }
 
 export const viewport: Viewport = {

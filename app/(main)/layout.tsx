@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { 
@@ -44,6 +44,27 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [showSports, setShowSports] = useState(true)
   const stats = useMatchStats()
+  const [branding, setBranding] = useState<{ siteName: string; logoUrl: string; logoDarkUrl: string }>({
+    siteName: "BetTips Pro",
+    logoUrl: "",
+    logoDarkUrl: "",
+  })
+
+  useEffect(() => {
+    let cancelled = false
+    fetch("/api/site-settings")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (cancelled || !d) return
+        setBranding({
+          siteName: d.siteName || "BetTips Pro",
+          logoUrl: d.logoUrl || "",
+          logoDarkUrl: d.logoDarkUrl || "",
+        })
+      })
+      .catch(() => undefined)
+    return () => { cancelled = true }
+  }, [])
 
   return (
     <div className="min-h-screen bg-background">
@@ -62,10 +83,35 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
         {/* Logo */}
         <div className="flex h-16 items-center justify-between border-b border-border px-4">
           <Link href="/" className="flex items-center gap-2">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white font-bold">
-              BT
-            </div>
-            <span className="text-lg font-bold">BetTips Pro</span>
+            {branding.logoUrl ? (
+              <>
+                <img
+                  src={branding.logoUrl}
+                  alt={branding.siteName}
+                  className={`h-9 w-auto object-contain ${branding.logoDarkUrl ? 'block dark:hidden' : ''}`}
+                />
+                {branding.logoDarkUrl && (
+                  <img
+                    src={branding.logoDarkUrl}
+                    alt={branding.siteName}
+                    className="hidden h-9 w-auto object-contain dark:block"
+                  />
+                )}
+              </>
+            ) : (
+              <>
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white font-bold">
+                  {branding.siteName
+                    .split(" ")
+                    .filter(Boolean)
+                    .slice(0, 2)
+                    .map((w) => w.charAt(0).toUpperCase())
+                    .join("")
+                    .slice(0, 2) || "BT"}
+                </div>
+                <span className="text-lg font-bold">{branding.siteName}</span>
+              </>
+            )}
           </Link>
           <Button variant="ghost" size="icon" className="lg:hidden" onClick={() => setSidebarOpen(false)}>
             <X className="h-5 w-5" />

@@ -196,13 +196,21 @@ function GithubIcon() {
 }
 
 function LoginPanel() {
-  const { login } = useAuth();
+  const { login, completeTwoFactor, resendTwoFactor } = useAuth();
   const { close, setView } = useAuthModal();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  const [twoFactor, setTwoFactor] = useState<{
+    challengeId: string;
+    deliveredTo: string;
+    channel: string;
+    warning?: string;
+  } | null>(null);
+  const [otpCode, setOtpCode] = useState('');
+  const [resendNote, setResendNote] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -210,12 +218,89 @@ function LoginPanel() {
     setIsLoading(true);
     const result = await login(email, password);
     setIsLoading(false);
-    if (result.success) {
-      close();
-    } else {
+    if (!result.success) {
       setError(result.error || 'Login failed');
+      return;
+    }
+    if (result.requiresTwoFactor && result.challengeId) {
+      setTwoFactor({
+        challengeId: result.challengeId,
+        deliveredTo: result.deliveredTo || '',
+        channel: result.channel || 'email',
+        warning: result.warning,
+      });
+      return;
+    }
+    close();
+  };
+
+  const handleVerify = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!twoFactor) return;
+    setError('');
+    setIsLoading(true);
+    const r = await completeTwoFactor(twoFactor.challengeId, otpCode);
+    setIsLoading(false);
+    if (r.success) close();
+    else setError(r.error || 'Wrong code');
+  };
+
+  const handleResend = async () => {
+    if (!email) return;
+    setResendNote('');
+    setError('');
+    const r = await resendTwoFactor(email);
+    if (r.success && r.challengeId) {
+      setTwoFactor((prev) => prev ? { ...prev, challengeId: r.challengeId!, deliveredTo: r.deliveredTo || prev.deliveredTo, channel: r.channel || prev.channel } : prev);
+      setOtpCode('');
+      setResendNote(`A new code was sent to ${r.deliveredTo}.`);
+    } else {
+      setError(r.error || 'Could not resend code');
     }
   };
+
+  if (twoFactor) {
+    return (
+      <form onSubmit={handleVerify} className="space-y-3">
+        <div className="rounded-lg border border-primary/30 bg-primary/5 p-3 text-sm">
+          We sent a 6-digit code to <strong>{twoFactor.deliveredTo}</strong>
+          {twoFactor.channel === 'sms' ? ' via SMS.' : ' by email.'} Enter it below to finish signing in.
+        </div>
+        {twoFactor.warning && (
+          <div className="rounded-lg border border-yellow-500/30 bg-yellow-500/10 p-2.5 text-xs text-yellow-700 dark:text-yellow-300">
+            {twoFactor.warning}
+          </div>
+        )}
+        {error && (
+          <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-2.5 text-sm text-destructive">{error}</div>
+        )}
+        {resendNote && (
+          <div className="rounded-lg border border-success/30 bg-success/10 p-2.5 text-sm text-success">{resendNote}</div>
+        )}
+        <div className="space-y-1.5">
+          <Label htmlFor="modal-otp">Verification code</Label>
+          <Input
+            id="modal-otp"
+            inputMode="numeric"
+            autoComplete="one-time-code"
+            placeholder="123456"
+            value={otpCode}
+            onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+            className="text-center text-2xl tracking-[0.5em] font-mono"
+            required
+            disabled={isLoading}
+          />
+        </div>
+        <Button type="submit" className="w-full" disabled={isLoading || otpCode.length !== 6}>
+          {isLoading ? (<><Loader2 className="mr-2 h-4 w-4 animate-spin" />Verifying…</>) : 'Verify and sign in'}
+        </Button>
+        <div className="flex items-center justify-between text-xs">
+          <button type="button" onClick={() => { setTwoFactor(null); setOtpCode(''); setError(''); }} className="text-muted-foreground hover:text-foreground hover:underline">Use a different account</button>
+          <button type="button" onClick={handleResend} className="font-medium text-primary hover:underline">Resend code</button>
+        </div>
+      </form>
+    );
+  }
 
   return (
     <>

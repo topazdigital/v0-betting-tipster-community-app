@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Search, Bell, User, ChevronDown, Settings, LogOut, Menu, X } from 'lucide-react';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { Button } from '@/components/ui/button';
@@ -31,16 +31,56 @@ export function Header() {
   const { settings, setOddsFormat } = useUserSettings();
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [branding, setBranding] = useState<{ siteName: string; logoUrl: string; logoDarkUrl: string }>({
+    siteName: 'Betcheza',
+    logoUrl: '',
+    logoDarkUrl: '',
+  });
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/site-settings')
+      .then((r) => r.ok ? r.json() : null)
+      .then((d) => {
+        if (cancelled || !d) return;
+        setBranding({
+          siteName: d.siteName || 'Betcheza',
+          logoUrl: d.logoUrl || '',
+          logoDarkUrl: d.logoDarkUrl || '',
+        });
+      })
+      .catch(() => undefined);
+    return () => { cancelled = true; };
+  }, []);
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border bg-card">
       <div className="mx-auto flex h-14 max-w-7xl items-center justify-between gap-4 px-4">
         {/* Logo */}
         <Link href="/" className="flex items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
-            <span className="font-mono text-lg font-bold text-primary-foreground">B</span>
-          </div>
-          <span className="hidden font-semibold text-foreground sm:inline">Betcheza</span>
+          {branding.logoUrl ? (
+            <>
+              <img
+                src={branding.logoUrl}
+                alt={branding.siteName}
+                className={`h-8 w-auto object-contain ${branding.logoDarkUrl ? 'block dark:hidden' : ''}`}
+              />
+              {branding.logoDarkUrl && (
+                <img
+                  src={branding.logoDarkUrl}
+                  alt={branding.siteName}
+                  className="hidden h-8 w-auto object-contain dark:block"
+                />
+              )}
+            </>
+          ) : (
+            <>
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
+                <span className="font-mono text-lg font-bold text-primary-foreground">{branding.siteName.charAt(0).toUpperCase()}</span>
+              </div>
+              <span className="hidden font-semibold text-foreground sm:inline">{branding.siteName}</span>
+            </>
+          )}
         </Link>
 
         {/* Desktop Navigation */}

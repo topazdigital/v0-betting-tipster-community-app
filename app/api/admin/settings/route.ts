@@ -1,10 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query, execute, getPool } from '@/lib/db';
+import { invalidateSiteSettingsCache } from '@/lib/site-settings';
 
 export const dynamic = 'force-dynamic';
 
-// In-memory storage for development mode when no database
-const memorySettings: Record<string, string> = {
+// In-memory storage for development mode when no database. Exposed on
+// globalThis so the public site-settings reader picks up admin updates
+// even when no DB is configured.
+const g = globalThis as { __memorySettings?: Record<string, string> };
+const memorySettings: Record<string, string> = g.__memorySettings ?? (g.__memorySettings = {
   site_name: 'Betcheza',
   site_description: 'Your trusted betting tips community. Get expert predictions, track your performance, and compete with other tipsters.',
   default_theme: 'light',
@@ -23,7 +27,14 @@ const memorySettings: Record<string, string> = {
   notify_new_comment: 'false',
   google_analytics_id: '',
   facebook_pixel_id: '',
-};
+  logo_url: '',
+  logo_dark_url: '',
+  favicon_url: '',
+  twofa_enabled: 'false',
+  twofa_method: 'email',
+  url_rewrites: '[]',
+  seo_pages: '[]',
+});
 
 // Get all settings
 export async function GET() {
@@ -81,9 +92,12 @@ export async function POST(request: NextRequest) {
       );
     }
     
-    // If no database, store in memory
+    // Always update in-memory copy so non-DB readers + cache reflect change
+    Object.assign(memorySettings, settings);
+    invalidateSiteSettingsCache();
+
+    // If no database, store in memory only
     if (!pool) {
-      Object.assign(memorySettings, settings);
       return NextResponse.json({ 
         success: true, 
         message: 'Settings saved to memory (no database connection)',

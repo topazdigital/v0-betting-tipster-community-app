@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { setAuthCookie, verifyPassword } from '@/lib/auth';
 import { mockUsers } from '@/lib/mock-data';
+import { issueTwoFactorChallenge, requiresTwoFactor } from '@/lib/two-factor-store';
 
 export const dynamic = 'force-dynamic';
 
@@ -48,6 +49,23 @@ export async function POST(request: Request) {
         { success: false, error: 'Invalid email or password' },
         { status: 401 }
       );
+    }
+
+    // Two-factor gate: if either the user opted in OR the admin enforces 2FA
+    // for everyone, we issue a one-time code instead of a session cookie.
+    if (await requiresTwoFactor(user.id)) {
+      const challenge = await issueTwoFactorChallenge({
+        userId: user.id,
+        email: user.email,
+      });
+      return NextResponse.json({
+        success: true,
+        requiresTwoFactor: true,
+        challengeId: challenge.challengeId,
+        channel: challenge.channel,
+        deliveredTo: challenge.deliveredTo,
+        warning: challenge.warning,
+      });
     }
 
     // Set auth cookie

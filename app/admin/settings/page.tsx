@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Save, Globe, Bell, Shield, Palette, Database, Loader2, CheckCircle2, AlertCircle, Search } from "lucide-react"
+import { Save, Globe, Bell, Shield, Palette, Database, Loader2, CheckCircle2, AlertCircle, Search, ImageIcon, Link2, KeyRound, Plus, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -28,6 +28,13 @@ interface Settings {
   default_theme: string
   google_analytics_id: string
   facebook_pixel_id: string
+  logo_url: string
+  logo_dark_url: string
+  favicon_url: string
+  twofa_enabled: string
+  twofa_method: string
+  url_rewrites: string
+  seo_pages: string
 }
 
 const defaultSettings: Settings = {
@@ -47,7 +54,21 @@ const defaultSettings: Settings = {
   primary_color: "#10B981",
   default_theme: "light",
   google_analytics_id: "",
-  facebook_pixel_id: ""
+  facebook_pixel_id: "",
+  logo_url: "",
+  logo_dark_url: "",
+  favicon_url: "",
+  twofa_enabled: "false",
+  twofa_method: "email",
+  url_rewrites: "[]",
+  seo_pages: "[]",
+}
+
+interface SeoPageEntry { path: string; title?: string; description?: string; keywords?: string; ogImage?: string; noIndex?: boolean }
+interface RewriteEntry { source: string; destination: string; permanent?: boolean }
+
+function safeParse<T>(raw: string, fallback: T): T {
+  try { const v = JSON.parse(raw); return Array.isArray(v) ? (v as unknown as T) : fallback; } catch { return fallback; }
 }
 
 export default function AdminSettingsPage() {
@@ -156,7 +177,7 @@ export default function AdminSettingsPage() {
       )}
 
       <Tabs defaultValue="general" className="space-y-3">
-        <TabsList className="grid w-full grid-cols-2 md:w-auto md:grid-cols-6">
+        <TabsList className="grid w-full grid-cols-2 md:w-auto md:grid-cols-9">
           <TabsTrigger value="general" className="gap-2">
             <Globe className="h-4 w-4" /> General
           </TabsTrigger>
@@ -171,6 +192,15 @@ export default function AdminSettingsPage() {
           </TabsTrigger>
           <TabsTrigger value="appearance" className="gap-2">
             <Palette className="h-4 w-4" /> Appearance
+          </TabsTrigger>
+          <TabsTrigger value="branding" className="gap-2">
+            <ImageIcon className="h-4 w-4" /> Branding
+          </TabsTrigger>
+          <TabsTrigger value="rewrites" className="gap-2">
+            <Link2 className="h-4 w-4" /> URL Rewrites
+          </TabsTrigger>
+          <TabsTrigger value="twofa" className="gap-2">
+            <KeyRound className="h-4 w-4" /> 2FA
           </TabsTrigger>
           <TabsTrigger value="seo" className="gap-2">
             <Search className="h-4 w-4" /> SEO
@@ -393,48 +423,218 @@ export default function AdminSettingsPage() {
           </Card>
         </TabsContent>
 
-        {/* SEO Settings */}
-        <TabsContent value="seo">
+        {/* Branding */}
+        <TabsContent value="branding">
           <Card>
             <CardHeader>
-              <CardTitle>SEO Settings</CardTitle>
-              <CardDescription>Configure search engine optimization</CardDescription>
+              <CardTitle>Branding</CardTitle>
+              <CardDescription>Logo and favicon shown across the site and in browser tabs.</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="space-y-2">
-                <Label htmlFor="googleAnalytics">Google Analytics ID</Label>
-                <Input 
-                  id="googleAnalytics" 
-                  placeholder="G-XXXXXXXXXX"
-                  value={settings.google_analytics_id}
-                  onChange={(e) => updateSetting('google_analytics_id', e.target.value)}
-                />
-                <p className="text-xs text-muted-foreground">Enter your Google Analytics 4 measurement ID</p>
+            <CardContent className="space-y-4">
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="logoUrl">Logo URL (light theme)</Label>
+                  <Input id="logoUrl" placeholder="https://… or /uploads/logo.png" value={settings.logo_url} onChange={(e) => updateSetting('logo_url', e.target.value)} />
+                  {settings.logo_url && (
+                    <div className="rounded-md border border-border bg-muted/40 p-3"><img src={settings.logo_url} alt="logo preview" className="h-10 object-contain" /></div>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="logoDarkUrl">Logo URL (dark theme — optional)</Label>
+                  <Input id="logoDarkUrl" placeholder="https://… or /uploads/logo-dark.png" value={settings.logo_dark_url} onChange={(e) => updateSetting('logo_dark_url', e.target.value)} />
+                  {settings.logo_dark_url && (
+                    <div className="rounded-md border border-border bg-slate-900 p-3"><img src={settings.logo_dark_url} alt="dark logo preview" className="h-10 object-contain" /></div>
+                  )}
+                </div>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="facebookPixel">Facebook Pixel ID</Label>
-                <Input 
-                  id="facebookPixel" 
-                  placeholder="XXXXXXXXXXXXXXXX"
-                  value={settings.facebook_pixel_id}
-                  onChange={(e) => updateSetting('facebook_pixel_id', e.target.value)}
-                />
-                <p className="text-xs text-muted-foreground">Enter your Facebook Pixel ID for conversion tracking</p>
+                <Label htmlFor="faviconUrl">Favicon URL (PNG, ICO or SVG)</Label>
+                <Input id="faviconUrl" placeholder="https://… or /uploads/favicon.png" value={settings.favicon_url} onChange={(e) => updateSetting('favicon_url', e.target.value)} />
+                {settings.favicon_url && (
+                  <div className="flex items-center gap-3 rounded-md border border-border bg-muted/40 p-3">
+                    <img src={settings.favicon_url} alt="favicon preview" className="h-8 w-8 rounded" />
+                    <span className="text-xs text-muted-foreground">Saved favicons take effect after a hard refresh.</span>
+                  </div>
+                )}
               </div>
-              <div className="rounded-lg border border-border p-4 bg-muted/50">
-                <h4 className="font-medium mb-2">SEO Templates</h4>
-                <p className="text-sm text-muted-foreground mb-4">
-                  Default SEO templates are applied automatically to matches, leagues, and teams.
-                  You can customize individual pages from their respective admin sections.
+              <p className="text-xs text-muted-foreground">
+                Tip: paste a public image URL (or upload to <code className="rounded bg-muted px-1">/public/uploads/</code> and reference it as <code className="rounded bg-muted px-1">/uploads/your-file.png</code>).
+              </p>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* URL Rewrites */}
+        <TabsContent value="rewrites">
+          <RewritesEditor
+            value={safeParse<RewriteEntry[]>(settings.url_rewrites, [])}
+            onChange={(next) => updateSetting('url_rewrites', JSON.stringify(next))}
+          />
+        </TabsContent>
+
+        {/* 2FA */}
+        <TabsContent value="twofa">
+          <Card>
+            <CardHeader>
+              <CardTitle>Two-Factor Authentication</CardTitle>
+              <CardDescription>Require a one-time code at every sign-in. Codes are sent over the free email-to-SMS gateway or by email.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-start justify-between gap-4 rounded-lg border border-border p-3">
+                <div>
+                  <Label htmlFor="twofaForceAll" className="text-sm font-medium">Enforce 2FA for everyone</Label>
+                  <p className="text-xs text-muted-foreground mt-1">When on, every user must enter a verification code after their password.</p>
+                </div>
+                <Switch id="twofaForceAll" checked={settings.twofa_enabled === 'true'} onCheckedChange={(c) => updateSetting('twofa_enabled', c ? 'true' : 'false')} />
+              </div>
+              <div className="space-y-2">
+                <Label>Default delivery method</Label>
+                <div className="flex gap-2">
+                  <Button type="button" variant={settings.twofa_method === 'email' ? 'default' : 'outline'} onClick={() => updateSetting('twofa_method', 'email')}>Email</Button>
+                  <Button type="button" variant={settings.twofa_method === 'sms' ? 'default' : 'outline'} onClick={() => updateSetting('twofa_method', 'sms')}>Email-to-SMS gateway</Button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Email-to-SMS uses your existing SMTP credentials and free carrier gateways (no Twilio account needed). Each user picks their carrier from their account page.
                 </p>
-                <Button variant="outline" size="sm" asChild>
-                  <a href="/admin/seo">Manage SEO Templates</a>
-                </Button>
               </div>
             </CardContent>
           </Card>
         </TabsContent>
+
+        {/* SEO Settings */}
+        <TabsContent value="seo">
+          <div className="space-y-3">
+            <Card>
+              <CardHeader>
+                <CardTitle>Tracking</CardTitle>
+                <CardDescription>Site-wide analytics IDs.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="space-y-2">
+                  <Label htmlFor="googleAnalytics">Google Analytics ID</Label>
+                  <Input id="googleAnalytics" placeholder="G-XXXXXXXXXX" value={settings.google_analytics_id} onChange={(e) => updateSetting('google_analytics_id', e.target.value)} />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="facebookPixel">Facebook Pixel ID</Label>
+                  <Input id="facebookPixel" placeholder="XXXXXXXXXXXXXXXX" value={settings.facebook_pixel_id} onChange={(e) => updateSetting('facebook_pixel_id', e.target.value)} />
+                </div>
+              </CardContent>
+            </Card>
+            <SeoPagesEditor
+              value={safeParse<SeoPageEntry[]>(settings.seo_pages, [])}
+              onChange={(next) => updateSetting('seo_pages', JSON.stringify(next))}
+            />
+          </div>
+        </TabsContent>
       </Tabs>
     </div>
   )
+}
+
+function SeoPagesEditor({ value, onChange }: { value: SeoPageEntry[]; onChange: (next: SeoPageEntry[]) => void }) {
+  const update = (i: number, patch: Partial<SeoPageEntry>) => {
+    const next = value.slice();
+    next[i] = { ...next[i], ...patch };
+    onChange(next);
+  };
+  const remove = (i: number) => onChange(value.filter((_, idx) => idx !== i));
+  const add = () => onChange([...value, { path: '/', title: '', description: '' }]);
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle>Per-page SEO</CardTitle>
+            <CardDescription>Override the title and description for any path. Use <code className="rounded bg-muted px-1">/leagues/*</code> to match a section.</CardDescription>
+          </div>
+          <Button size="sm" onClick={add}><Plus className="h-4 w-4 mr-1" />Add page</Button>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {value.length === 0 && (
+          <p className="text-sm text-muted-foreground">No custom SEO yet — defaults are applied. Click "Add page" to start.</p>
+        )}
+        {value.map((entry, i) => (
+          <div key={i} className="rounded-lg border border-border p-3 space-y-2">
+            <div className="grid gap-2 md:grid-cols-[1fr_auto]">
+              <div className="space-y-1.5">
+                <Label className="text-xs">Path</Label>
+                <Input value={entry.path} onChange={(e) => update(i, { path: e.target.value })} placeholder="/, /matches, /leagues/*" />
+              </div>
+              <div className="flex items-end gap-2">
+                <Button variant="ghost" size="sm" onClick={() => remove(i)} className="text-destructive"><Trash2 className="h-4 w-4" /></Button>
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Title (≤ 60 chars recommended)</Label>
+              <Input value={entry.title || ''} onChange={(e) => update(i, { title: e.target.value })} placeholder="Today's free betting tips — Betcheza" />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Meta description (≤ 160 chars recommended)</Label>
+              <Textarea rows={2} value={entry.description || ''} onChange={(e) => update(i, { description: e.target.value })} placeholder="Browse expert betting tips and predictions for today's matches." />
+            </div>
+            <div className="grid gap-2 md:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label className="text-xs">Keywords (comma separated)</Label>
+                <Input value={entry.keywords || ''} onChange={(e) => update(i, { keywords: e.target.value })} placeholder="betting tips, predictions, EPL" />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Open Graph image URL</Label>
+                <Input value={entry.ogImage || ''} onChange={(e) => update(i, { ogImage: e.target.value })} placeholder="https://…/og.png" />
+              </div>
+            </div>
+            <div className="flex items-center gap-2 pt-1">
+              <Switch checked={!!entry.noIndex} onCheckedChange={(c) => update(i, { noIndex: c })} />
+              <span className="text-xs text-muted-foreground">Hide from search engines (noindex)</span>
+            </div>
+          </div>
+        ))}
+      </CardContent>
+    </Card>
+  );
+}
+
+function RewritesEditor({ value, onChange }: { value: RewriteEntry[]; onChange: (next: RewriteEntry[]) => void }) {
+  const update = (i: number, patch: Partial<RewriteEntry>) => {
+    const next = value.slice();
+    next[i] = { ...next[i], ...patch };
+    onChange(next);
+  };
+  const remove = (i: number) => onChange(value.filter((_, idx) => idx !== i));
+  const add = () => onChange([...value, { source: '/old-path', destination: '/new-path', permanent: false }]);
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle>URL Rewrites</CardTitle>
+            <CardDescription>Send visitors from an old URL to a new one. Append <code className="rounded bg-muted px-1">*</code> to the source for prefix matching, e.g. <code className="rounded bg-muted px-1">/blog/*</code> → <code className="rounded bg-muted px-1">/news/*</code>.</CardDescription>
+          </div>
+          <Button size="sm" onClick={add}><Plus className="h-4 w-4 mr-1" />Add rule</Button>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {value.length === 0 && (
+          <p className="text-sm text-muted-foreground">No rewrite rules yet.</p>
+        )}
+        {value.map((entry, i) => (
+          <div key={i} className="rounded-lg border border-border p-3 grid gap-2 md:grid-cols-[1fr_1fr_auto_auto] items-end">
+            <div className="space-y-1.5">
+              <Label className="text-xs">From (source)</Label>
+              <Input value={entry.source} onChange={(e) => update(i, { source: e.target.value })} placeholder="/old-path" />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">To (destination)</Label>
+              <Input value={entry.destination} onChange={(e) => update(i, { destination: e.target.value })} placeholder="/new-path" />
+            </div>
+            <div className="flex items-center gap-2 pb-2">
+              <Switch checked={!!entry.permanent} onCheckedChange={(c) => update(i, { permanent: c })} />
+              <span className="text-xs text-muted-foreground whitespace-nowrap">Permanent (308)</span>
+            </div>
+            <Button variant="ghost" size="sm" onClick={() => remove(i)} className="text-destructive"><Trash2 className="h-4 w-4" /></Button>
+          </div>
+        ))}
+      </CardContent>
+    </Card>
+  );
 }

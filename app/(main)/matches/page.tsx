@@ -90,16 +90,20 @@ function MatchesContent() {
 
     // Date tab filter — applies on top of all other filters
     // Use local-tz YYYY-MM-DD comparison (works regardless of browser TZ)
+    // EXCEPTION: when filtering by "Live Now" we want every live match
+    // regardless of when it kicked off (late games crossing midnight, etc).
     const todayKey = toLocalISODate(new Date());
-    if (dateTab === 'today') {
-      result = result.filter(m => toLocalISODate(new Date(m.kickoffTime)) === todayKey);
-    } else if (dateTab === 'upcoming') {
-      result = result.filter(m => {
-        const k = toLocalISODate(new Date(m.kickoffTime));
-        return k > todayKey && m.status === 'scheduled';
-      });
-    } else if (dateTab === 'calendar' && calendarDate) {
-      result = result.filter(m => toLocalISODate(new Date(m.kickoffTime)) === calendarDate);
+    if (statusFilter !== 'live') {
+      if (dateTab === 'today') {
+        result = result.filter(m => toLocalISODate(new Date(m.kickoffTime)) === todayKey);
+      } else if (dateTab === 'upcoming') {
+        result = result.filter(m => {
+          const k = toLocalISODate(new Date(m.kickoffTime));
+          return k > todayKey && m.status === 'scheduled';
+        });
+      } else if (dateTab === 'calendar' && calendarDate) {
+        result = result.filter(m => toLocalISODate(new Date(m.kickoffTime)) === calendarDate);
+      }
     }
     void tz; void isTodayTz;
 

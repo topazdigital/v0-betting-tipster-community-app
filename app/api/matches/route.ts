@@ -250,6 +250,30 @@ export async function GET(request: NextRequest) {
     const sources = new Set(apiMatches.map(m => m.source));
     apiSource = Array.from(sources).join('+') || 'espn';
 
+    // Stale-live guard — upstream feeds (ESPN/SportsDB) sometimes leave
+    // matches stuck on "live" long after they've ended. Treat any match
+    // tagged live whose kickoff was more than the sport's max duration ago
+    // as finished, so the Live section never shows zombie fixtures.
+    const STALE_LIVE_HOURS: Record<string, number> = {
+      soccer: 3.5, football: 3.5, basketball: 3.5,
+      americanfootball: 4.5, baseball: 5, hockey: 4, icehockey: 4,
+      tennis: 6, cricket: 10, rugby: 3, mma: 4, boxing: 4,
+      golf: 12, racing: 6,
+    };
+    const nowMs = Date.now();
+    const isStaleLive = (m: MatchData) => {
+      const live = m.status === 'live' || m.status === 'halftime' ||
+        m.status === 'extra_time' || m.status === 'penalties';
+      if (!live) return false;
+      const slug = m.sport.slug;
+      const maxHours = STALE_LIVE_HOURS[slug] ?? 4;
+      const ageHours = (nowMs - new Date(m.kickoffTime).getTime()) / 3_600_000;
+      return ageHours > maxHours;
+    };
+    // Drop stale-live matches outright — they shouldn't pollute live or
+    // upcoming views (they belong on /results once the feed catches up).
+    matches = matches.filter(m => !isStaleLive(m));
+
     // Status filter — IMPORTANT: upcoming list never shows finished
     if (status === 'live') {
       matches = matches.filter(m =>
