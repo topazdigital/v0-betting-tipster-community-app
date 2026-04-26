@@ -4,6 +4,8 @@ import {
   getOAuthConfig,
   saveOAuthConfig,
   maskedOAuthConfig,
+  getOAuthSiteUrl,
+  setOAuthSiteUrl,
   type OAuthAllConfig,
 } from '@/lib/oauth-config-store';
 
@@ -19,14 +21,18 @@ async function requireAdmin() {
 export async function GET() {
   const user = await requireAdmin();
   if (!user) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  const cfg = await getOAuthConfig();
-  return NextResponse.json({ config: maskedOAuthConfig(cfg) });
+  const [cfg, siteUrl] = await Promise.all([getOAuthConfig(), getOAuthSiteUrl()]);
+  return NextResponse.json({ config: maskedOAuthConfig(cfg), siteUrl });
 }
 
 export async function PUT(req: Request) {
   const user = await requireAdmin();
   if (!user) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  const body = (await req.json().catch(() => ({}))) as Partial<OAuthAllConfig>;
-  const saved = await saveOAuthConfig(body);
-  return NextResponse.json({ config: maskedOAuthConfig(saved) });
+  const body = (await req.json().catch(() => ({}))) as Partial<OAuthAllConfig> & { siteUrl?: string };
+  const { siteUrl, ...providerPatch } = body;
+  const [saved, savedSiteUrl] = await Promise.all([
+    saveOAuthConfig(providerPatch as Partial<OAuthAllConfig>),
+    siteUrl !== undefined ? setOAuthSiteUrl(siteUrl) : getOAuthSiteUrl(),
+  ]);
+  return NextResponse.json({ config: maskedOAuthConfig(saved), siteUrl: savedSiteUrl });
 }

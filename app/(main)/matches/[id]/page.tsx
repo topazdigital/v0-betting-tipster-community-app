@@ -1522,72 +1522,112 @@ export default function MatchDetailPage({ params }: PageProps) {
           {/* ══ STANDINGS ══ */}
           <TabsContent value="standings" className="mt-0 space-y-4">
             {standings && standings.length > 0 ? (
-              standings.map((g, i) => (
-                <Card key={i} className="overflow-hidden">
-                  {g.header && (
-                    <div className="px-4 pt-4 pb-3 border-b border-border/50">
-                      <h3 className="text-sm font-bold">{g.header}</h3>
+              standings.map((g, i) => {
+                const hasGoals = g.rows.some(r => r.goalsFor !== undefined)
+                const totalRows = g.rows.length
+                return (
+                  <Card key={i} className="overflow-hidden">
+                    <div className="px-4 pt-4 pb-3 border-b border-border/50 flex items-center gap-2">
+                      <Trophy className="h-4 w-4 text-warning" />
+                      <h3 className="text-sm font-bold">{g.header || 'League Table'}</h3>
                     </div>
-                  )}
-                  <CardContent className="p-0">
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-sm">
-                        <thead>
-                          <tr className="border-b border-border/40 text-xs uppercase text-muted-foreground bg-muted/30">
-                            <th className="px-3 py-3 text-left w-8">#</th>
-                            <th className="px-3 py-3 text-left">Team</th>
-                            <th className="px-3 py-3 text-center">P</th>
-                            <th className="px-3 py-3 text-center">W</th>
-                            <th className="px-3 py-3 text-center">D</th>
-                            <th className="px-3 py-3 text-center">L</th>
-                            {g.rows.some(r => r.goalsFor !== undefined) && <th className="px-3 py-3 text-center">GD</th>}
-                            <th className="px-3 py-3 text-center font-bold">Pts</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {g.rows.map((r, ri) => {
-                            const isCurrent = r.teamName === match.homeTeam.name || r.teamName === match.awayTeam.name
-                            return (
-                              <tr key={ri} className={cn(
-                                "border-b border-border/20 hover:bg-muted/30 transition-colors",
-                                isCurrent && "bg-primary/8 font-semibold"
-                              )}>
-                                <td className="px-3 py-2.5 text-muted-foreground text-center">{r.position ?? ri + 1}</td>
-                                <td className="px-3 py-2.5">
-                                  <div className="flex items-center gap-2">
-                                    <TeamLogo teamName={r.teamName || ''} logoUrl={r.teamLogo} size="sm" />
+                    <CardContent className="p-4">
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr className="border-b text-muted-foreground">
+                              <th className="pb-2 pr-2 text-left font-medium">#</th>
+                              <th className="pb-2 text-left font-medium">Team</th>
+                              <th className="pb-2 text-center font-medium">P</th>
+                              <th className="pb-2 text-center font-medium">W</th>
+                              <th className="pb-2 text-center font-medium">D</th>
+                              <th className="pb-2 text-center font-medium">L</th>
+                              {hasGoals && <th className="pb-2 text-center font-medium">GF</th>}
+                              {hasGoals && <th className="pb-2 text-center font-medium">GA</th>}
+                              {hasGoals && <th className="pb-2 text-center font-medium">GD</th>}
+                              <th className="pb-2 pl-2 text-center font-medium">Pts</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {g.rows.map((r, ri) => {
+                              const position = r.position ?? ri + 1
+                              const isCurrent = r.teamName === match.homeTeam.name || r.teamName === match.awayTeam.name
+                              const isTop = position <= 4
+                              const isBottom = position >= totalRows - 2
+                              const gd = r.goalDifference
+                              return (
+                                <tr
+                                  key={ri}
+                                  className={cn(
+                                    "border-b transition-colors hover:bg-muted/50",
+                                    isTop && "bg-success/5",
+                                    isBottom && "bg-destructive/5",
+                                    isCurrent && "bg-primary/10 font-semibold",
+                                  )}
+                                >
+                                  <td className="py-2 pr-2">
+                                    <span
+                                      className={cn(
+                                        "inline-flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold",
+                                        isTop && "bg-success text-success-foreground",
+                                        isBottom && "bg-destructive text-destructive-foreground",
+                                        !isTop && !isBottom && "text-muted-foreground",
+                                      )}
+                                    >
+                                      {position}
+                                    </span>
+                                  </td>
+                                  <td className="py-2">
                                     {r.teamId && match.homeTeam.leagueSlug ? (
                                       <Link
                                         href={`/teams/espn_${match.homeTeam.leagueSlug}_${r.teamId}`}
-                                        className={cn("truncate hover:underline", isCurrent ? "font-bold text-primary" : "hover:text-foreground")}
+                                        className="group flex items-center gap-2 hover:text-primary"
                                         onClick={e => e.stopPropagation()}
                                       >
-                                        {r.teamName}
+                                        <TeamLogo teamName={r.teamName || ''} logoUrl={r.teamLogo} size="xs" />
+                                        <span className={cn(
+                                          "truncate font-medium group-hover:underline",
+                                          isCurrent && "text-primary",
+                                        )}>{r.teamName}</span>
                                       </Link>
                                     ) : (
-                                      <span className={cn("truncate", isCurrent && "font-bold text-primary")}>{r.teamName}</span>
+                                      <div className="flex items-center gap-2">
+                                        <TeamLogo teamName={r.teamName || ''} logoUrl={r.teamLogo} size="xs" />
+                                        <span className={cn("truncate font-medium", isCurrent && "text-primary")}>
+                                          {r.teamName}
+                                        </span>
+                                      </div>
                                     )}
-                                  </div>
-                                </td>
-                                <td className="px-3 py-2.5 text-center">{r.played}</td>
-                                <td className="px-3 py-2.5 text-center text-emerald-600">{r.won}</td>
-                                <td className="px-3 py-2.5 text-center text-amber-500">{r.drawn}</td>
-                                <td className="px-3 py-2.5 text-center text-rose-500">{r.lost}</td>
-                                {g.rows.some(x => x.goalsFor !== undefined) && (
-                                  <td className="px-3 py-2.5 text-center text-muted-foreground">
-                                    {r.goalDifference !== undefined ? (r.goalDifference > 0 ? '+' : '') + r.goalDifference : '—'}
                                   </td>
-                                )}
-                                <td className="px-3 py-2.5 text-center font-bold text-primary">{r.points}</td>
-                              </tr>
-                            )
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))
+                                  <td className="py-2 text-center">{r.played}</td>
+                                  <td className="py-2 text-center text-success">{r.won}</td>
+                                  <td className="py-2 text-center">{r.drawn}</td>
+                                  <td className="py-2 text-center text-destructive">{r.lost}</td>
+                                  {hasGoals && <td className="py-2 text-center">{r.goalsFor ?? '—'}</td>}
+                                  {hasGoals && <td className="py-2 text-center">{r.goalsAgainst ?? '—'}</td>}
+                                  {hasGoals && (
+                                    <td className="py-2 text-center font-medium">
+                                      {gd !== undefined ? (
+                                        <span className={cn(
+                                          gd > 0 && "text-success",
+                                          gd < 0 && "text-destructive",
+                                        )}>
+                                          {gd > 0 ? `+${gd}` : gd}
+                                        </span>
+                                      ) : '—'}
+                                    </td>
+                                  )}
+                                  <td className="py-2 pl-2 text-center font-bold">{r.points}</td>
+                                </tr>
+                              )
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )
+              })
             ) : (
               <Card>
                 <CardContent className="py-14 text-center text-muted-foreground">

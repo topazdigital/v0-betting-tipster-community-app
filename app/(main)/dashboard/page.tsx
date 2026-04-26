@@ -7,6 +7,7 @@ import { TeamLogo } from '@/components/ui/team-logo';
 import { FlagIcon } from '@/components/ui/flag-icon';
 import { Spinner } from '@/components/ui/spinner';
 import { useAuth } from '@/contexts/auth-context';
+import { useAuthModal } from '@/contexts/auth-modal-context';
 import { formatDate, formatTime, getBrowserTimezone } from '@/lib/utils/timezone';
 import { cn } from '@/lib/utils';
 
@@ -44,6 +45,7 @@ interface DashboardData {
 
 export default function DashboardPage() {
   const { user, isLoading: authLoading } = useAuth();
+  const { open: openAuthModal } = useAuthModal();
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [tz] = useState<string>(() => getBrowserTimezone());
@@ -74,12 +76,20 @@ export default function DashboardPage() {
             Sign in to follow teams, get AI tips for your favourites, and never miss a fixture.
           </p>
           <div className="mt-6 flex justify-center gap-2">
-            <Link href="/login?next=/dashboard" className="rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90">
+            <button
+              type="button"
+              onClick={() => openAuthModal('login')}
+              className="rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90"
+            >
               Sign in
-            </Link>
-            <Link href="/register" className="rounded-lg border border-border px-5 py-2.5 text-sm font-semibold hover:bg-muted">
+            </button>
+            <button
+              type="button"
+              onClick={() => openAuthModal('register')}
+              className="rounded-lg border border-border px-5 py-2.5 text-sm font-semibold hover:bg-muted"
+            >
               Create account
-            </Link>
+            </button>
           </div>
         </div>
       </div>

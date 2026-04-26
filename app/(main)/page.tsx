@@ -710,22 +710,36 @@ function LiveMarquee({ matches }: { matches: Match[] }) {
   const cards = matches.length;
   const duration = Math.max(28, cards * 9); // seconds per loop
 
+  // Only loop the marquee when there are enough cards to overflow the row
+  // (otherwise we'd render the same 1-2 cards twice and look broken).
+  const MARQUEE_MIN = 4;
+  const shouldLoop = cards >= MARQUEE_MIN;
+  const cardsToRender = shouldLoop ? [...matches, ...matches] : matches;
+
   return (
     <div className="group relative overflow-hidden">
-      {/* Fade edges */}
-      <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-12 bg-gradient-to-r from-background to-transparent" />
-      <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-12 bg-gradient-to-l from-background to-transparent" />
+      {/* Fade edges only when looping */}
+      {shouldLoop && (
+        <>
+          <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-12 bg-gradient-to-r from-background to-transparent" />
+          <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-12 bg-gradient-to-l from-background to-transparent" />
+        </>
+      )}
 
       <div
-        className="flex gap-4 pb-2 animate-marquee group-hover:[animation-play-state:paused] motion-reduce:animate-none"
-        style={{ animationDuration: `${duration}s` }}
+        className={cn(
+          "flex gap-4 pb-2 motion-reduce:animate-none",
+          shouldLoop
+            ? "animate-marquee group-hover:[animation-play-state:paused]"
+            : "flex-wrap",
+        )}
+        style={shouldLoop ? { animationDuration: `${duration}s` } : undefined}
       >
-        {/* Render twice so the second copy slides in seamlessly */}
-        {[...matches, ...matches].map((match, idx) => (
+        {cardsToRender.map((match, idx) => (
           <div
             key={`${match.id}-${idx}`}
             className="w-80 shrink-0"
-            aria-hidden={idx >= cards}
+            aria-hidden={shouldLoop && idx >= cards}
           >
             <MatchCardNew match={match} showSport />
           </div>

@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Bell, Check, ExternalLink, Loader2, MessageSquare, Heart, UserPlus, Trophy, Newspaper, AlertCircle, Megaphone, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/auth-context';
+import { useAuthModal } from '@/contexts/auth-modal-context';
 import { cn } from '@/lib/utils';
 
 interface NotifRow {
@@ -62,6 +63,7 @@ function timeAgo(iso: string): string {
 
 export function NotificationBell() {
   const { isAuthenticated } = useAuth();
+  const { open: openAuthModal } = useAuthModal();
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState<NotifRow[]>([]);
   const [unread, setUnread] = useState(0);
@@ -166,8 +168,8 @@ export function NotificationBell() {
               <div className="p-6 text-center">
                 <Bell className="mx-auto mb-2 h-8 w-8 text-muted-foreground" />
                 <p className="text-sm text-muted-foreground mb-3">Sign in to see your notifications</p>
-                <Button asChild size="sm">
-                  <Link href="/login">Sign in</Link>
+                <Button size="sm" onClick={() => { setOpen(false); openAuthModal('login'); }}>
+                  Sign in
                 </Button>
               </div>
             ) : loading && items.length === 0 ? (

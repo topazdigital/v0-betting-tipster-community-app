@@ -64,11 +64,18 @@ function emptyState(): Record<Provider, ProviderState> {
 export default function AdminSocialLoginPage() {
   const [state, setState] = useState<Record<Provider, ProviderState>>(emptyState);
   const [revealed, setRevealed] = useState<Partial<Record<Provider, boolean>>>({});
+  const [siteUrl, setSiteUrl] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState<{ kind: 'ok' | 'err'; msg: string } | null>(null);
 
-  const baseUrl = useMemo(() => (typeof window !== 'undefined' ? window.location.origin : ''), []);
+  // Falls back to the current browser origin so the admin can copy a working
+  // callback URL even before they configure a permanent Site URL.
+  const browserOrigin = useMemo(
+    () => (typeof window !== 'undefined' ? window.location.origin : ''),
+    [],
+  );
+  const baseUrl = (siteUrl.trim() || browserOrigin).replace(/\/+$/, '');
   const callbackUrl = (p: Provider) => `${baseUrl}/api/auth/oauth/${p}/callback`;
 
   useEffect(() => {
@@ -76,6 +83,7 @@ export default function AdminSocialLoginPage() {
       .then((r) => r.json())
       .then((d) => {
         const cfg = d?.config as Record<Provider, { enabled: boolean; clientId: string; secretSet: boolean }> | undefined;
+        if (typeof d?.siteUrl === 'string') setSiteUrl(d.siteUrl);
         if (!cfg) return;
         setState((prev) => {
           const next = { ...prev };
@@ -100,7 +108,7 @@ export default function AdminSocialLoginPage() {
     setSaving(true);
     setStatus(null);
     try {
-      const payload: Record<string, { enabled: boolean; clientId: string; clientSecret: string; extra?: Record<string, string> }> = {};
+      const payload: Record<string, unknown> = { siteUrl: siteUrl.trim() };
       ORDER.forEach((p) => {
         const s = state[p];
         payload[p] = {
@@ -121,6 +129,7 @@ export default function AdminSocialLoginPage() {
         throw new Error(j.error || `Save failed (${res.status})`);
       }
       const j = await res.json();
+      if (typeof j?.siteUrl === 'string') setSiteUrl(j.siteUrl);
       const cfg = j?.config as Record<Provider, { enabled: boolean; clientId: string; secretSet: boolean }> | undefined;
       if (cfg) {
         setState((prev) => {
@@ -187,6 +196,38 @@ export default function AdminSocialLoginPage() {
           {status.msg}
         </div>
       )}
+
+      {/* Site URL — drives every callback URL shown below */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">Site URL (used for all callback URLs)</CardTitle>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Set this to your live install domain (e.g. <code className="rounded bg-muted px-1">https://betcheza.com</code>)
+            so the callback URLs below stay constant — even if you open this admin
+            panel from a staging or dev URL. Leave blank to use the current browser origin.
+          </p>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          <Label className="text-xs">Public site URL</Label>
+          <div className="flex items-center gap-2">
+            <Input
+              value={siteUrl}
+              onChange={(e) => setSiteUrl(e.target.value)}
+              placeholder="https://your-domain.com"
+              className="font-mono text-xs"
+            />
+            {siteUrl && (
+              <Button type="button" variant="outline" size="sm" onClick={() => setSiteUrl('')}>
+                Clear
+              </Button>
+            )}
+          </div>
+          <p className="text-[11px] text-muted-foreground">
+            Currently using:{' '}
+            <code className="rounded bg-muted px-1 font-mono">{baseUrl || '(none)'}</code>
+          </p>
+        </CardContent>
+      </Card>
 
       <div className="grid gap-4 lg:grid-cols-2">
         {ORDER.map((p) => {

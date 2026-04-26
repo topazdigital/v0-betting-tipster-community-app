@@ -17,6 +17,7 @@ import {
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { Tip, Tipster } from "@/lib/types"
+import { useAuthModal } from "@/contexts/auth-modal-context"
 
 interface MatchTipsProps {
   matchId: string
@@ -255,6 +256,7 @@ function TipCard({ tip, isAuthenticated }: { tip: typeof mockTips[0], isAuthenti
 }
 
 export function MatchTips({ matchId, isAuthenticated = false }: MatchTipsProps) {
+  const { open: openAuthModal } = useAuthModal()
   const tips = mockTips.filter(t => t.matchId === matchId || true) // Show all for demo
 
   return (
@@ -277,8 +279,8 @@ export function MatchTips({ matchId, isAuthenticated = false }: MatchTipsProps) 
             {isAuthenticated ? (
               <Button className="mt-4">Be the first to add a tip</Button>
             ) : (
-              <Button variant="outline" className="mt-4" asChild>
-                <Link href="/login">Login to add a tip</Link>
+              <Button variant="outline" className="mt-4" onClick={() => openAuthModal('login')}>
+                Login to add a tip
               </Button>
             )}
           </div>

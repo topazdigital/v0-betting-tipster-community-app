@@ -220,6 +220,7 @@ function getUpcomingMatches(matches: Match[]): Match[] {
 }
 
 function getFinishedMatches(matches: Match[]): Match[] {
+  const now = Date.now();
   return matches
     .filter(m => m.status === 'finished')
     // Drop matches that the upstream feed marked finished but never sent a
@@ -227,6 +228,10 @@ function getFinishedMatches(matches: Match[]): Match[] {
     // We require BOTH scores to be present (0 is a valid score, null is not).
     .filter(m => m.homeScore !== null && m.homeScore !== undefined
                  && m.awayScore !== null && m.awayScore !== undefined)
+    // Belt-and-braces: never show a "finished" match whose kickoff is still
+    // in the future — that's always a stale/erroneous status from the feed
+    // and would otherwise pollute the Results page with tomorrow's fixtures.
+    .filter(m => new Date(m.kickoffTime).getTime() <= now)
     .sort((a, b) => new Date(b.kickoffTime).getTime() - new Date(a.kickoffTime).getTime());
 }
 

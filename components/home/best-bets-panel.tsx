@@ -53,11 +53,21 @@ export function BestBetsPanel({ matches }: BestBetsPanelProps) {
     )
   }
 
-  // Build a top "featured" pick + 2-fold accumulator from the next 2
-  const featured = picks[0]
-  const acca = picks.slice(1, 3)
+  // Build a top "featured" pick + 2-fold accumulator from the next 2.
+  // Dedupe by match id so the same fixture never appears in more than one
+  // section — when only 1-2 distinct matches qualify, downstream sections
+  // gracefully hide instead of repeating the featured pick.
+  const seen = new Set<string>()
+  const unique: Pick[] = []
+  for (const p of picks) {
+    if (seen.has(p.match.id)) continue
+    seen.add(p.match.id)
+    unique.push(p)
+  }
+  const featured = unique[0]
+  const acca = unique.slice(1, 3)
   const accaOdds = acca.reduce((p, c) => p * c.odds, 1)
-  const others = picks.slice(3, 6)
+  const others = unique.slice(3, 6)
 
   return (
     <aside className="space-y-3">

@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/contexts/auth-context"
+import { useAuthModal } from "@/contexts/auth-modal-context"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { NotificationBell } from "@/components/notifications/notification-bell"
 import { BottomNav } from "@/components/layout/bottom-nav"
@@ -41,6 +42,7 @@ const mainNavItems: Array<{ href: string; label: string; icon: typeof Home; badg
 export default function MainLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const { user, isAuthenticated, logout, isLoading } = useAuth()
+  const { open: openAuthModal } = useAuthModal()
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [showSports, setShowSports] = useState(true)
   const stats = useMatchStats()
@@ -273,14 +275,16 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
               </DropdownMenu>
             ) : (
               <div className="flex items-center gap-2">
-                <Button variant="ghost" size="sm" asChild>
-                  <Link href="/login">Login</Link>
+                <Button variant="ghost" size="sm" onClick={() => openAuthModal('login')}>
+                  Login
                 </Button>
-                <Button size="sm" className="hidden md:flex gap-2" asChild>
-                  <Link href="/register">
-                    <LogIn className="h-4 w-4" />
-                    Sign Up
-                  </Link>
+                <Button
+                  size="sm"
+                  className="hidden md:flex gap-2"
+                  onClick={() => openAuthModal('register')}
+                >
+                  <LogIn className="h-4 w-4" />
+                  Sign Up
                 </Button>
               </div>
             )}

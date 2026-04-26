@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getOAuthConfig, type OAuthProvider } from '@/lib/oauth-config-store';
+import { getOAuthConfig, getOAuthSiteUrl, type OAuthProvider } from '@/lib/oauth-config-store';
 import { PROVIDERS, exchangeCodeForToken, fetchOAuthProfile } from '@/lib/oauth-providers';
 import { mockUsers } from '@/lib/mock-data';
 import { setAuthCookie } from '@/lib/auth';
@@ -11,7 +11,11 @@ export const runtime = 'nodejs';
 const STATE_COOKIE = 'bcz_oauth_state';
 const NEXT_COOKIE = 'bcz_oauth_next';
 
-function getRedirectUri(req: NextRequest, provider: OAuthProvider): string {
+async function getRedirectUri(req: NextRequest, provider: OAuthProvider): Promise<string> {
+  // Must match exactly what we sent in the start handler — prefer the
+  // admin-configured Site URL when set, otherwise derive from the request.
+  const siteUrl = await getOAuthSiteUrl();
+  if (siteUrl) return `${siteUrl}/api/auth/oauth/${provider}/callback`;
   const proto = req.headers.get('x-forwarded-proto') || 'https';
   const host = req.headers.get('x-forwarded-host') || req.headers.get('host') || 'localhost:5000';
   return `${proto}://${host}/api/auth/oauth/${provider}/callback`;
@@ -102,7 +106,7 @@ export async function GET(
     return errorRedirect(req, `${p}_not_configured`);
   }
 
-  const redirectUri = getRedirectUri(req, p);
+  const redirectUri = await getRedirectUri(req, p);
   const tokenRes = await exchangeCodeForToken(p, code, redirectUri, cfg);
   if (!tokenRes) return errorRedirect(req, `${p}_token_failed`);
 

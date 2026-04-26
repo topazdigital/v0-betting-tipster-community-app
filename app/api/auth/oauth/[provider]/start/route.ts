@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { randomBytes } from 'crypto';
-import { getOAuthConfig, type OAuthProvider } from '@/lib/oauth-config-store';
+import { getOAuthConfig, getOAuthSiteUrl, type OAuthProvider } from '@/lib/oauth-config-store';
 import { PROVIDERS } from '@/lib/oauth-providers';
 
 export const dynamic = 'force-dynamic';
@@ -9,8 +9,12 @@ export const runtime = 'nodejs';
 const STATE_COOKIE = 'bcz_oauth_state';
 const NEXT_COOKIE = 'bcz_oauth_next';
 
-function getRedirectUri(req: NextRequest, provider: OAuthProvider): string {
-  // Prefer x-forwarded-* headers because we sit behind Replit's proxy.
+async function getRedirectUri(req: NextRequest, provider: OAuthProvider): Promise<string> {
+  // Admin-configured Site URL wins so OAuth callbacks always land on the
+  // production domain regardless of which environment kicked off the flow.
+  const siteUrl = await getOAuthSiteUrl();
+  if (siteUrl) return `${siteUrl}/api/auth/oauth/${provider}/callback`;
+  // Otherwise prefer x-forwarded-* headers because we sit behind a proxy.
   const proto = req.headers.get('x-forwarded-proto') || 'https';
   const host = req.headers.get('x-forwarded-host') || req.headers.get('host') || 'localhost:5000';
   return `${proto}://${host}/api/auth/oauth/${provider}/callback`;
@@ -35,7 +39,7 @@ export async function GET(
   }
 
   const ep = PROVIDERS[p];
-  const redirectUri = getRedirectUri(req, p);
+  const redirectUri = await getRedirectUri(req, p);
   const state = randomBytes(24).toString('base64url');
   const next = req.nextUrl.searchParams.get('next') || '/';
 
