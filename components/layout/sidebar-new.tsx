@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useEffect, useState } from 'react';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { 
   ChevronRight, 
@@ -20,25 +21,28 @@ import {
 import { cn } from '@/lib/utils';
 import { ALL_SPORTS, ALL_LEAGUES, BOOKMAKERS, getSportIcon } from '@/lib/sports-data';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { useMatchStats, useUserCountry } from '@/lib/hooks/use-matches';
+import { useMatchStats, useUserCountry, useMatches } from '@/lib/hooks/use-matches';
 import { FlagIcon } from '@/components/ui/flag-icon';
 
-// Map a single user country code to the broader region it belongs to so we can
-// surface neighbouring African / European leagues alongside the user's home
-// league when ordering "Top Leagues".
-const COUNTRY_REGION: Record<string, string[]> = {
-  KE: ['KE', 'UG', 'TZ', 'AF'],
-  UG: ['UG', 'KE', 'TZ', 'AF'],
-  TZ: ['TZ', 'KE', 'UG', 'AF'],
-  NG: ['NG', 'GH', 'AF'],
-  GH: ['GH', 'NG', 'AF'],
-  ZA: ['ZA', 'AF'],
-  EG: ['EG', 'AF'],
-  US: ['US'],
-  MX: ['MX', 'US'],
-  BR: ['BR', 'SA', 'AR'],
-  AR: ['AR', 'SA', 'BR'],
-};
+// Europe's "Top 5" — these are always shown in the sidebar regardless of
+// whether they have matches today, because they're the most-followed.
+const EUROPE_TOP5_IDS = new Set<number>([1, 2, 3, 4, 5]);
+
+// Continental / international competitions to surface ONLY when they have
+// matches today. IDs match ESPN_LEAGUES (see lib/sports-data.ts header note).
+const INTERNATIONAL_IDS = new Set<number>([
+  9,   // UEFA Champions League
+  10,  // UEFA Europa League
+  26,  // UEFA Conference League
+  24,  // AFCON
+  102, // CAF Champions League
+  103, // CAF Confederation Cup
+  25,  // Copa Libertadores
+  104, // AFC Champions League
+  111, // UEFA Nations League
+  109, // FIFA Club World Cup
+  80,  // CONCACAF Champions Cup
+]);
 
 interface SidebarNewProps {
   selectedSportId?: number | null;
@@ -50,6 +54,14 @@ export function SidebarNew({ selectedSportId, onSelectSport }: SidebarNewProps) 
   const searchParams = useSearchParams();
   const stats = useMatchStats();
   const userCountry = useUserCountry();
+  const { matches: allMatches } = useMatches();
+
+  // The country/international groups depend on browser-only signals
+  // (timezone-detected country + SWR-loaded matches). We gate them behind
+  // a `mounted` flag so the SSR HTML and the first client render match —
+  // otherwise React throws a hydration mismatch when those groups appear.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
 
   // Group sports by category
   const popularSports = ALL_SPORTS.filter(s => s.category === 'popular');
@@ -59,31 +71,69 @@ export function SidebarNew({ selectedSportId, onSelectSport }: SidebarNewProps) 
   const racingSports = ALL_SPORTS.filter(s => s.category === 'racing');
   const otherSports = ALL_SPORTS.filter(s => s.category === 'other');
 
-  // Get top leagues for selected sport — pool of candidates first
+  // Build the set of league IDs that have at least one match in the next ~24h
+  // (or are currently live). Used to gate Country + International groups so
+  // the sidebar only shows things actually playing today.
+  const now = Date.now();
+  const dayMs = 24 * 60 * 60 * 1000;
+  const leaguesPlayingToday = new Set<number>();
+  for (const m of allMatches) {
+    if (!m?.league?.id) continue;
+    if (m.status === 'live' || m.status === 'halftime') {
+      leaguesPlayingToday.add(m.league.id);
+      continue;
+    }
+    const t = new Date(m.kickoffTime).getTime();
+    if (!Number.isNaN(t) && t >= now - 6 * 60 * 60 * 1000 && t <= now + dayMs) {
+      leaguesPlayingToday.add(m.league.id);
+    }
+  }
+
+  // Pool of candidate leagues (respect selected sport when one is chosen).
   const candidatePool = selectedSportId
     ? ALL_LEAGUES.filter(l => l.sportId === selectedSportId)
-    : ALL_LEAGUES.filter(l => l.tier === 1);
+    : ALL_LEAGUES;
 
-  // Reorder: user's home league(s) first, then leagues in the same region,
-  // then the rest. So a Kenyan visitor sees Kenya Premier League at the
-  // top, then Uganda/Tanzania/CAF, then EPL/La Liga/etc.
-  const region = COUNTRY_REGION[userCountry] || [userCountry];
-  const localCountryRank = (cc: string): number => {
-    const idx = region.indexOf(cc);
-    if (idx === -1) return 999;
-    return idx; // 0 = exact home country, 1+ = neighbours / continent
+  const dedupe = (arr: typeof ALL_LEAGUES) => {
+    const seen = new Set<number>();
+    return arr.filter(l => (seen.has(l.id) ? false : (seen.add(l.id), true)));
   };
 
-  const topLeagues = [...candidatePool]
-    .sort((a, b) => {
-      const ra = localCountryRank(a.countryCode);
-      const rb = localCountryRank(b.countryCode);
-      if (ra !== rb) return ra - rb;
-      // Within same locality bucket, keep tier-1 ahead and stable league id order
-      if (a.tier !== b.tier) return a.tier - b.tier;
-      return a.id - b.id;
-    })
-    .slice(0, 10);
+  // 1. User's home country leagues — only those with matches today.
+  const countryLeagues = dedupe(
+    candidatePool
+      .filter(l => l.countryCode === userCountry && leaguesPlayingToday.has(l.id))
+      .sort((a, b) => a.tier - b.tier || a.name.localeCompare(b.name)),
+  );
+
+  // 2. International / continental — only when matches today.
+  const internationalLeagues = dedupe(
+    candidatePool
+      .filter(l => INTERNATIONAL_IDS.has(l.id) && leaguesPlayingToday.has(l.id))
+      .sort((a, b) => a.id - b.id),
+  );
+
+  // 3. Europe Top 5 — always shown. Sport filter still applies (so basketball
+  //    selection won't show football leagues).
+  const europeTop5Leagues = dedupe(
+    candidatePool
+      .filter(l => EUROPE_TOP5_IDS.has(l.id))
+      .sort((a, b) => a.id - b.id),
+  );
+
+  const renderLeagueLink = (league: (typeof ALL_LEAGUES)[number]) => (
+    <Link
+      key={league.id}
+      href={`/leagues/${league.slug}`}
+      className="flex items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-sm text-sidebar-foreground transition-colors hover:bg-sidebar-accent/50"
+    >
+      <div className="flex items-center gap-2 min-w-0">
+        <FlagIcon countryCode={league.countryCode} size="xs" />
+        <span className="truncate">{league.name}</span>
+      </div>
+      <ChevronRight className="h-3 w-3 shrink-0 text-sidebar-foreground/40" />
+    </Link>
+  );
 
   return (
     <aside className="hidden w-64 shrink-0 border-r border-border bg-sidebar lg:block">
@@ -224,27 +274,36 @@ export function SidebarNew({ selectedSportId, onSelectSport }: SidebarNewProps) 
             </details>
           </div>
 
-          {/* Top Leagues */}
-          <div className="mb-6">
-            <h3 className="mb-2 px-2 text-xs font-semibold uppercase tracking-wider text-sidebar-foreground/60">
-              Top Leagues
-            </h3>
-            <nav className="space-y-0.5">
-              {topLeagues.map((league) => (
-                <Link
-                  key={league.id}
-                  href={`/leagues/${league.slug}`}
-                  className="flex items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-sm text-sidebar-foreground transition-colors hover:bg-sidebar-accent/50"
-                >
-                  <div className="flex items-center gap-2">
-                    <FlagIcon countryCode={league.countryCode} size="xs" />
-                    <span className="truncate">{league.name}</span>
-                  </div>
-                  <ChevronRight className="h-3 w-3 text-sidebar-foreground/40" />
-                </Link>
-              ))}
-            </nav>
-          </div>
+          {/* Country leagues — only when matches today */}
+          {mounted && countryLeagues.length > 0 && (
+            <div className="mb-6">
+              <h3 className="mb-2 flex items-center gap-2 px-2 text-xs font-semibold uppercase tracking-wider text-sidebar-foreground/60">
+                <FlagIcon countryCode={userCountry} size="xs" />
+                <span>Your Country • Today</span>
+              </h3>
+              <nav className="space-y-0.5">{countryLeagues.map(renderLeagueLink)}</nav>
+            </div>
+          )}
+
+          {/* International / continental — only when matches today */}
+          {mounted && internationalLeagues.length > 0 && (
+            <div className="mb-6">
+              <h3 className="mb-2 px-2 text-xs font-semibold uppercase tracking-wider text-sidebar-foreground/60">
+                International • Today
+              </h3>
+              <nav className="space-y-0.5">{internationalLeagues.map(renderLeagueLink)}</nav>
+            </div>
+          )}
+
+          {/* Europe Top 5 — always visible */}
+          {europeTop5Leagues.length > 0 && (
+            <div className="mb-6">
+              <h3 className="mb-2 px-2 text-xs font-semibold uppercase tracking-wider text-sidebar-foreground/60">
+                Europe Top 5
+              </h3>
+              <nav className="space-y-0.5">{europeTop5Leagues.map(renderLeagueLink)}</nav>
+            </div>
+          )}
 
           {/* Quick Links */}
           <div className="mb-6">

@@ -16,7 +16,35 @@ export interface SiteSettings {
   seo_pages: string;
   maintenance_mode: string;
   maintenance_message: string;
+  /** JSON-serialised SocialLink[] — managed in /admin/settings → Social tab. */
+  social_links: string;
   [key: string]: string;
+}
+
+export interface SocialLink {
+  /** Stable platform key (twitter, facebook, instagram, youtube, tiktok, telegram, whatsapp, linkedin, discord). */
+  platform: string;
+  /** Public URL the icon links to. */
+  url: string;
+  /** Optional handle (@betcheza) — purely cosmetic, shown as a tooltip. */
+  handle?: string;
+  /** When false, the icon is hidden from the footer even if a URL is set. */
+  enabled: boolean;
+}
+
+export function parseSocialLinks(raw: string): SocialLink[] {
+  try {
+    const arr = JSON.parse(raw || '[]');
+    if (!Array.isArray(arr)) return [];
+    return arr
+      .filter(
+        (e): e is SocialLink =>
+          typeof e?.platform === 'string' && typeof e?.url === 'string',
+      )
+      .map((e) => ({ enabled: true, ...e }));
+  } catch {
+    return [];
+  }
 }
 
 const DEFAULTS: SiteSettings = {
@@ -35,6 +63,7 @@ const DEFAULTS: SiteSettings = {
   seo_pages: '[]',
   maintenance_mode: 'false',
   maintenance_message: '',
+  social_links: '[]',
 };
 
 const g = globalThis as { __siteSettingsCache?: { value: SiteSettings; ts: number } };

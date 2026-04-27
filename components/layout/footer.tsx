@@ -1,6 +1,90 @@
+'use client';
+
 import Link from 'next/link';
+import useSWR from 'swr';
+import {
+  Facebook,
+  Twitter,
+  Instagram,
+  Youtube,
+  Linkedin,
+  Send,
+  MessageCircle,
+  Music2,
+  Github,
+  Twitch,
+  type LucideIcon,
+} from 'lucide-react';
+
+interface SocialLink {
+  platform: string;
+  url: string;
+  handle?: string;
+  enabled?: boolean;
+}
+
+interface PublicSettings {
+  siteName?: string;
+  siteDescription?: string;
+  socialLinks?: SocialLink[];
+}
+
+const fetcher = (url: string) => fetch(url).then((r) => r.json());
+
+const PLATFORM_META: Record<string, { label: string; icon: LucideIcon }> = {
+  twitter: { label: 'Twitter / X', icon: Twitter },
+  x: { label: 'X', icon: Twitter },
+  facebook: { label: 'Facebook', icon: Facebook },
+  instagram: { label: 'Instagram', icon: Instagram },
+  youtube: { label: 'YouTube', icon: Youtube },
+  tiktok: { label: 'TikTok', icon: Music2 },
+  telegram: { label: 'Telegram', icon: Send },
+  whatsapp: { label: 'WhatsApp', icon: MessageCircle },
+  linkedin: { label: 'LinkedIn', icon: Linkedin },
+  discord: { label: 'Discord', icon: MessageCircle },
+  github: { label: 'GitHub', icon: Github },
+  twitch: { label: 'Twitch', icon: Twitch },
+};
+
+function SocialIcons({ links }: { links: SocialLink[] }) {
+  if (!links || links.length === 0) return null;
+  return (
+    <div className="mt-4 flex flex-wrap items-center gap-2">
+      {links.map((link) => {
+        const meta = PLATFORM_META[link.platform.toLowerCase()];
+        const Icon = meta?.icon ?? MessageCircle;
+        const label = meta?.label ?? link.platform;
+        return (
+          <a
+            key={link.platform + link.url}
+            href={link.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label={`${label}${link.handle ? ` (${link.handle})` : ''}`}
+            title={link.handle ? `${label} — ${link.handle}` : label}
+            className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-border bg-background text-muted-foreground transition-colors hover:border-primary hover:bg-primary/10 hover:text-primary"
+          >
+            <Icon className="h-4 w-4" />
+          </a>
+        );
+      })}
+    </div>
+  );
+}
 
 export function Footer() {
+  const { data } = useSWR<PublicSettings>('/api/site-settings', fetcher, {
+    revalidateOnFocus: false,
+    dedupingInterval: 60_000,
+  });
+  const siteName = data?.siteName || 'Betcheza';
+  const description =
+    data?.siteDescription ||
+    'Your trusted betting tips community. Get expert predictions, track your performance, and compete with other tipsters.';
+  const socialLinks = (data?.socialLinks ?? []).filter(
+    (l) => l.enabled !== false && l.url,
+  );
+
   return (
     <footer className="border-t border-border bg-card pb-20 md:pb-0">
       <div className="mx-auto max-w-7xl px-4 py-8">
@@ -11,11 +95,10 @@ export function Footer() {
               <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
                 <span className="font-mono text-lg font-bold text-primary-foreground">B</span>
               </div>
-              <span className="font-semibold text-foreground">Betcheza</span>
+              <span className="font-semibold text-foreground">{siteName}</span>
             </Link>
-            <p className="mt-4 text-sm text-muted-foreground">
-              Your trusted betting tips community. Get expert predictions, track your performance, and compete with other tipsters.
-            </p>
+            <p className="mt-4 text-sm text-muted-foreground">{description}</p>
+            <SocialIcons links={socialLinks} />
           </div>
 
           {/* Quick Links */}
@@ -53,7 +136,10 @@ export function Footer() {
               <Link href="/contact" className="text-sm text-muted-foreground hover:text-foreground">
                 Contact Us
               </Link>
-              <Link href="/responsible-gambling" className="text-sm text-muted-foreground hover:text-foreground">
+              <Link
+                href="/responsible-gambling"
+                className="text-sm text-muted-foreground hover:text-foreground"
+              >
                 Responsible Gambling
               </Link>
             </nav>
@@ -79,7 +165,7 @@ export function Footer() {
         {/* Bottom */}
         <div className="mt-8 flex flex-col items-center justify-between gap-4 border-t border-border pt-8 sm:flex-row">
           <p className="text-xs text-muted-foreground">
-            &copy; {new Date().getFullYear()} Betcheza. All rights reserved.
+            &copy; {new Date().getFullYear()} {siteName}. All rights reserved.
           </p>
           <p className="text-xs text-muted-foreground">
             18+ | Gamble Responsibly | BeGambleAware.org

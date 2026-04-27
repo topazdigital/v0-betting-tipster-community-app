@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Save, Globe, Bell, Shield, Palette, Database, Loader2, CheckCircle2, AlertCircle, Search, ImageIcon, Link2, KeyRound, Plus, Trash2 } from "lucide-react"
+import { Save, Globe, Bell, Shield, Palette, Database, Loader2, CheckCircle2, AlertCircle, Search, ImageIcon, Link2, KeyRound, Plus, Trash2, Share2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -35,6 +35,46 @@ interface Settings {
   twofa_method: string
   url_rewrites: string
   seo_pages: string
+  social_links: string
+}
+
+interface SocialLink {
+  platform: string
+  url: string
+  handle?: string
+  enabled: boolean
+}
+
+const SOCIAL_PLATFORMS: { key: string; label: string; placeholder: string }[] = [
+  { key: 'twitter', label: 'Twitter / X', placeholder: 'https://x.com/your-handle' },
+  { key: 'facebook', label: 'Facebook', placeholder: 'https://facebook.com/your-page' },
+  { key: 'instagram', label: 'Instagram', placeholder: 'https://instagram.com/your-handle' },
+  { key: 'youtube', label: 'YouTube', placeholder: 'https://youtube.com/@your-channel' },
+  { key: 'tiktok', label: 'TikTok', placeholder: 'https://tiktok.com/@your-handle' },
+  { key: 'telegram', label: 'Telegram', placeholder: 'https://t.me/your-channel' },
+  { key: 'whatsapp', label: 'WhatsApp', placeholder: 'https://wa.me/254700000000' },
+  { key: 'linkedin', label: 'LinkedIn', placeholder: 'https://linkedin.com/company/your-co' },
+  { key: 'discord', label: 'Discord', placeholder: 'https://discord.gg/invite-code' },
+]
+
+function safeParseSocials(raw: string): Record<string, SocialLink> {
+  const out: Record<string, SocialLink> = {}
+  try {
+    const arr = JSON.parse(raw || '[]')
+    if (Array.isArray(arr)) {
+      for (const e of arr) {
+        if (e && typeof e.platform === 'string') {
+          out[e.platform] = {
+            platform: e.platform,
+            url: typeof e.url === 'string' ? e.url : '',
+            handle: typeof e.handle === 'string' ? e.handle : '',
+            enabled: e.enabled !== false,
+          }
+        }
+      }
+    }
+  } catch {}
+  return out
 }
 
 const defaultSettings: Settings = {
@@ -62,6 +102,7 @@ const defaultSettings: Settings = {
   twofa_method: "email",
   url_rewrites: "[]",
   seo_pages: "[]",
+  social_links: "[]",
 }
 
 interface SeoPageEntry { path: string; title?: string; description?: string; keywords?: string; ogImage?: string; noIndex?: boolean }
@@ -177,7 +218,7 @@ export default function AdminSettingsPage() {
       )}
 
       <Tabs defaultValue="general" className="space-y-3">
-        <TabsList className="grid w-full grid-cols-2 md:w-auto md:grid-cols-9">
+        <TabsList className="grid w-full grid-cols-2 md:w-auto md:grid-cols-10">
           <TabsTrigger value="general" className="gap-2">
             <Globe className="h-4 w-4" /> General
           </TabsTrigger>
@@ -204,6 +245,9 @@ export default function AdminSettingsPage() {
           </TabsTrigger>
           <TabsTrigger value="seo" className="gap-2">
             <Search className="h-4 w-4" /> SEO
+          </TabsTrigger>
+          <TabsTrigger value="social" className="gap-2">
+            <Share2 className="h-4 w-4" /> Social
           </TabsTrigger>
         </TabsList>
 
@@ -526,9 +570,76 @@ export default function AdminSettingsPage() {
             />
           </div>
         </TabsContent>
+
+        {/* Social Links */}
+        <TabsContent value="social">
+          <SocialLinksEditor
+            value={settings.social_links}
+            onChange={(next) => updateSetting('social_links', next)}
+          />
+        </TabsContent>
       </Tabs>
     </div>
   )
+}
+
+function SocialLinksEditor({ value, onChange }: { value: string; onChange: (next: string) => void }) {
+  const current = safeParseSocials(value);
+
+  const update = (platform: string, patch: Partial<SocialLink>) => {
+    const next: Record<string, SocialLink> = { ...current };
+    const existing = next[platform] || { platform, url: '', handle: '', enabled: true };
+    next[platform] = { ...existing, ...patch, platform };
+    // Persist as compact array — only entries with a URL or that are explicitly enabled.
+    const arr = Object.values(next).filter((e) => e.url || e.enabled);
+    onChange(JSON.stringify(arr));
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Social Links</CardTitle>
+        <CardDescription>
+          Toggle each platform on or off and paste the public URL. Enabled icons appear in the site footer.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {SOCIAL_PLATFORMS.map((p) => {
+          const entry = current[p.key] || { platform: p.key, url: '', handle: '', enabled: false };
+          return (
+            <div
+              key={p.key}
+              className="grid items-end gap-2 rounded-lg border border-border p-3 md:grid-cols-[auto_1fr_220px]"
+            >
+              <div className="flex items-center gap-3 md:flex-col md:items-start">
+                <Switch
+                  checked={entry.enabled}
+                  onCheckedChange={(c) => update(p.key, { enabled: c })}
+                />
+                <Label className="text-sm font-medium">{p.label}</Label>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">URL</Label>
+                <Input
+                  value={entry.url}
+                  placeholder={p.placeholder}
+                  onChange={(e) => update(p.key, { url: e.target.value })}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Handle (optional)</Label>
+                <Input
+                  value={entry.handle || ''}
+                  placeholder="@betcheza"
+                  onChange={(e) => update(p.key, { handle: e.target.value })}
+                />
+              </div>
+            </div>
+          );
+        })}
+      </CardContent>
+    </Card>
+  );
 }
 
 function SeoPagesEditor({ value, onChange }: { value: SeoPageEntry[]; onChange: (next: SeoPageEntry[]) => void }) {
