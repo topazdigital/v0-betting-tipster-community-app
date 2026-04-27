@@ -46,10 +46,23 @@ const PLATFORM_META: Record<string, { label: string; icon: LucideIcon }> = {
   twitch: { label: 'Twitch', icon: Twitch },
 };
 
-function SocialIcons({ links }: { links: SocialLink[] }) {
+function SocialIcons({
+  links,
+  size = 'md',
+}: {
+  links: SocialLink[];
+  size?: 'sm' | 'md' | 'lg';
+}) {
   if (!links || links.length === 0) return null;
+  const dims =
+    size === 'lg'
+      ? 'h-11 w-11'
+      : size === 'sm'
+        ? 'h-8 w-8'
+        : 'h-9 w-9';
+  const iconSize = size === 'lg' ? 'h-5 w-5' : 'h-4 w-4';
   return (
-    <div className="mt-4 flex flex-wrap items-center gap-2">
+    <div className="flex flex-wrap items-center gap-2">
       {links.map((link) => {
         const meta = PLATFORM_META[link.platform.toLowerCase()];
         const Icon = meta?.icon ?? MessageCircle;
@@ -62,14 +75,21 @@ function SocialIcons({ links }: { links: SocialLink[] }) {
             rel="noopener noreferrer"
             aria-label={`${label}${link.handle ? ` (${link.handle})` : ''}`}
             title={link.handle ? `${label} — ${link.handle}` : label}
-            className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-border bg-background text-muted-foreground transition-colors hover:border-primary hover:bg-primary/10 hover:text-primary"
+            className={cn(
+              'inline-flex items-center justify-center rounded-full border border-border bg-background text-muted-foreground transition-colors hover:border-primary hover:bg-primary/10 hover:text-primary',
+              dims,
+            )}
           >
-            <Icon className="h-4 w-4" />
+            <Icon className={iconSize} />
           </a>
         );
       })}
     </div>
   );
+}
+
+function cn(...parts: Array<string | false | null | undefined>) {
+  return parts.filter(Boolean).join(' ');
 }
 
 export function Footer() {
@@ -87,6 +107,23 @@ export function Footer() {
 
   return (
     <footer className="border-t border-border bg-card pb-20 md:pb-0">
+      {/* Promoted "Follow us" social bar — sits above the footer columns */}
+      {socialLinks.length > 0 && (
+        <div className="border-b border-border bg-muted/40">
+          <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-3 px-4 py-4 sm:flex-row">
+            <div className="text-center sm:text-left">
+              <p className="text-sm font-semibold text-foreground">
+                Join our sports betting community
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Follow {siteName} on your favourite social network
+              </p>
+            </div>
+            <SocialIcons links={socialLinks} size="lg" />
+          </div>
+        </div>
+      )}
+
       <div className="mx-auto max-w-7xl px-4 py-8">
         <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
           {/* Brand */}
@@ -98,7 +135,6 @@ export function Footer() {
               <span className="font-semibold text-foreground">{siteName}</span>
             </Link>
             <p className="mt-4 text-sm text-muted-foreground">{description}</p>
-            <SocialIcons links={socialLinks} />
           </div>
 
           {/* Quick Links */}

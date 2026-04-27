@@ -27,8 +27,16 @@ import { matchIdToSlug } from "@/lib/utils/match-url"
 import { AIMatchPrediction } from "@/components/ai/ai-match-prediction"
 import { AIMultiMarket } from "@/components/ai/ai-multi-market"
 import { AddTipForm } from "@/components/matches/add-tip-form"
+import { WinnerVote } from "@/components/matches/winner-vote"
 import { useAuth } from "@/contexts/auth-context"
 import { useMatches } from "@/lib/hooks/use-matches"
+
+// Sports where a draw is not a possible outcome (so the vote widget hides it).
+const NO_DRAW_SPORTS = new Set([
+  'basketball', 'tennis', 'baseball', 'ice-hockey', 'hockey',
+  'american-football', 'football-american', 'volleyball', 'mma', 'boxing',
+  'esports', 'darts', 'snooker',
+])
 
 interface PageProps { params: Promise<{ id: string }> }
 
@@ -1130,6 +1138,16 @@ export default function MatchDetailPage({ params }: PageProps) {
 
           {/* ══ OVERVIEW ══ */}
           <TabsContent value="overview" className="mt-0 space-y-4">
+            {/* Fan poll: who will win? (works for logged-in & guest users) */}
+            <WinnerVote
+              matchId={match.id}
+              homeName={match.homeTeam.name}
+              awayName={match.awayTeam.name}
+              homeLogo={match.homeTeam.logo}
+              awayLogo={match.awayTeam.logo}
+              allowDraw={!NO_DRAW_SPORTS.has(sport)}
+            />
+
             {/* AI Auto-Prediction */}
             <AIMatchPrediction
               homeTeam={match.homeTeam.name}

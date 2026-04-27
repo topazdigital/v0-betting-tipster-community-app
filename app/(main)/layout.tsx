@@ -23,6 +23,7 @@ import { useAuthModal } from "@/contexts/auth-modal-context"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { NotificationBell } from "@/components/notifications/notification-bell"
 import { BottomNav } from "@/components/layout/bottom-nav"
+import { Footer } from "@/components/layout/footer"
 import { useMatchStats } from "@/lib/hooks/use-matches"
 
 // ✅ FIX: import correct export and alias it
@@ -292,7 +293,10 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
         </header>
 
         <main className="p-4 pb-20 md:pb-4">{children}</main>
-        
+
+        {/* Site footer (admin-managed branding + social links) */}
+        <Footer />
+
         {/* Mobile Bottom Navigation */}
         <BottomNav />
       </div>

@@ -299,7 +299,7 @@ export function SidebarNew({ selectedSportId, onSelectSport }: SidebarNewProps) 
           {europeTop5Leagues.length > 0 && (
             <div className="mb-6">
               <h3 className="mb-2 px-2 text-xs font-semibold uppercase tracking-wider text-sidebar-foreground/60">
-                Europe Top 5
+                Popular Leagues
               </h3>
               <nav className="space-y-0.5">{europeTop5Leagues.map(renderLeagueLink)}</nav>
             </div>

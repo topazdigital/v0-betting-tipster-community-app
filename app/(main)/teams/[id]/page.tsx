@@ -205,96 +205,114 @@ export default function TeamPage({ params }: PageProps) {
         {/* ── Main column ─────────────────────────────────────────── */}
         <div className="min-w-0 space-y-3">
 
-      {/* Team Hero */}
-      <div
-        className="relative overflow-hidden rounded-2xl p-6"
-        style={{ background: `linear-gradient(135deg, ${accentColor}22 0%, transparent 60%)` }}
-      >
+      {/* Team Hero — oddspedia-inspired banner */}
+      <div className="relative overflow-hidden rounded-2xl border border-border shadow-sm">
+        {/* Tinted banner background */}
         <div
-          className="absolute inset-0 opacity-10"
-          style={{ background: `radial-gradient(circle at top right, ${accentColor}, transparent 70%)` }}
-        />
-        <div className="relative flex items-center gap-5">
-          <div className="h-20 w-20 shrink-0 overflow-hidden rounded-2xl border border-border bg-card shadow-lg">
-            <TeamLogo teamName={team.name} logoUrl={team.logo} sportSlug={sportSlug} size="xl" className="h-full w-full" />
-          </div>
-          <div className="min-w-0 flex-1">
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <h1 className="text-2xl font-bold">{team.name}</h1>
-                {team.nickname && team.nickname !== team.name && (
-                  <p className="text-sm text-muted-foreground">{team.nickname}</p>
-                )}
-              </div>
-              <div className="flex flex-col items-end gap-1.5 shrink-0">
-                <FollowTeamButton
-                  teamId={id}
-                  teamName={team.name}
-                  teamLogo={team.logo}
-                  leagueId={(team as any).leagueId ?? null}
-                  leagueSlug={(team as any).leagueSlug ?? null}
-                  leagueName={(team as any).league ?? null}
-                  sportSlug={sportSlug ?? null}
-                  countryCode={countryCode ?? null}
-                  size="md"
-                />
-                <span className="inline-flex items-center gap-1 text-[11px] font-medium text-muted-foreground">
-                  <Users className="h-3 w-3" />
-                  {(followersCount ?? 0).toLocaleString()} {followersCount === 1 ? 'follower' : 'followers'}
-                </span>
-              </div>
+          className="relative px-5 pt-6 pb-5 sm:px-8 sm:pt-8 sm:pb-7"
+          style={{
+            background: `linear-gradient(135deg, ${accentColor}f0 0%, ${accentColor}b3 55%, ${accentColor}66 100%)`,
+          }}
+        >
+          {/* Decorative blob */}
+          <div
+            className="pointer-events-none absolute -top-20 -right-20 h-64 w-64 rounded-full opacity-30 blur-3xl"
+            style={{ background: `radial-gradient(circle, #ffffff 0%, transparent 70%)` }}
+            aria-hidden
+          />
+          <div className="relative flex flex-col gap-5 sm:flex-row sm:items-center">
+            <div className="flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-white/30 bg-white shadow-xl ring-1 ring-black/5 sm:h-28 sm:w-28">
+              <TeamLogo teamName={team.name} logoUrl={team.logo} sportSlug={sportSlug} size="xl" className="h-full w-full p-2" />
             </div>
-            <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-              {countryCode && (
-                <span className="flex items-center gap-1.5">
-                  <FlagIcon countryCode={countryCode} size="sm" />
-                  {country || countryCode}
-                </span>
-              )}
-              {team.venue && (
-                <span className="flex items-center gap-1">
-                  <MapPin className="h-3 w-3" />
-                  {team.venue}
-                </span>
-              )}
-              {team.founded && (
-                <span className="flex items-center gap-1">
-                  <Calendar className="h-3 w-3" />
-                  Est. {team.founded}
-                </span>
-              )}
-              {team.record && (
-                <Badge variant="outline" className="text-xs">{team.record}</Badge>
-              )}
-              {team.standing?.position && (
-                <span className="flex items-center gap-1">
-                  <Trophy className="h-3 w-3" />
-                  {team.standing.position}
-                </span>
+
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-start">
+                <div className="min-w-0">
+                  <h1 className="text-2xl font-extrabold tracking-tight text-white drop-shadow-sm sm:text-3xl">
+                    {team.name}
+                  </h1>
+                  {team.nickname && team.nickname !== team.name && (
+                    <p className="mt-0.5 text-sm text-white/85">{team.nickname}</p>
+                  )}
+                  <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-white/90">
+                    {countryCode && (
+                      <span className="inline-flex items-center gap-1.5">
+                        <FlagIcon countryCode={countryCode} size="sm" />
+                        {country || countryCode}
+                      </span>
+                    )}
+                    {team.venue && (
+                      <span className="inline-flex items-center gap-1">
+                        <MapPin className="h-3 w-3" />
+                        {team.venue}
+                      </span>
+                    )}
+                    {team.founded && (
+                      <span className="inline-flex items-center gap-1">
+                        <Calendar className="h-3 w-3" />
+                        Est. {team.founded}
+                      </span>
+                    )}
+                    {team.record && (
+                      <span className="inline-flex items-center rounded-full bg-white/20 px-2 py-0.5 font-semibold tabular-nums">
+                        {team.record}
+                      </span>
+                    )}
+                    {team.standing?.position && (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-white/20 px-2 py-0.5 font-semibold">
+                        <Trophy className="h-3 w-3" />
+                        {team.standing.position}
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <div className="flex flex-col items-start gap-1.5 sm:items-end">
+                  <FollowTeamButton
+                    teamId={id}
+                    teamName={team.name}
+                    teamLogo={team.logo}
+                    leagueId={(team as any).leagueId ?? null}
+                    leagueSlug={(team as any).leagueSlug ?? null}
+                    leagueName={(team as any).league ?? null}
+                    sportSlug={sportSlug ?? null}
+                    countryCode={countryCode ?? null}
+                    size="md"
+                  />
+                  <span className="inline-flex items-center gap-1 text-[11px] font-medium text-white/80">
+                    <Users className="h-3 w-3" />
+                    {(followersCount ?? 0).toLocaleString()} {followersCount === 1 ? 'follower' : 'followers'}
+                  </span>
+                </div>
+              </div>
+              {past?.length > 0 && (
+                <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1 backdrop-blur-sm">
+                  <span className="text-[11px] font-semibold uppercase tracking-wide text-white/85">Form</span>
+                  <FormBar past={past} />
+                </div>
               )}
             </div>
-            {past?.length > 0 && (
-              <div className="mt-2 flex items-center gap-2">
-                <span className="text-xs text-muted-foreground">Form:</span>
-                <FormBar past={past} />
-              </div>
-            )}
           </div>
         </div>
 
-        {/* Season stats */}
+        {/* Season stats strip — clean white card under the banner */}
         {played > 0 && (
-          <div className="relative mt-5 grid grid-cols-5 gap-2">
+          <div className="grid grid-cols-5 divide-x divide-border bg-card">
             {[
-              { label: 'P', value: played },
-              { label: 'W', value: wins, color: 'text-green-500' },
-              { label: 'D', value: draws, color: 'text-yellow-500' },
-              { label: 'L', value: losses, color: 'text-red-500' },
-              { label: 'GD', value: `${goalsFor > 0 ? '+' : ''}${goalsFor - goalsAgainst}`, color: (goalsFor - goalsAgainst) >= 0 ? 'text-green-500' : 'text-red-500' },
-            ].map(s => (
-              <div key={s.label} className="rounded-lg border border-border bg-card/60 p-2 text-center">
-                <div className={cn('text-lg font-bold', s.color)}>{s.value}</div>
-                <div className="text-[10px] text-muted-foreground">{s.label}</div>
+              { label: 'Played', value: played, color: 'text-foreground' },
+              { label: 'Won', value: wins, color: 'text-green-600 dark:text-green-400' },
+              { label: 'Drawn', value: draws, color: 'text-yellow-600 dark:text-yellow-400' },
+              { label: 'Lost', value: losses, color: 'text-red-600 dark:text-red-400' },
+              {
+                label: 'Goal diff',
+                value: `${goalsFor - goalsAgainst > 0 ? '+' : ''}${goalsFor - goalsAgainst}`,
+                color: goalsFor - goalsAgainst >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400',
+              },
+            ].map((s) => (
+              <div key={s.label} className="px-2 py-3 text-center">
+                <div className={cn('text-xl font-bold tabular-nums', s.color)}>{s.value}</div>
+                <div className="mt-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                  {s.label}
+                </div>
               </div>
             ))}
           </div>
