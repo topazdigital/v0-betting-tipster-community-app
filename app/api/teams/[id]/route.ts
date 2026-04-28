@@ -181,14 +181,49 @@ async function fetchTeamSchedule(sport: string, league: string, teamId: string) 
     dateWindows.push(`${fmt(start)}-${fmt(end)}`);
   }
 
+  // For soccer, also probe major continental cups so a club's UCL/UEL/Copa
+  // Libertadores/Copa Sudamericana/etc. fixtures surface alongside its
+  // domestic-league schedule. ESPN scoreboard endpoints return ALL events
+  // for that league in the date window, and we filter to ones involving
+  // this team further down.
+  const SOCCER_CONTINENTAL_LEAGUES = [
+    'uefa.champions', 'uefa.europa', 'uefa.europa.conf', 'uefa.super_cup',
+    'uefa.nations', 'uefa.euro', 'uefa.euroq',
+    'fifa.world', 'fifa.cwc', 'fifa.worldq.uefa', 'fifa.worldq.conmebol',
+    'fifa.worldq.concacaf', 'fifa.worldq.afc', 'fifa.worldq.caf',
+    'conmebol.libertadores', 'conmebol.sudamericana', 'conmebol.america',
+    'concacaf.champions', 'concacaf.gold', 'concacaf.nations.league',
+    'caf.champions', 'caf.confed', 'caf.cup_of_nations',
+    'afc.champions', 'afc.asian',
+    // Domestic cups for the most-watched leagues — adds FA Cup, Copa del Rey,
+    // Coupe de France, Coppa Italia, DFB Pokal goals when applicable.
+    'eng.fa', 'eng.league_cup', 'esp.copa_del_rey', 'fra.coupe_de_france',
+    'ita.coppa_italia', 'ger.dfb_pokal',
+  ];
+  const continentalLeagues = sport === 'soccer'
+    ? SOCCER_CONTINENTAL_LEAGUES.filter(l => l !== league)
+    : [];
+
   const candidates = [
     `${ESPN_BASE}/${sport}/${league}/teams/${teamId}/schedule`,
     `${ESPN_BASE}/${sport}/${league}/teams/${teamId}/schedule?season=${year}`,
     `${ESPN_BASE}/${sport}/${league}/teams/${teamId}/schedule?season=${year + 1}`,
     `${ESPN_BASE}/${sport}/${league}/teams/${teamId}/schedule?season=${year - 1}`,
     ...dateWindows.map(w => `${ESPN_BASE}/${sport}/${league}/scoreboard?dates=${w}`),
+    // Also probe continental/cup competitions across the same date windows.
+    ...continentalLeagues.flatMap(l =>
+      dateWindows.map(w => `${ESPN_BASE}/${sport}/${l}/scoreboard?dates=${w}`)
+    ),
   ];
   type ScheduleResp = { events?: Array<{ id?: string; competitions?: Array<{ competitors?: Array<{ team?: { id?: string } }> }> }> } & Record<string, unknown>;
+  // Extract the league key from the URL so we can tag each event with the
+  // competition it actually came from. Without this, a UCL fixture would
+  // get linked as `espn_<domesticLeague>_<eventId>` and 404 on click.
+  const leagueFromUrl = (url: string): string => {
+    // Both .../{sport}/{league}/teams/... and .../{sport}/{league}/scoreboard...
+    const m = url.match(new RegExp(`/${sport}/([^/]+)/`));
+    return m?.[1] || league;
+  };
   const results = await Promise.all(
     candidates.map(async (url) => {
       try {
@@ -203,6 +238,7 @@ async function fetchTeamSchedule(sport: string, league: string, teamId: string) 
   for (const { url, data } of results) {
     if (!data) continue;
     const isScoreboard = url.includes('/scoreboard');
+    const sourceLeague = leagueFromUrl(url);
     for (const ev of (data.events || [])) {
       if (!ev?.id || seen.has(ev.id)) continue;
       // Scoreboard endpoints return ALL league events for that date window —
@@ -213,6 +249,9 @@ async function fetchTeamSchedule(sport: string, league: string, teamId: string) 
         if (!involves) continue;
       }
       seen.add(ev.id);
+      // Stamp the source league onto the event so the caller can build the
+      // correct internal match link (`espn_<sourceLeague>_<eventId>`).
+      (ev as { _sourceLeague?: string })._sourceLeague = sourceLeague;
       merged.events.push(ev);
     }
   }
@@ -412,6 +451,8 @@ export async function GET(
     name?: string;
     shortName?: string;
     status?: { type?: { state?: string; completed?: boolean } };
+    season?: { type?: number; year?: number; slug?: string };
+    league?: { abbreviation?: string; name?: string };
     competitions?: Array<{
       status?: { type?: { state?: string; completed?: boolean } };
       competitors?: Competitor[];
@@ -425,6 +466,33 @@ export async function GET(
       }>;
       venue?: { fullName?: string };
     }>;
+    _sourceLeague?: string;
+  };
+
+  // Pretty competition labels for the most common ESPN league keys. Used to
+  // tag each fixture on the team page so a Champions League match shows
+  // "UCL" / "Champions League" instead of being lumped under Ligue 1.
+  const COMP_LABEL: Record<string, { short: string; full: string }> = {
+    'uefa.champions': { short: 'UCL', full: 'Champions League' },
+    'uefa.europa': { short: 'UEL', full: 'Europa League' },
+    'uefa.europa.conf': { short: 'UECL', full: 'Conference League' },
+    'uefa.super_cup': { short: 'Super Cup', full: 'UEFA Super Cup' },
+    'uefa.nations': { short: 'UNL', full: 'Nations League' },
+    'uefa.euro': { short: 'EURO', full: 'UEFA Euro' },
+    'uefa.euroq': { short: 'EURO Q', full: 'Euro Qualifiers' },
+    'fifa.world': { short: 'WC', full: 'FIFA World Cup' },
+    'fifa.cwc': { short: 'CWC', full: 'Club World Cup' },
+    'conmebol.libertadores': { short: 'Libertadores', full: 'Copa Libertadores' },
+    'conmebol.sudamericana': { short: 'Sudamericana', full: 'Copa Sudamericana' },
+    'concacaf.champions': { short: 'CCL', full: 'CONCACAF Champions Cup' },
+    'caf.champions': { short: 'CAF CL', full: 'CAF Champions League' },
+    'afc.champions': { short: 'ACL', full: 'AFC Champions League' },
+    'eng.fa': { short: 'FA Cup', full: 'FA Cup' },
+    'eng.league_cup': { short: 'EFL Cup', full: 'EFL Cup' },
+    'esp.copa_del_rey': { short: 'Copa', full: 'Copa del Rey' },
+    'fra.coupe_de_france': { short: 'Coupe', full: 'Coupe de France' },
+    'ita.coppa_italia': { short: 'Coppa', full: 'Coppa Italia' },
+    'ger.dfb_pokal': { short: 'Pokal', full: 'DFB-Pokal' },
   };
 
   const readScore = (s: CompScore | undefined): number | null => {
@@ -483,9 +551,14 @@ export async function GET(
     const oppScore = readScore(opponentComp?.score);
     const status = mapStatus(statusState, statusCompleted);
 
+    const sourceLeague = ev._sourceLeague || parsed.league || league;
+    const competition = COMP_LABEL[sourceLeague];
     return {
-      id: `espn_${parsed.league.replace(/[^a-z0-9]/gi, '')}_${ev.id}`,
+      id: `espn_${sourceLeague.replace(/[^a-z0-9]/gi, '')}_${ev.id}`,
       espnEventId: ev.id,
+      competition: competition?.short,
+      competitionFull: competition?.full,
+      sourceLeague,
       date: ev.date,
       name: ev.shortName || ev.name,
       status,

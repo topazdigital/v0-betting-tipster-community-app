@@ -34,6 +34,9 @@ const memorySettings: Record<string, string> = g.__memorySettings ?? (g.__memory
   twofa_method: 'email',
   url_rewrites: '[]',
   seo_pages: '[]',
+  cookie_banner_enabled: 'true',
+  cookie_banner_message:
+    'We use cookies to improve your experience, analyse site traffic and personalise content. By clicking "Accept", you consent to our use of cookies.',
 });
 
 // Get all settings

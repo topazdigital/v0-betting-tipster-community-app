@@ -106,9 +106,25 @@ function mapRoster(r: RosterEntry | undefined) {
     let id = rawId !== undefined && rawId !== null && String(rawId).length > 0
       ? String(rawId)
       : undefined;
-    if (!id && p.athlete?.headshot) {
-      const m = String(p.athlete.headshot).match(/players\/full\/(\d+)\.(?:png|jpg)/i);
+    // ESPN's summary endpoint returns headshot as either a plain URL string
+    // or an object `{ href: '...' }`. Normalise to a string URL so the UI
+    // never tries to render `[object Object]` as an image src.
+    const rawHeadshot = (p.athlete as { headshot?: string | { href?: string } })?.headshot;
+    let headshotUrl: string | undefined;
+    if (typeof rawHeadshot === 'string') {
+      headshotUrl = rawHeadshot;
+    } else if (rawHeadshot && typeof rawHeadshot === 'object') {
+      headshotUrl = rawHeadshot.href;
+    }
+    // Derive a stable player id from the headshot URL when ESPN omits it.
+    if (!id && headshotUrl) {
+      const m = headshotUrl.match(/players\/full\/(\d+)\.(?:png|jpg)/i);
       if (m) id = m[1];
+    }
+    // Final fallback: ESPN exposes a stable headshot CDN by athlete id —
+    // build it for soccer when we have an id but no explicit headshot.
+    if (!headshotUrl && id) {
+      headshotUrl = `https://a.espncdn.com/i/headshots/soccer/players/full/${id}.png`;
     }
     return {
       id,
@@ -117,7 +133,7 @@ function mapRoster(r: RosterEntry | undefined) {
       position: p.position?.abbreviation || p.position?.name,
       jersey: p.jersey,
       starter: !!p.starter,
-      headshot: p.athlete?.headshot,
+      headshot: headshotUrl,
     };
   });
   // Sort starters back→front so the goalkeeper is first, then defenders,

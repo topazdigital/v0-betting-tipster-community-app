@@ -24,5 +24,7 @@ export async function GET() {
     twoFactorEnabled: s.twofa_enabled === 'true',
     twoFactorMethod: s.twofa_method,
     socialLinks,
+    cookieBannerEnabled: s.cookie_banner_enabled === 'true',
+    cookieBannerMessage: s.cookie_banner_message,
   });
 }

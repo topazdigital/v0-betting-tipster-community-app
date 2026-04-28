@@ -36,6 +36,8 @@ interface Settings {
   url_rewrites: string
   seo_pages: string
   social_links: string
+  cookie_banner_enabled: string
+  cookie_banner_message: string
 }
 
 interface SocialLink {
@@ -103,6 +105,9 @@ const defaultSettings: Settings = {
   url_rewrites: "[]",
   seo_pages: "[]",
   social_links: "[]",
+  cookie_banner_enabled: "true",
+  cookie_banner_message:
+    'We use cookies to improve your experience, analyse site traffic and personalise content. By clicking "Accept", you consent to our use of cookies.',
 }
 
 interface SeoPageEntry { path: string; title?: string; description?: string; keywords?: string; ogImage?: string; noIndex?: boolean }
@@ -286,6 +291,29 @@ export default function AdminSettingsPage() {
                   checked={settings.maintenance_mode === 'true'}
                   onCheckedChange={() => toggleSetting('maintenance_mode')}
                 />
+              </div>
+              <div className="rounded-lg border border-border p-4 space-y-3">
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <p className="font-medium">Cookie Consent Banner</p>
+                    <p className="text-sm text-muted-foreground">Show a GDPR-style cookie banner to first-time visitors.</p>
+                  </div>
+                  <Switch
+                    checked={settings.cookie_banner_enabled === 'true'}
+                    onCheckedChange={() => toggleSetting('cookie_banner_enabled')}
+                  />
+                </div>
+                {settings.cookie_banner_enabled === 'true' && (
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-muted-foreground">Banner message</label>
+                    <textarea
+                      className="w-full rounded-md border border-border bg-background p-2 text-sm"
+                      rows={3}
+                      value={settings.cookie_banner_message}
+                      onChange={(e) => updateSetting('cookie_banner_message', e.target.value)}
+                    />
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>

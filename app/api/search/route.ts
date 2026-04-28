@@ -160,7 +160,18 @@ export async function GET(request: NextRequest) {
   // ── 2. Matches + teams (from unified feed; cached upstream) ──────────
   // We run team derivation off the same fetch so we only hit ESPN once.
   const matchHits: SearchHit[] = [];
+  // Dedupe by *normalized team name* — ESPN often lists the same club
+  // under multiple feeds with different IDs (e.g. PSG appears once under
+  // Ligue 1 with id 160 and again under a friendly/cup feed with id 19258),
+  // and we don't want both to surface in search.
   const teamMap = new Map<string, SearchHit>();
+  // Prefer entries whose league country is a real country (not "World" /
+  // "Europe" / "International") and whose sport is football — that keeps
+  // PSG → Ligue 1 · France instead of PSG → Champions League · Europe.
+  const isPreferredSubtitle = (countryName: string) => {
+    const c = (countryName || '').toLowerCase();
+    return c.length > 0 && c !== 'world' && c !== 'europe' && c !== 'international' && c !== 'south america' && c !== 'north america' && c !== 'asia' && c !== 'africa';
+  };
   try {
     const allMatches = await getAllMatches();
     for (const m of allMatches) {
@@ -168,23 +179,35 @@ export async function GET(request: NextRequest) {
       const awayS = scoreMatch(q, m.awayTeam.name);
       const matchScore = Math.max(homeS, awayS);
 
-      // Team hits — dedupe by team id, keep best scoring instance, surface both teams.
-      // Skip noisy variants (women's, U-teams, reserves) so the senior side
-      // surfaces cleanly when a user searches "Marseille" / "Liverpool" etc.
+      // Team hits — dedupe by normalized team name (id alone is not enough,
+      // ESPN duplicates clubs across competition feeds). Skip noisy variants
+      // (women's, U-teams, reserves) so the senior side surfaces cleanly
+      // when a user searches "Marseille" / "Liverpool" etc.
       for (const t of [m.homeTeam, m.awayTeam]) {
         if (isNoisyTeamName(t.name)) continue;
         const ts = scoreMatch(q, t.name);
         if (ts <= 0) continue;
-        if (!teamMap.has(t.id)) {
-          teamMap.set(t.id, {
-            type: 'team',
-            id: t.id,
-            title: t.name,
-            subtitle: `${m.league.name} • ${m.league.country}`,
-            href: teamHref(t.name, t.id),
-            logoUrl: t.logo,
-            sportSlug: m.sport?.slug,
-          });
+        const dedupeKey = norm(t.name);
+        const existing = teamMap.get(dedupeKey);
+        const candidate: SearchHit = {
+          type: 'team',
+          id: t.id,
+          title: t.name,
+          subtitle: `${m.league.name} • ${m.league.country}`,
+          href: teamHref(t.name, t.id),
+          logoUrl: t.logo,
+          sportSlug: m.sport?.slug,
+        };
+        if (!existing) {
+          teamMap.set(dedupeKey, candidate);
+          continue;
+        }
+        // Prefer the entry whose subtitle uses a real country over generic
+        // continental/international labels.
+        const existingCountry = (existing.subtitle.split('•')[1] || '').trim();
+        const candidateCountry = (m.league.country || '').trim();
+        if (!isPreferredSubtitle(existingCountry) && isPreferredSubtitle(candidateCountry)) {
+          teamMap.set(dedupeKey, candidate);
         }
       }
 

@@ -18,6 +18,10 @@ export interface SiteSettings {
   maintenance_message: string;
   /** JSON-serialised SocialLink[] — managed in /admin/settings → Social tab. */
   social_links: string;
+  /** "true" / "false" — when true the cookie consent banner shows on first visit. */
+  cookie_banner_enabled: string;
+  /** Customisable banner copy. Falls back to a sensible default. */
+  cookie_banner_message: string;
   [key: string]: string;
 }
 
@@ -64,6 +68,9 @@ const DEFAULTS: SiteSettings = {
   maintenance_mode: 'false',
   maintenance_message: '',
   social_links: '[]',
+  cookie_banner_enabled: 'true',
+  cookie_banner_message:
+    'We use cookies to improve your experience, analyse site traffic and personalise content. By clicking "Accept", you consent to our use of cookies.',
 };
 
 const g = globalThis as { __siteSettingsCache?: { value: SiteSettings; ts: number } };

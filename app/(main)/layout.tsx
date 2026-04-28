@@ -24,6 +24,7 @@ import { ThemeToggle } from "@/components/theme-toggle"
 import { NotificationBell } from "@/components/notifications/notification-bell"
 import { BottomNav } from "@/components/layout/bottom-nav"
 import { Footer } from "@/components/layout/footer"
+import { CookieBanner } from "@/components/layout/cookie-banner"
 import { useMatchStats } from "@/lib/hooks/use-matches"
 
 // ✅ FIX: import correct export and alias it
@@ -302,6 +303,9 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
 
         {/* Mobile Bottom Navigation */}
         <BottomNav />
+
+        {/* Cookie consent banner (admin-toggleable) */}
+        <CookieBanner />
       </div>
     </div>
   )

@@ -65,6 +65,8 @@ interface MatchEvent {
   result: string | null;
   venue?: string;
   odds?: { home?: number; draw?: number; away?: number };
+  competition?: string;
+  competitionFull?: string;
 }
 
 function MatchRow({ event, timezone, teamName }: { event: MatchEvent; timezone: string; teamName: string }) {
@@ -104,7 +106,14 @@ function MatchRow({ event, timezone, teamName }: { event: MatchEvent; timezone: 
         {event.opponent ? (
           <>
             <TeamLogo teamName={event.opponent.name} logoUrl={event.opponent.logo} size="xs" />
-            <span className="truncate text-sm font-medium">{event.opponent.name}</span>
+            <div className="min-w-0">
+              <div className="truncate text-sm font-medium">{event.opponent.name}</div>
+              {event.competition && (
+                <div className="truncate text-[10px] uppercase tracking-wide text-muted-foreground" title={event.competitionFull}>
+                  {event.competition}
+                </div>
+              )}
+            </div>
           </>
         ) : (
           <span className="text-sm text-muted-foreground">Unknown</span>
