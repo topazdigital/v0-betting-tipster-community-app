@@ -659,6 +659,261 @@ async function fetchESPN(
   }
 }
 
+// ============================================
+// ESPN Global Catch-all Scoreboard
+// ============================================
+// ESPN exposes a `/sports/<sport>/all/scoreboard` endpoint that returns EVERY
+// match across EVERY league for the date(s) requested — including tons of
+// leagues we don't have explicitly configured (Iraqi Premier, Maltese
+// Premier, Hong Kong, Costa Rica cup, etc). We use this to dramatically
+// expand match coverage so the Live + Today lists feel as rich as Oddspedia.
+//
+// We map each event into a UnifiedMatch using the league id encoded in
+// `event.uid` (s:<sportId>~l:<leagueId>~e:<eventId>) and resolve unknown
+// league ids to a friendly name via a one-shot ESPN league-info fetch
+// that's cached per worker.
+const GLOBAL_SPORT_TYPES: Array<{ sport: string; sportType: ESPNLeagueConfig['sportType']; sportId: number }> = [
+  { sport: 'soccer', sportType: 'soccer', sportId: 1 },
+  { sport: 'basketball', sportType: 'basketball', sportId: 2 },
+  { sport: 'tennis', sportType: 'tennis', sportId: 3 },
+  { sport: 'baseball', sportType: 'baseball', sportId: 6 },
+  { sport: 'hockey', sportType: 'hockey', sportId: 7 },
+  { sport: 'rugby', sportType: 'rugby', sportId: 8 },
+  { sport: 'mma', sportType: 'mma', sportId: 27 },
+];
+
+// Cache resolved league info: ESPN league id (numeric) → { name, slug, country }
+interface GlobalLeagueInfo { name: string; slug: string; country: string; countryCode: string; }
+const globalLeagueInfoCache = new Map<string, GlobalLeagueInfo>();
+
+// Build a fast index of "ESPN league code (e.g. eng.1) → ESPNLeagueConfig" so
+// when the global feed surfaces a known league we still link to our internal
+// league page instead of inventing a duplicate.
+const ESPN_CONFIG_BY_LEAGUE_CODE = new Map<string, ESPNLeagueConfig>();
+for (const cfg of ESPN_LEAGUES) ESPN_CONFIG_BY_LEAGUE_CODE.set(cfg.league, cfg);
+
+// Hand-curated map of common ESPN numeric league ids → friendly metadata.
+// Covers everything we don't already configure as a first-class league but
+// surfaces frequently in /all/scoreboard. Names match how Oddspedia/ESPN
+// display the competition.
+const KNOWN_GLOBAL_LEAGUES: Record<string, { name: string; country: string; countryCode: string }> = {
+  '21231': { name: 'Saudi Pro League', country: 'Saudi Arabia', countryCode: 'SA' },
+  '8316': { name: 'Indian Super League', country: 'India', countryCode: 'IN' },
+  '8339': { name: 'Indonesian Super League', country: 'Indonesia', countryCode: 'ID' },
+  '8340': { name: 'Malaysian Super League', country: 'Malaysia', countryCode: 'MY' },
+  '11053': { name: 'Ugandan Premier League', country: 'Uganda', countryCode: 'UG' },
+  '8305': { name: 'KNVB Beker', country: 'Netherlands', countryCode: 'NL' },
+  '5454': { name: 'Copa Libertadores', country: 'South America', countryCode: 'WO' },
+  '5337': { name: 'US Open Cup', country: 'United States', countryCode: 'US' },
+  '5699': { name: 'CONCACAF Champions Cup', country: 'North America', countryCode: 'WO' },
+  '3903': { name: 'Argentine Primera B Metropolitana', country: 'Argentina', countryCode: 'AR' },
+  '3914': { name: 'EFL League One', country: 'England', countryCode: 'GB' },
+  '3915': { name: 'EFL League Two', country: 'England', countryCode: 'GB' },
+  '3917': { name: 'EFL League Two Playoffs', country: 'England', countryCode: 'GB' },
+  '3910': { name: 'National League', country: 'England', countryCode: 'GB' },
+  '4002': { name: 'Scottish Championship', country: 'Scotland', countryCode: 'GB' },
+  '10951': { name: 'Saudi King Cup', country: 'Saudi Arabia', countryCode: 'SA' },
+  '22059': { name: 'AFC Champions League Two', country: 'Asia', countryCode: 'WO' },
+  '775': { name: 'UEFA Champions League', country: 'Europe', countryCode: 'WO' },
+  '783': { name: 'Copa Sudamericana', country: 'South America', countryCode: 'WO' },
+};
+
+// Convert a season slug like "2025-26-saudi-pro-league" or "uefa-champions-league"
+// into a clean display name. Strips year prefixes and title-cases the rest.
+function leagueNameFromSeasonSlug(slug?: string): string | null {
+  if (!slug) return null;
+  // Skip generic slugs that don't carry league info.
+  const generic = new Set(['regular-season', 'group-stage', 'semifinals', 'quarterfinals', 'round-of-16', 'first-round', 'second-round', 'final', 'playoffs', 'preseason', 'postseason', 'promotion-quarterfinals']);
+  if (generic.has(slug)) return null;
+  // Strip leading year prefix (e.g. "2025-26-" or "2025-").
+  const stripped = slug.replace(/^\d{4}(-\d{2})?-/, '');
+  if (generic.has(stripped) || /^\d/.test(stripped)) return null;
+  // Title-case each word.
+  return stripped
+    .split('-')
+    .map(w => w.length <= 3 ? w.toUpperCase() : w.charAt(0).toUpperCase() + w.slice(1))
+    .join(' ');
+}
+
+async function resolveGlobalLeagueInfo(
+  sport: string,
+  espnLeagueId: string,
+  hint?: { seasonSlug?: string; teamSlug?: string },
+): Promise<GlobalLeagueInfo> {
+  const ck = `${sport}_${espnLeagueId}`;
+  const cached = globalLeagueInfoCache.get(ck);
+  if (cached) return cached;
+
+  // 1. Curated map wins — most accurate names.
+  const known = KNOWN_GLOBAL_LEAGUES[espnLeagueId];
+  if (known) {
+    const info: GlobalLeagueInfo = { name: known.name, slug: known.name.toLowerCase().replace(/[^a-z0-9]+/g, '-'), country: known.country, countryCode: known.countryCode };
+    globalLeagueInfoCache.set(ck, info);
+    return info;
+  }
+  // 2. Try the season slug (e.g. "2025-26-saudi-pro-league" → "Saudi Pro League").
+  const fromSlug = leagueNameFromSeasonSlug(hint?.seasonSlug);
+  if (fromSlug) {
+    const info: GlobalLeagueInfo = { name: fromSlug, slug: fromSlug.toLowerCase().replace(/[^a-z0-9]+/g, '-'), country: 'World', countryCode: 'WO' };
+    globalLeagueInfoCache.set(ck, info);
+    return info;
+  }
+  // 3. Fallback: derive country from team slug ("ksa.1" → KSA).
+  const country = hint?.teamSlug?.split('.')[0]?.toUpperCase();
+  const info: GlobalLeagueInfo = {
+    name: country ? `${country} League` : `League ${espnLeagueId}`,
+    slug: `espn-${espnLeagueId}`,
+    country: country || 'World',
+    countryCode: 'WO',
+  };
+  globalLeagueInfoCache.set(ck, info);
+  return info;
+}
+
+async function fetchESPNGlobalSport(sport: string, sportType: ESPNLeagueConfig['sportType'], sportId: number): Promise<UnifiedMatch[]> {
+  const cacheKey = `espn-global-${sport}`;
+  const cached = getCached<UnifiedMatch[]>(cacheKey, CACHE_DURATION.live);
+  if (cached) return cached;
+
+  // Pull a 3-day window (yesterday, today, tomorrow) so the Live + Today
+  // lists are rich without overloading the request.
+  const now = new Date();
+  const start = new Date(now); start.setUTCDate(start.getUTCDate() - 1);
+  const end = new Date(now); end.setUTCDate(end.getUTCDate() + 1);
+  const range = `${formatYYYYMMDD(start)}-${formatYYYYMMDD(end)}`;
+  const url = `${ESPN_BASE_URL}/${sport}/all/scoreboard?dates=${range}`;
+  let data: ESPNScoreboardResponseFull | null = null;
+  try {
+    const r = await fetch(url, { headers: { Accept: 'application/json' }, next: { revalidate: 30 } });
+    if (r.ok) data = await r.json() as ESPNScoreboardResponseFull;
+  } catch { /* fall through */ }
+  if (!data?.events?.length) {
+    setCache(cacheKey, []);
+    return [];
+  }
+
+  const noDrawSports: ESPNLeagueConfig['sportType'][] = ['basketball', 'baseball', 'mma', 'tennis', 'golf', 'racing'];
+  const hasDraw = !noDrawSports.includes(sportType);
+
+  const matches: UnifiedMatch[] = [];
+  // Build per-league hint (use the season slug from the first event of each
+  // league — usually contains the league name like "2025-26-saudi-pro-league")
+  // so resolveGlobalLeagueInfo can derive friendly names without expensive
+  // per-event lookups.
+  const leagueHints = new Map<string, { seasonSlug?: string; teamSlug?: string }>();
+  for (const ev of data.events) {
+    const evExt = ev as ESPNEvent & { uid?: string; season?: { slug?: string } };
+    const m = evExt.uid?.match(/l:(\d+)/);
+    if (!m) continue;
+    if (!leagueHints.has(m[1])) {
+      const homeSlug = (ev.competitions?.[0]?.competitors?.[0]?.team as { slug?: string } | undefined)?.slug;
+      leagueHints.set(m[1], { seasonSlug: evExt.season?.slug, teamSlug: homeSlug });
+    }
+  }
+  const leagueInfoMap = new Map<string, GlobalLeagueInfo>();
+  await Promise.all(
+    Array.from(leagueHints.entries()).map(async ([lid, hint]) => {
+      const info = await resolveGlobalLeagueInfo(sport, lid, hint);
+      leagueInfoMap.set(lid, info);
+    })
+  );
+
+  for (const event of data.events) {
+    const competition = event.competitions[0];
+    if (!competition) continue;
+    const homeCompetitor = competition.competitors.find(c => c.homeAway === 'home');
+    const awayCompetitor = competition.competitors.find(c => c.homeAway === 'away');
+    const homeTeamName = homeCompetitor?.team?.displayName || homeCompetitor?.team?.name || homeCompetitor?.athlete?.displayName || 'TBD';
+    const awayTeamName = awayCompetitor?.team?.displayName || awayCompetitor?.team?.name || awayCompetitor?.athlete?.displayName || 'TBD';
+    if (homeTeamName === 'TBD' && awayTeamName === 'TBD') continue;
+
+    const espnLeagueIdMatch = (event as ESPNEvent & { uid?: string }).uid?.match(/l:(\d+)/);
+    const espnLeagueId = espnLeagueIdMatch?.[1] || '0';
+    const leagueInfo = leagueInfoMap.get(espnLeagueId) || { name: 'Unknown League', slug: `espn-${espnLeagueId}`, country: 'World', countryCode: 'WO' };
+
+    // Pseudo-config for ID stability — a deterministic leagueId derived from
+    // ESPN's league id keeps URLs consistent across requests.
+    const ourLeagueId = 80000 + parseInt(espnLeagueId, 10);
+    // Use ESPN league id as the slug fragment in our match ID so the match
+    // detail page can reconstruct it. Format: espn_global<id>_<eventId>
+    const leagueKeyForId = `global${espnLeagueId}`;
+
+    const status = mapESPNStatus(event.status);
+    const { odds, markets } = extractEspnOdds(competition.odds, hasDraw);
+    const venue = competition.venue?.fullName;
+
+    matches.push({
+      id: `espn_${leagueKeyForId}_${event.id}`,
+      externalId: event.id,
+      source: 'espn',
+      sportId,
+      sportKey: `${sport}_global${espnLeagueId}`,
+      leagueId: ourLeagueId,
+      leagueKey: leagueKeyForId,
+      homeTeam: {
+        id: homeCompetitor?.team?.id || homeCompetitor?.athlete?.id || '',
+        name: homeTeamName,
+        shortName: homeCompetitor?.team?.abbreviation || homeCompetitor?.athlete?.shortName || homeTeamName.slice(0, 3).toUpperCase(),
+        logo: homeCompetitor?.team?.logo,
+        form: homeCompetitor?.form || undefined,
+        record: homeCompetitor?.records?.find(r => r.type === 'total' || !r.type)?.summary || undefined,
+      },
+      awayTeam: {
+        id: awayCompetitor?.team?.id || awayCompetitor?.athlete?.id || '',
+        name: awayTeamName,
+        shortName: awayCompetitor?.team?.abbreviation || awayCompetitor?.athlete?.shortName || awayTeamName.slice(0, 3).toUpperCase(),
+        logo: awayCompetitor?.team?.logo,
+        form: awayCompetitor?.form || undefined,
+        record: awayCompetitor?.records?.find(r => r.type === 'total' || !r.type)?.summary || undefined,
+      },
+      kickoffTime: new Date(event.date),
+      status,
+      homeScore:
+        homeCompetitor?.score !== undefined && homeCompetitor?.score !== null && homeCompetitor.score !== ''
+          ? parseInt(homeCompetitor.score, 10)
+          : null,
+      awayScore:
+        awayCompetitor?.score !== undefined && awayCompetitor?.score !== null && awayCompetitor.score !== ''
+          ? parseInt(awayCompetitor.score, 10)
+          : null,
+      minute: extractLiveMinute(event.status, sportType) ?? undefined,
+      period: event.status.displayClock,
+      league: {
+        id: ourLeagueId,
+        name: leagueInfo.name,
+        slug: leagueInfo.slug,
+        country: leagueInfo.country,
+        countryCode: leagueInfo.countryCode,
+        tier: 3,
+      },
+      sport: {
+        id: sportId,
+        name: ALL_SPORTS.find(s => s.id === sportId)?.name || sport,
+        slug: ALL_SPORTS.find(s => s.id === sportId)?.slug || sport,
+        icon: ALL_SPORTS.find(s => s.id === sportId)?.icon || sport,
+      },
+      odds,
+      markets,
+      tipsCount: 0,
+      venue,
+    });
+  }
+
+  setCache(cacheKey, matches);
+  return matches;
+}
+
+async function fetchESPNGlobalAll(): Promise<UnifiedMatch[]> {
+  const all = await Promise.allSettled(
+    GLOBAL_SPORT_TYPES.map(s => fetchESPNGlobalSport(s.sport, s.sportType, s.sportId))
+  );
+  const out: UnifiedMatch[] = [];
+  for (const r of all) {
+    if (r.status === 'fulfilled') out.push(...r.value);
+  }
+  return out;
+}
+
 // Leagues we always fetch a multi-day window for (so today + a week of fixtures
 // always show up regardless of ESPN's default "next game day" behaviour).
 const PRIORITY_LEAGUE_KEYS = new Set<string>([
@@ -2135,6 +2390,7 @@ export async function getAllMatches(): Promise<UnifiedMatch[]> {
     oldbMatches,
     fdMatches,
     fmMatches,
+    globalEspnMatches,
   ] = await Promise.all([
     Promise.allSettled(ESPN_LEAGUES.map(config => getESPNMatches(config))),
     buildRealOddsIndex(),
@@ -2142,6 +2398,7 @@ export async function getAllMatches(): Promise<UnifiedMatch[]> {
     fetchOpenLigaDBMatches().catch(() => [] as UnifiedMatch[]),
     fetchFootballDataOrgMatches().catch(() => [] as UnifiedMatch[]),
     fetchFotMobMatches().catch(() => [] as UnifiedMatch[]),
+    fetchESPNGlobalAll().catch(() => [] as UnifiedMatch[]),
   ]);
 
   for (const result of espnResults) {
@@ -2167,13 +2424,15 @@ export async function getAllMatches(): Promise<UnifiedMatch[]> {
     }
   }
 
-  // Merge in supplementary sources (TheSportsDB, OpenLigaDB, football-data.org,
-  // FotMob). Order matters because addMatch() dedupes by team-pair+date and
-  // keeps the first source seen — we put higher-trust feeds first.
-  // ESPN already added above. Then football-data.org (top-tier, named teams),
-  // then OpenLigaDB (German depth), then TheSportsDB (African/exotic),
-  // then FotMob (catch-all).
-  const supplementarySources: UnifiedMatch[][] = [fdMatches, oldbMatches, tsdbMatches, fmMatches];
+  // Merge in supplementary sources (ESPN global catch-all, TheSportsDB,
+  // OpenLigaDB, football-data.org, FotMob). Order matters because addMatch()
+  // dedupes by team-pair+date and keeps the first source seen — we put
+  // higher-trust feeds first.
+  // ESPN per-league already added above. Then ESPN /all/scoreboard (covers
+  // every other ESPN league we don't explicitly configure), then
+  // football-data.org (top-tier), then OpenLigaDB (German depth),
+  // then TheSportsDB (African/exotic), then FotMob (catch-all).
+  const supplementarySources: UnifiedMatch[][] = [globalEspnMatches, fdMatches, oldbMatches, tsdbMatches, fmMatches];
   for (const source of supplementarySources) {
     for (const match of source) {
       if (realOddsIndex.size > 0) {

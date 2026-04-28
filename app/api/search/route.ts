@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { ALL_LEAGUES, ALL_SPORTS } from '@/lib/sports-data';
-import { getAllMatches } from '@/lib/api/unified-sports-api';
+import { getAllMatches, type UnifiedMatch } from '@/lib/api/unified-sports-api';
 import { query } from '@/lib/db';
 import { teamHref } from '@/lib/utils/slug';
 
@@ -237,6 +237,12 @@ export async function GET(request: NextRequest) {
       }
 
       if (matchScore > 0) {
+        // Hide finished/cancelled/postponed games from search results — users
+        // searching for a fixture want the upcoming or live one, not a stale
+        // result from last week.
+        const HIDDEN_STATUSES: UnifiedMatch['status'][] = ['finished', 'cancelled', 'postponed'];
+        if (HIDDEN_STATUSES.includes(m.status)) continue;
+
         matchHits.push({
           type: 'match',
           id: m.id,
