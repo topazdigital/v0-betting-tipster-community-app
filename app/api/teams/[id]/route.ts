@@ -33,6 +33,9 @@ const SOCCER_COUNTRY_TO_LEAGUE: Record<string, string> = {
 
 // Soccer fallback domestic-league probe order (only used when the slug
 // trick fails). Domestic before continental keeps PSG → Ligue 1.
+// Women's leagues live alongside men's — without them, sides like Arsenal
+// Women / Lyon Féminin / OL Féminin / NWSL clubs return "no upcoming matches"
+// because we never even try fetching their schedule from the right league.
 const TEAM_RESOLVER_CANDIDATES: Array<[string, string]> = [
   ['soccer', 'eng.1'], ['soccer', 'esp.1'], ['soccer', 'ita.1'], ['soccer', 'ger.1'], ['soccer', 'fra.1'],
   ['soccer', 'eng.2'], ['soccer', 'esp.2'], ['soccer', 'ita.2'], ['soccer', 'ger.2'], ['soccer', 'fra.2'],
@@ -40,8 +43,12 @@ const TEAM_RESOLVER_CANDIDATES: Array<[string, string]> = [
   ['soccer', 'usa.1'], ['soccer', 'usa.2'], ['soccer', 'mex.1'],
   ['soccer', 'bra.1'], ['soccer', 'arg.1'], ['soccer', 'col.1'], ['soccer', 'chi.1'],
   ['soccer', 'sau.1'], ['soccer', 'aus.1'], ['soccer', 'jpn.1'], ['soccer', 'kor.1'],
+  // Women's top flights (matches `eng.w.1`, `usa.nwsl`, etc).
+  ['soccer', 'eng.w.1'], ['soccer', 'esp.w.1'], ['soccer', 'ger.w.1'], ['soccer', 'fra.w.1'],
+  ['soccer', 'ita.w.1'], ['soccer', 'usa.nwsl'], ['soccer', 'aus.w-league'],
+  ['soccer', 'swe.w.1'], ['soccer', 'mex.w.1'],
   ['soccer', 'uefa.champions'], ['soccer', 'uefa.europa'], ['soccer', 'uefa.europa.conf'],
-  ['soccer', 'uefa.nations'], ['soccer', 'uefa.euro'],
+  ['soccer', 'uefa.nations'], ['soccer', 'uefa.euro'], ['soccer', 'uefa.wchampions'],
   ['soccer', 'concacaf.champions'], ['soccer', 'concacaf.gold'],
   ['soccer', 'conmebol.libertadores'], ['soccer', 'conmebol.sudamericana'], ['soccer', 'conmebol.america'],
   ['soccer', 'caf.champions'], ['soccer', 'caf.cup_of_nations'],
@@ -72,6 +79,27 @@ async function probeTeam(sport: string, league: string, teamId: string): Promise
   }
 }
 
+// Confirm a team actually plays in a given league by hitting the league
+// scoreboard and looking for the team id in any event. We use this when
+// the team payload itself doesn't tell us the league (e.g. women's clubs
+// whose slugs don't follow the `<country>.<abbr>` convention).
+async function probeTeamInScoreboard(sport: string, league: string, teamId: string): Promise<boolean> {
+  const url = `${ESPN_BASE}/${sport}/${league}/scoreboard?limit=300`;
+  try {
+    const r = await fetch(url, { headers: { Accept: 'application/json' }, next: { revalidate: 3600 } });
+    if (!r.ok) return false;
+    const data = (await r.json()) as { events?: Array<{ competitions?: Array<{ competitors?: Array<{ team?: { id?: string } }> }> }> };
+    for (const ev of data.events || []) {
+      for (const comp of ev.competitions || []) {
+        for (const c of comp.competitors || []) {
+          if (c.team?.id === teamId) return true;
+        }
+      }
+    }
+  } catch { /* fall through */ }
+  return false;
+}
+
 // Read the soccer team's `<country>.<abbrev>` slug and map it to the
 // top-flight domestic league. Returns null when the slug doesn't follow
 // that convention or the country isn't in the table.
@@ -96,9 +124,29 @@ async function resolveTeamSportLeague(
   const probeLeague = hint?.league || 'eng.1';
   const probed = await probeTeam(probeSport, probeLeague, espnTeamId);
   if (probed && probeSport === 'soccer') {
-    const domestic = leagueFromSlug(probed.team?.slug);
+    const slug = probed.team?.slug || '';
+    const domestic = leagueFromSlug(slug);
     if (domestic) {
       const choice = { sport: 'soccer', league: domestic };
+      teamLeagueCache.set(espnTeamId, choice);
+      return choice;
+    }
+    // Women's clubs use slugs like `arsenal_women` / `chelsea_w` which
+    // have no country prefix. Confirm membership by probing each women's
+    // league's scoreboard until we find a match referencing this team.
+    if (/(_women$|_w$|women)/i.test(slug)) {
+      const womensLeagues = ['eng.w.1', 'esp.w.1', 'ger.w.1', 'fra.w.1', 'ita.w.1', 'usa.nwsl', 'aus.w-league', 'swe.w.1', 'mex.w.1'];
+      for (const wl of womensLeagues) {
+        const found = await probeTeamInScoreboard('soccer', wl, espnTeamId);
+        if (found) {
+          const choice = { sport: 'soccer', league: wl };
+          teamLeagueCache.set(espnTeamId, choice);
+          return choice;
+        }
+      }
+      // Last-resort: assume WSL when slug contains "women" but no match
+      // surfaced (off-season, no recent fixtures cached).
+      const choice = { sport: 'soccer', league: 'eng.w.1' };
       teamLeagueCache.set(espnTeamId, choice);
       return choice;
     }
@@ -155,6 +203,83 @@ function parseTeamId(teamId: string): { sport: string; league: string; espnTeamI
   return null;
 }
 
+// football-data.org team IDs come through match feeds as `fd_team_<id>`
+// (see lib/api/football-data-org.ts). They aren't ESPN ids, so we resolve
+// them to an ESPN team by fetching the FD team's name/short name and
+// searching ESPN's site search. Result is cached so we only pay this once.
+const fdTeamCache = new Map<string, { espnId: string; name: string; slug: string } | null>();
+async function resolveFdTeamId(fdId: string): Promise<{ espnId: string; name: string; slug: string } | null> {
+  const cached = fdTeamCache.get(fdId);
+  if (cached !== undefined) return cached;
+
+  const apiKey = process.env.FOOTBALL_DATA_API_KEY;
+  if (!apiKey) {
+    fdTeamCache.set(fdId, null);
+    return null;
+  }
+  // Step 1: get team name from football-data.org
+  let teamName: string | null = null;
+  let shortName: string | null = null;
+  try {
+    const r = await fetch(`https://api.football-data.org/v4/teams/${fdId}`, {
+      headers: { 'X-Auth-Token': apiKey, Accept: 'application/json' },
+      next: { revalidate: 86400 },
+    });
+    if (r.ok) {
+      const data = (await r.json()) as { name?: string; shortName?: string };
+      teamName = data.name || null;
+      shortName = data.shortName || null;
+    }
+  } catch { /* fall through */ }
+
+  if (!teamName) {
+    fdTeamCache.set(fdId, null);
+    return null;
+  }
+
+  // Step 2: search ESPN for that name. ESPN has a sport-search endpoint
+  // that returns matching teams — we pick the top "team" hit.
+  type EspnSearchResult = {
+    results?: Array<{
+      type?: string;
+      contents?: Array<{ type?: string; uid?: string; id?: string; displayName?: string }>;
+    }>;
+  };
+  const candidates = [teamName, shortName].filter((s): s is string => !!s);
+  for (const name of candidates) {
+    try {
+      const url = `https://site.web.api.espn.com/apis/search/v2?query=${encodeURIComponent(name)}&limit=10&type=team`;
+      const r = await fetch(url, { headers: { Accept: 'application/json' }, next: { revalidate: 86400 } });
+      if (!r.ok) continue;
+      const data = (await r.json()) as EspnSearchResult;
+      for (const cat of data.results || []) {
+        for (const c of cat.contents || []) {
+          if (c.type !== 'team') continue;
+          // ESPN search puts a GUID in `id`. The numeric team id we
+          // actually need is encoded in `uid` as "s:<sportId>~t:<teamId>".
+          const uidMatch = c.uid?.match(/t:(\d+)/);
+          const numericId = uidMatch?.[1];
+          if (!numericId) continue;
+          const slug = (c.displayName || teamName)
+            .toLowerCase()
+            .normalize('NFKD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .replace(/[^a-z0-9\s-]+/g, ' ')
+            .trim()
+            .replace(/\s+/g, '-')
+            .replace(/-+/g, '-');
+          const result = { espnId: numericId, name: c.displayName || teamName, slug };
+          fdTeamCache.set(fdId, result);
+          return result;
+        }
+      }
+    } catch { /* try next name variant */ }
+  }
+
+  fdTeamCache.set(fdId, null);
+  return null;
+}
+
 async function fetchTeamInfo(sport: string, league: string, teamId: string) {
   const url = `${ESPN_BASE}/${sport}/${league}/teams/${teamId}`;
   try {
@@ -200,8 +325,15 @@ async function fetchTeamSchedule(sport: string, league: string, teamId: string) 
     'eng.fa', 'eng.league_cup', 'esp.copa_del_rey', 'fra.coupe_de_france',
     'ita.coppa_italia', 'ger.dfb_pokal',
   ];
+  // Women's continental + women's-specific cups. Probed when the team
+  // resolved to a women's domestic league so we surface UWCL fixtures
+  // and women's international cups for clubs like Arsenal Women.
+  const SOCCER_WOMENS_LEAGUES = [
+    'uefa.wchampions', 'fifa.wwc', 'concacaf.wchampions', 'eng.w.fa',
+  ];
+  const isWomens = /\.w\./.test(league) || league === 'usa.nwsl' || league.startsWith('aus.w');
   const continentalLeagues = sport === 'soccer'
-    ? SOCCER_CONTINENTAL_LEAGUES.filter(l => l !== league)
+    ? [...SOCCER_CONTINENTAL_LEAGUES, ...(isWomens ? SOCCER_WOMENS_LEAGUES : [])].filter(l => l !== league)
     : [];
 
   const candidates = [
@@ -305,7 +437,26 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  const parsed = parseTeamId(id);
+
+  // Resolve `fd_team_<id>` (football-data.org) URLs to a real ESPN id so
+  // the team page works when a user landed here from a football-data
+  // sourced match. We just swap the id and let the rest of the resolver
+  // run normally — the response includes `team.canonicalId` and the page
+  // does a router.replace to the SEO URL.
+  let workingId = id;
+  const fdMatch = id.match(/^fd_team_(\d+)$/i);
+  if (fdMatch) {
+    const resolved = await resolveFdTeamId(fdMatch[1]);
+    if (!resolved) {
+      return NextResponse.json(
+        { error: 'Could not match this football-data team to an ESPN team' },
+        { status: 404 },
+      );
+    }
+    workingId = `${resolved.slug}-${resolved.espnId}`;
+  }
+
+  const parsed = parseTeamId(workingId);
   if (!parsed) {
     return NextResponse.json({ error: 'Invalid team ID format' }, { status: 400 });
   }

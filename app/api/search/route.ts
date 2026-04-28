@@ -23,6 +23,18 @@ function norm(s: string): string {
   return s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
 }
 
+// Stronger normaliser used only for de-duplicating teams that ESPN and
+// football-data.org list under slightly different names. Strips club
+// suffixes (FC, AFC, CF, SC, FK, BK, AC, etc.) and leading articles so
+// "Arsenal", "Arsenal FC" and "AFC Arsenal" all collapse to one entry.
+function normTeamName(s: string): string {
+  return norm(s)
+    .replace(/\b(fc|afc|cf|sc|fk|bk|ac|sk|sv|tsv|vfb|vfl|sk|us|as|cd|ud)\b/g, '')
+    .replace(/\b(the|club|football|futbol|soccer)\b/g, '')
+    .replace(/[^a-z0-9]+/g, '')
+    .trim();
+}
+
 // Common abbreviations / nicknames so users can type "PSG", "MUFC", "Spurs"
 // and still get the right team. Keys must already be normalised (lowercase,
 // accents stripped). Multiple aliases for the same team are fine.
@@ -187,7 +199,11 @@ export async function GET(request: NextRequest) {
         if (isNoisyTeamName(t.name)) continue;
         const ts = scoreMatch(q, t.name);
         if (ts <= 0) continue;
-        const dedupeKey = norm(t.name);
+        // Use stripped-suffix normalisation so "Arsenal" and "Arsenal FC"
+        // (the latter coming from football-data.org with an `fd_team_*` id)
+        // collapse to a single entry — and we always prefer the ESPN id.
+        const dedupeKey = normTeamName(t.name);
+        if (!dedupeKey) continue;
         const existing = teamMap.get(dedupeKey);
         const candidate: SearchHit = {
           type: 'team',
@@ -202,8 +218,17 @@ export async function GET(request: NextRequest) {
           teamMap.set(dedupeKey, candidate);
           continue;
         }
-        // Prefer the entry whose subtitle uses a real country over generic
-        // continental/international labels.
+        // Prefer ESPN-sourced ids (numeric or `espn_…`) over football-data
+        // (`fd_team_…`) — ESPN ids power our team page, FD ids 404.
+        const existingIsFd = existing.id.startsWith('fd_team_');
+        const candidateIsFd = t.id.startsWith('fd_team_');
+        if (existingIsFd && !candidateIsFd) {
+          teamMap.set(dedupeKey, candidate);
+          continue;
+        }
+        if (!existingIsFd && candidateIsFd) continue;
+        // Same-source tie-break: prefer the entry whose subtitle uses a
+        // real country over generic continental/international labels.
         const existingCountry = (existing.subtitle.split('•')[1] || '').trim();
         const candidateCountry = (m.league.country || '').trim();
         if (!isPreferredSubtitle(existingCountry) && isPreferredSubtitle(candidateCountry)) {

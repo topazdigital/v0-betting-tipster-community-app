@@ -2,6 +2,7 @@
 
 import { use } from "react"
 import Link from "next/link"
+import Image from "next/image"
 import useSWR from "swr"
 import {
   ArrowLeft, Trophy, Calendar, TrendingUp,
@@ -514,6 +515,23 @@ export default function LeaguePage({ params }: PageProps) {
                           )}>
                             {s.position}
                           </span>
+                          {/* Headshot — falls back to initial when ESPN omits a photo. */}
+                          <div className="relative h-8 w-8 shrink-0 overflow-hidden rounded-full bg-muted">
+                            {s.player.photo ? (
+                              <Image
+                                src={s.player.photo}
+                                alt={s.player.name}
+                                fill
+                                sizes="32px"
+                                className="object-cover"
+                                unoptimized
+                              />
+                            ) : (
+                              <span className="flex h-full w-full items-center justify-center text-[10px] font-bold text-muted-foreground">
+                                {s.player.name.charAt(0)}
+                              </span>
+                            )}
+                          </div>
                           <div className="min-w-0 flex-1">
                             <p className={cn(
                               "truncate text-sm font-semibold",

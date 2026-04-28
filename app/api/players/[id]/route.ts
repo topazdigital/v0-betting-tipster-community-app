@@ -110,6 +110,82 @@ async function fetchAthleteStats(sportPath: string, id: string) {
   }
 }
 
+// Recent match log — ESPN exposes this via the /gamelog endpoint and it
+// powers the "Recent matches" section on the player profile.
+interface AthleteGameLogEvent {
+  date?: string;
+  opponent?: { displayName?: string; abbreviation?: string; logo?: string };
+  homeAwaySymbol?: string;
+  team?: { displayName?: string; logo?: string };
+  result?: string;
+  score?: string;
+  stats?: Array<{ name?: string; displayName?: string; value?: number; displayValue?: string }>;
+}
+interface AthleteGameLogResponse {
+  events?: Record<string, AthleteGameLogEvent>;
+  seasonTypes?: Array<{
+    categories?: Array<{ events?: Array<{ eventId?: string; stats?: string[] }>; type?: string }>;
+  }>;
+  labels?: string[];
+  names?: string[];
+}
+
+async function fetchAthleteGameLog(sportPath: string, id: string): Promise<AthleteGameLogResponse | null> {
+  const url = `https://site.web.api.espn.com/apis/common/v3/sports/${sportPath}/athletes/${id}/gamelog`;
+  try {
+    const r = await fetch(url, { headers: { Accept: 'application/json' }, next: { revalidate: 3600 } });
+    if (!r.ok) return null;
+    return (await r.json()) as AthleteGameLogResponse;
+  } catch {
+    return null;
+  }
+}
+
+interface NormalisedGameLogRow {
+  date?: string;
+  opponent?: { name?: string; abbr?: string; logo?: string };
+  homeAway?: 'home' | 'away';
+  result?: string;
+  score?: string;
+  stats: Record<string, string>;
+}
+
+function normaliseGameLog(raw: AthleteGameLogResponse | null): NormalisedGameLogRow[] {
+  if (!raw?.events || !raw.seasonTypes) return [];
+  // Use stat labels from the first season type — they tell us what each
+  // stat slot actually represents (Goals, Assists, Min, Cards, etc).
+  const labels = raw.labels || raw.names || [];
+  const out: NormalisedGameLogRow[] = [];
+  // Walk the most recent season first.
+  for (const seasonType of raw.seasonTypes) {
+    for (const cat of seasonType.categories || []) {
+      for (const ev of cat.events || []) {
+        const eventInfo = raw.events[ev.eventId || ''];
+        if (!eventInfo) continue;
+        const stats: Record<string, string> = {};
+        (ev.stats || []).forEach((val, idx) => {
+          const lbl = labels[idx];
+          if (lbl && val !== undefined && val !== null && val !== '0' && val !== '0.0' && val !== '') stats[lbl] = String(val);
+        });
+        out.push({
+          date: eventInfo.date,
+          opponent: eventInfo.opponent ? {
+            name: eventInfo.opponent.displayName,
+            abbr: eventInfo.opponent.abbreviation,
+            logo: eventInfo.opponent.logo,
+          } : undefined,
+          homeAway: eventInfo.homeAwaySymbol === '@' ? 'away' : 'home',
+          result: eventInfo.result,
+          score: eventInfo.score,
+          stats,
+        });
+        if (out.length >= 20) return out;
+      }
+    }
+  }
+  return out;
+}
+
 // Strip a trailing `-12345` or leading `12345-` numeric ESPN id from a slug.
 function extractNumericId(raw: string): string {
   // Pure numeric ids stay as-is.
@@ -154,7 +230,11 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     return NextResponse.json({ error: 'Player not found' }, { status: 404 });
   }
 
-  const stats = await fetchAthleteStats(found.sportPath, id).catch(() => null);
+  const [stats, gamelogRaw] = await Promise.all([
+    fetchAthleteStats(found.sportPath, id).catch(() => null),
+    fetchAthleteGameLog(found.sportPath, id).catch(() => null),
+  ]);
+  const recentMatches = normaliseGameLog(gamelogRaw);
 
   const a = found.athlete;
   const sportRoot = found.sportPath.split('/')[0];
@@ -162,6 +242,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     || `https://a.espncdn.com/i/headshots/${sportRoot}/players/full/${id}.png`;
 
   return NextResponse.json({
+    recentMatches,
     id: String(a.id ?? id),
     name: a.displayName || a.fullName || `${a.firstName ?? ''} ${a.lastName ?? ''}`.trim(),
     firstName: a.firstName,

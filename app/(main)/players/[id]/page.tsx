@@ -2,9 +2,10 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import Image from 'next/image';
-import { ChevronLeft, MapPin, Calendar, Ruler, Weight, Star, GitCompareArrows } from 'lucide-react';
+import { ChevronLeft, MapPin, Calendar, Ruler, Weight, Star, GitCompareArrows, Trophy } from 'lucide-react';
 import { getSiteSettings } from '@/lib/site-settings';
 import { extractNumericPlayerId } from '@/lib/utils/slug';
+import { teamHref } from '@/lib/utils/slug';
 
 interface PlayerProfile {
   id: string;
@@ -26,6 +27,16 @@ interface PlayerProfile {
   headshot?: string;
   sportPath?: string;
   stats?: unknown;
+  recentMatches?: GameLogRow[];
+}
+
+interface GameLogRow {
+  date?: string;
+  opponent?: { name?: string; abbr?: string; logo?: string };
+  homeAway?: 'home' | 'away';
+  result?: string;
+  score?: string;
+  stats: Record<string, string>;
 }
 
 async function getPlayer(id: string): Promise<PlayerProfile | null> {
@@ -78,15 +89,40 @@ function extractStatCategories(stats: unknown): StatCategory[] {
   return s.splits?.categories || s.categories || [];
 }
 
+// Pull a couple of headline stats out of the categories so the header card
+// can show "12 goals · 5 assists" at a glance instead of forcing the user
+// to scroll. We look across every category so this works for any sport
+// (goals/assists for soccer, points/rebounds for basketball, etc).
+function pickHeadlineStats(categories: StatCategory[]): Array<{ label: string; value: string }> {
+  const seen = new Set<string>();
+  const headline: Array<{ label: string; value: string }> = [];
+  const wanted = ['goals', 'assists', 'appearances', 'points', 'rebounds', 'wins', 'minutes'];
+  for (const cat of categories) {
+    for (const s of cat.stats || []) {
+      const name = (s.name || s.displayName || '').toLowerCase();
+      if (!name || seen.has(name)) continue;
+      if (!wanted.some(w => name.includes(w))) continue;
+      const value = s.displayValue ?? (s.value !== undefined ? String(s.value) : '');
+      if (!value || value === '0' || value === '0.0') continue;
+      headline.push({ label: s.displayName || s.name || name, value });
+      seen.add(name);
+      if (headline.length >= 4) return headline;
+    }
+  }
+  return headline;
+}
+
 export default async function PlayerProfilePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const player = await getPlayer(id);
   if (!player) notFound();
 
-  const categories = extractStatCategories(player.stats).slice(0, 4);
+  const categories = extractStatCategories(player.stats);
+  const headlineStats = pickHeadlineStats(categories);
+  const recent = player.recentMatches || [];
 
   return (
-    <div className="mx-auto max-w-4xl px-4 py-6">
+    <div className="mx-auto max-w-5xl px-4 py-6">
       <div className="mb-4 flex items-center justify-between gap-3">
         <Link
           href="/matches"
@@ -146,20 +182,52 @@ export default async function PlayerProfilePage({ params }: { params: Promise<{ 
               {player.name}
             </h1>
             {player.team?.name && (
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                {player.team.logo && (
-                  <Image
-                    src={player.team.logo}
-                    alt={player.team.name}
-                    width={20}
-                    height={20}
-                    className="h-5 w-5 object-contain"
-                    unoptimized
-                  />
-                )}
-                <span>{player.team.name}</span>
+              player.team.id ? (
+                <Link
+                  href={teamHref(player.team.name, player.team.id)}
+                  className="group inline-flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-primary"
+                >
+                  {player.team.logo && (
+                    <Image
+                      src={player.team.logo}
+                      alt={player.team.name}
+                      width={20}
+                      height={20}
+                      className="h-5 w-5 object-contain"
+                      unoptimized
+                    />
+                  )}
+                  <span className="group-hover:underline">{player.team.name}</span>
+                </Link>
+              ) : (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  {player.team.logo && (
+                    <Image
+                      src={player.team.logo}
+                      alt={player.team.name}
+                      width={20}
+                      height={20}
+                      className="h-5 w-5 object-contain"
+                      unoptimized
+                    />
+                  )}
+                  <span>{player.team.name}</span>
+                </div>
+              )
+            )}
+
+            {/* Headline stats — surface 2-4 key numbers up top */}
+            {headlineStats.length > 0 && (
+              <div className="flex flex-wrap gap-2 pt-2">
+                {headlineStats.map((s, i) => (
+                  <div key={i} className="rounded-lg border border-primary/30 bg-primary/5 px-3 py-1.5">
+                    <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{s.label}</div>
+                    <div className="text-lg font-bold text-primary">{s.value}</div>
+                  </div>
+                ))}
               </div>
             )}
+
             <div className="grid grid-cols-2 gap-3 pt-3 text-xs sm:grid-cols-4">
               {player.age && (
                 <div className="rounded-lg border border-border bg-card p-2.5">
@@ -190,7 +258,19 @@ export default async function PlayerProfilePage({ params }: { params: Promise<{ 
                   <div className="flex items-center gap-1 text-muted-foreground">
                     <MapPin className="h-3 w-3" /> Nationality
                   </div>
-                  <div className="mt-0.5 font-semibold text-foreground">{player.nationality}</div>
+                  <div className="mt-0.5 flex items-center gap-1.5 font-semibold text-foreground">
+                    {player.flag && (
+                      <Image
+                        src={player.flag}
+                        alt={player.nationality}
+                        width={18}
+                        height={12}
+                        className="rounded-sm object-cover"
+                        unoptimized
+                      />
+                    )}
+                    {player.nationality}
+                  </div>
                 </div>
               )}
               {player.experienceYears !== undefined && (
@@ -212,28 +292,92 @@ export default async function PlayerProfilePage({ params }: { params: Promise<{ 
         </div>
       </div>
 
-      {/* Stats */}
+      {/* Stats — show every category ESPN gives us, not just the top 4. */}
       {categories.length > 0 && (
         <section className="mt-6 grid gap-4 md:grid-cols-2">
-          {categories.map((cat, i) => (
-            <div key={i} className="rounded-2xl border border-border bg-card p-4">
-              <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-muted-foreground">
-                {cat.displayName || cat.name || 'Stats'}
-              </h2>
-              <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-                {(cat.stats || []).slice(0, 10).map((s, j) => (
-                  <div key={j} className="flex justify-between gap-2 border-b border-border/50 pb-1">
-                    <dt className="truncate text-muted-foreground">{s.displayName || s.name}</dt>
-                    <dd className="font-semibold text-foreground">{s.displayValue ?? s.value ?? '—'}</dd>
-                  </div>
-                ))}
-              </dl>
-            </div>
-          ))}
+          {categories.map((cat, i) => {
+            const rows = (cat.stats || []).filter(s =>
+              (s.displayValue ?? s.value ?? '') !== '' &&
+              (s.displayValue ?? s.value ?? '') !== '0' &&
+              (s.displayValue ?? s.value ?? '') !== '0.0' &&
+              (s.displayValue ?? s.value ?? '') !== '-'
+            );
+            if (rows.length === 0) return null;
+            return (
+              <div key={i} className="rounded-2xl border border-border bg-card p-4">
+                <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-muted-foreground">
+                  {cat.displayName || cat.name || 'Stats'}
+                </h2>
+                <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                  {rows.map((s, j) => (
+                    <div key={j} className="flex justify-between gap-2 border-b border-border/50 pb-1">
+                      <dt className="truncate text-muted-foreground">{s.displayName || s.name}</dt>
+                      <dd className="font-semibold text-foreground">{s.displayValue ?? s.value ?? '—'}</dd>
+                    </div>
+                  ))}
+                </dl>
+              </div>
+            );
+          })}
         </section>
       )}
 
-      {categories.length === 0 && (
+      {/* Recent matches — gamelog, latest at top */}
+      {recent.length > 0 && (
+        <section className="mt-6 rounded-2xl border border-border bg-card p-4">
+          <h2 className="mb-3 flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-muted-foreground">
+            <Trophy className="h-3.5 w-3.5" /> Recent matches
+          </h2>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[480px] text-xs">
+              <thead className="text-left text-[10px] uppercase tracking-wider text-muted-foreground">
+                <tr className="border-b border-border/50">
+                  <th className="py-1.5 pr-3">Date</th>
+                  <th className="py-1.5 pr-3">Opponent</th>
+                  <th className="py-1.5 pr-3">Result</th>
+                  <th className="py-1.5">Stats</th>
+                </tr>
+              </thead>
+              <tbody>
+                {recent.map((m, i) => {
+                  const statSummary = Object.entries(m.stats)
+                    .filter(([, v]) => v && v !== '0' && v !== '0.0')
+                    .slice(0, 4)
+                    .map(([k, v]) => `${v} ${k}`)
+                    .join(' · ');
+                  const won = m.result?.toLowerCase().includes('w');
+                  const lost = m.result?.toLowerCase().includes('l');
+                  return (
+                    <tr key={i} className="border-b border-border/30 last:border-0">
+                      <td className="py-2 pr-3 text-muted-foreground">
+                        {m.date ? new Date(m.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : '—'}
+                      </td>
+                      <td className="py-2 pr-3">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[10px] text-muted-foreground">{m.homeAway === 'away' ? '@' : 'vs'}</span>
+                          {m.opponent?.logo && (
+                            <Image src={m.opponent.logo} alt="" width={14} height={14} className="object-contain" unoptimized />
+                          )}
+                          <span className="font-medium">{m.opponent?.abbr || m.opponent?.name || '—'}</span>
+                        </div>
+                      </td>
+                      <td className="py-2 pr-3">
+                        <span className={`inline-flex items-center gap-1 font-semibold ${won ? 'text-emerald-600' : lost ? 'text-red-600' : 'text-muted-foreground'}`}>
+                          {m.result || '—'}
+                          {m.score && <span className="text-[10px] text-muted-foreground">{m.score}</span>}
+                        </span>
+                      </td>
+                      <td className="py-2 text-muted-foreground">{statSummary || '—'}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
+
+      {categories.length === 0 && recent.length === 0 && (
         <div className="mt-6 rounded-2xl border border-dashed border-border bg-card p-8 text-center text-sm text-muted-foreground">
           Detailed stats for this player aren&apos;t available right now. Check back closer to their next fixture.
         </div>
