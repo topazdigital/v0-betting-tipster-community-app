@@ -20,13 +20,28 @@ export default function LoginRedirect() {
       router.replace('/');
       return;
     }
-    const ref = document.referrer;
+    // Prefer an explicit ?next= query parameter (set by callers like the
+    // follow-team button). If not provided, try the Referer header so users
+    // land back on whichever page they came from instead of the homepage —
+    // and never bounce them onto /players/compare or any other unrelated
+    // page just because that happened to be the previous referer.
     let target = '/';
     try {
-      if (ref) {
-        const r = new URL(ref);
-        if (r.origin === window.location.origin && r.pathname !== '/login') {
-          target = r.pathname + r.search + r.hash;
+      const url = new URL(window.location.href);
+      const next = url.searchParams.get('next');
+      if (next && next.startsWith('/') && !next.startsWith('//')) {
+        target = next;
+      } else {
+        const ref = document.referrer;
+        if (ref) {
+          const r = new URL(ref);
+          if (
+            r.origin === window.location.origin
+            && r.pathname !== '/login'
+            && r.pathname !== '/register'
+          ) {
+            target = r.pathname + r.search + r.hash;
+          }
         }
       }
     } catch { /* fall through to '/' */ }

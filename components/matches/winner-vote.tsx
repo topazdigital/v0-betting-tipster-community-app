@@ -29,6 +29,13 @@ interface WinnerVoteProps {
   awayLogo?: string;
   /** Hide the draw option for sports where ties don't apply (e.g. basketball, tennis). */
   allowDraw?: boolean;
+  /**
+   * Status of the match — when it's anything other than `scheduled` we lock
+   * the poll and show the final crowd sentiment without accepting new votes.
+   */
+  matchStatus?: string;
+  /** Kickoff time; if it's already in the past we also lock the poll. */
+  kickoffTime?: string | Date;
 }
 
 const fetcher = (url: string) => fetch(url, { credentials: "include" }).then((r) => r.json());
@@ -45,7 +52,18 @@ export function WinnerVote({
   homeLogo,
   awayLogo,
   allowDraw = true,
+  matchStatus,
+  kickoffTime,
 }: WinnerVoteProps) {
+  // Lock voting once the match has kicked off. We mirror the same rule the
+  // server uses (status check + kickoff timestamp) so users get instant UI
+  // feedback instead of waiting for a 409 round-trip.
+  const lockedStatuses = new Set(['live', 'halftime', 'extra_time', 'penalties', 'finished']);
+  const kickoffMs = kickoffTime
+    ? (kickoffTime instanceof Date ? kickoffTime.getTime() : new Date(kickoffTime).getTime())
+    : NaN;
+  const locked = (matchStatus ? lockedStatuses.has(matchStatus) : false)
+    || (Number.isFinite(kickoffMs) && kickoffMs <= Date.now());
   const url = `/api/matches/${encodeURIComponent(matchId)}/vote`;
   const { data, mutate, isLoading } = useSWR<VoteResponse>(url, fetcher, {
     revalidateOnFocus: false,
@@ -69,7 +87,7 @@ export function WinnerVote({
   const awayPct = pct(totals.away, totals.total);
 
   async function cast(pick: Pick) {
-    if (hasVoted || submitting) return;
+    if (hasVoted || submitting || locked) return;
     setSubmitting(pick);
     // Optimistic update
     const next: VoteResponse = {
@@ -92,6 +110,8 @@ export function WinnerVote({
       const json = (await res.json()) as VoteResponse & { ok?: boolean; reason?: string };
       if (!res.ok && json.reason === "already_voted") {
         setFlash("You've already voted on this match.");
+      } else if (!res.ok && json.reason === "voting_closed") {
+        setFlash("Voting has closed — the match has already kicked off.");
       }
       // Replace optimistic with server truth.
       await mutate(json, { revalidate: false });
@@ -134,7 +154,10 @@ export function WinnerVote({
       <div className={cn("grid gap-2", allowDraw ? "sm:grid-cols-3" : "sm:grid-cols-2")}>
         {buttons.map(({ pick, label, logo, pctVal, count }) => {
           const isMine = myVote === pick;
-          const disabled = hasVoted || submitting !== null;
+          const disabled = hasVoted || submitting !== null || locked;
+          // Once locked, reveal the crowd's prediction so guests/visitors
+          // can see what the consensus was even if they never voted.
+          const revealResults = hasVoted || locked;
           return (
             <button
               key={pick}
@@ -149,8 +172,9 @@ export function WinnerVote({
                 disabled && !isMine && "opacity-80",
               )}
             >
-              {/* Fill bar */}
-              {hasVoted && (
+              {/* Fill bar — shown after the user votes OR once voting locks
+                  so we still display the final crowd sentiment publicly. */}
+              {revealResults && (
                 <div
                   className={cn(
                     "absolute inset-y-0 left-0 -z-0",
@@ -173,7 +197,7 @@ export function WinnerVote({
                   <span className="truncate text-sm font-medium text-foreground">{label}</span>
                   {isMine && <CheckCircle2 className="h-4 w-4 shrink-0 text-primary" />}
                 </div>
-                {hasVoted ? (
+                {revealResults ? (
                   <span className="shrink-0 text-sm font-bold tabular-nums text-foreground">
                     {pctVal}%
                   </span>
@@ -183,7 +207,7 @@ export function WinnerVote({
                   </span>
                 )}
               </div>
-              {hasVoted && (
+              {revealResults && (
                 <div className="relative z-10 mt-1 text-xs text-muted-foreground">
                   {count.toLocaleString()} {count === 1 ? "vote" : "votes"}
                 </div>
@@ -196,9 +220,11 @@ export function WinnerVote({
       <p className="mt-3 text-xs text-muted-foreground">
         {isLoading
           ? "Loading votes…"
-          : hasVoted
-            ? "Thanks for voting! Results update live as more fans cast their pick."
-            : "Cast your prediction — one vote per device, no login needed."}
+          : locked
+            ? "Voting has closed — the match has already started. Final crowd prediction shown above."
+            : hasVoted
+              ? "Thanks for voting! Results update live as more fans cast their pick."
+              : "Cast your prediction — one vote per device, no login needed."}
       </p>
       {flash && (
         <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">{flash}</p>

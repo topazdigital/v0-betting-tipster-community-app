@@ -334,16 +334,27 @@ function PlayerSlot({
   );
 }
 
+interface PlayerSearchHit {
+  id: string;
+  name: string;
+  position?: string;
+  team?: string;
+  teamLogo?: string;
+  headshot?: string;
+  href: string;
+}
+
 function PlayerPicker({ slot, onPick }: { slot: 'A' | 'B'; onPick: (id: string) => void }) {
   const [q, setQ] = useState('');
-  const { data } = useSWR<{ hits: SearchHit[] }>(
-    q.trim().length >= 2 ? `/api/search?q=${encodeURIComponent(q.trim())}&limit=8` : null,
+  // Hit our dedicated player-search endpoint so the picker only ever returns
+  // athletes — never teams or leagues. Previously the unified /api/search
+  // route surfaced team hits, which made it impossible to actually pick a
+  // player from the dropdown.
+  const { data, isLoading } = useSWR<{ hits: PlayerSearchHit[] }>(
+    q.trim().length >= 2 ? `/api/players/search?q=${encodeURIComponent(q.trim())}&limit=10` : null,
     fetcher,
     { revalidateOnFocus: false, dedupingInterval: 300 },
   );
-  // The unified search returns players via athletes scattered through teams,
-  // but for now we surface team hits and let users navigate to a team page.
-  // Fall back: also let users paste a numeric ESPN athlete id.
   const numericId = /^\d+$/.test(q.trim()) ? q.trim() : null;
 
   return (
@@ -355,7 +366,7 @@ function PlayerPicker({ slot, onPick }: { slot: 'A' | 'B'; onPick: (id: string) 
           autoFocus
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          placeholder="Search by player name or paste an ID…"
+          placeholder="Search by player name (e.g. Mbappé, Haaland)…"
           className="w-full bg-transparent text-sm outline-none"
         />
       </div>
@@ -371,34 +382,44 @@ function PlayerPicker({ slot, onPick }: { slot: 'A' | 'B'; onPick: (id: string) 
 
       {(data?.hits?.length ?? 0) > 0 && (
         <ul className="mt-3 max-h-72 space-y-1 overflow-y-auto">
-          {data!.hits.map((h) => {
-            const teamMatch = /\/teams\/([^/]+)/.exec(h.href);
-            const playerHint = teamMatch && /^\d+$/.test(teamMatch[1]);
-            return (
-              <li key={h.type + h.id}>
-                <Link
-                  href={h.href}
-                  className="flex items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-muted"
-                >
-                  {h.logoUrl && (
-                    <Image src={h.logoUrl} alt="" width={20} height={20} className="h-5 w-5 rounded object-contain" unoptimized />
-                  )}
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate text-sm font-medium">{h.title}</div>
-                    <div className="truncate text-[11px] text-muted-foreground">{h.subtitle}</div>
+          {data!.hits.map((h) => (
+            <li key={h.id}>
+              <button
+                onClick={() => onPick(h.id)}
+                className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left hover:bg-muted"
+              >
+                {h.headshot ? (
+                  <Image
+                    src={h.headshot}
+                    alt={h.name}
+                    width={32}
+                    height={32}
+                    className="h-8 w-8 rounded-full object-cover bg-muted"
+                    unoptimized
+                  />
+                ) : (
+                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted text-xs font-bold text-muted-foreground">
+                    {h.name.charAt(0)}
                   </div>
-                  <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] uppercase text-muted-foreground">{h.type}</span>
-                </Link>
-                {playerHint && null}
-              </li>
-            );
-          })}
+                )}
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-sm font-medium">{h.name}</div>
+                  <div className="truncate text-[11px] text-muted-foreground">
+                    {[h.position, h.team].filter(Boolean).join(' · ') || 'Player'}
+                  </div>
+                </div>
+                {h.teamLogo && (
+                  <Image src={h.teamLogo} alt="" width={20} height={20} className="h-5 w-5 object-contain" unoptimized />
+                )}
+              </button>
+            </li>
+          ))}
         </ul>
       )}
 
-      {q.trim().length >= 2 && (data?.hits?.length ?? 0) === 0 && (
+      {q.trim().length >= 2 && !isLoading && (data?.hits?.length ?? 0) === 0 && !numericId && (
         <p className="mt-3 text-xs text-muted-foreground">
-          No matches. Tip: open a team or match page, click a player, then copy their ID from the URL.
+          No players match “{q.trim()}”. Try a full name (e.g. “Kylian Mbappé”).
         </p>
       )}
 

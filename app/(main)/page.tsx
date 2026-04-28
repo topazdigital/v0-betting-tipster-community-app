@@ -276,7 +276,7 @@ export default function HomePage() {
                             >
                               <div className="min-w-0">
                                 <p className="truncate text-sm font-medium text-foreground group-hover:text-primary">
-                                  {m.homeTeam.shortName || m.homeTeam.name} vs {m.awayTeam.shortName || m.awayTeam.name}
+                                  {m.homeTeam.name} vs {m.awayTeam.name}
                                 </p>
                                 <p className="truncate text-[11px] text-muted-foreground">
                                   {m.league?.name || m.sport?.name}

@@ -41,12 +41,23 @@ export function formatTime(date: Date | string, timezone: string): string {
 }
 
 /**
- * Format date only (e.g., "Apr 18")
+ * Format date only (e.g., "Apr 18", or "Apr 18, 2024" if not the current year).
+ *
+ * Pass `{ year: true }` to always include the year (e.g. for H2H rows where
+ * games can be years apart and the year is essential context). Pass
+ * `{ year: false }` to never include the year.
  */
-export function formatDate(date: Date | string, timezone: string): string {
+export function formatDate(
+  date: Date | string,
+  timezone: string,
+  options: { year?: boolean } = {},
+): string {
+  const dateObj = typeof date === 'string' ? new Date(date) : date;
+  const showYear = options.year ?? (dateObj.getFullYear() !== new Date().getFullYear());
   return formatInTimezone(date, timezone, {
     month: 'short',
     day: 'numeric',
+    ...(showYear ? { year: 'numeric' as const } : {}),
   });
 }
 

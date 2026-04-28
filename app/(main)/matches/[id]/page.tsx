@@ -138,7 +138,7 @@ interface MatchDetails {
     awayScore: number | null
     minute?: number
     period?: number
-    league: { name: string; country: string; countryCode: string }
+    league: { name: string; country: string; countryCode: string; slug?: string }
     sport: { name: string; slug: string; icon: string }
     odds?: { home: number; draw?: number; away: number; bookmaker?: string }
     oddsIsComputed?: boolean
@@ -907,7 +907,17 @@ export default function MatchDetailPage({ params }: PageProps) {
             <div className="flex items-center gap-2 min-w-0">
               <span className="text-lg shrink-0" aria-hidden>{SPORT_EMOJI[sport] || '🏆'}</span>
               <FlagIcon countryCode={match.league.countryCode} size="sm" className="shrink-0" title={match.league.country} />
-              <span className="text-sm font-semibold text-white/90 truncate">{match.league.name}</span>
+              {match.league.slug ? (
+                <Link
+                  href={`/leagues/${match.league.slug}`}
+                  className="text-sm font-semibold text-white/90 truncate hover:text-white hover:underline"
+                  onClick={e => e.stopPropagation()}
+                >
+                  {match.league.name}
+                </Link>
+              ) : (
+                <span className="text-sm font-semibold text-white/90 truncate">{match.league.name}</span>
+              )}
               <span className="text-xs text-white/40 shrink-0 hidden sm:inline">• {match.league.country}</span>
             </div>
             <div className="flex items-center gap-1.5">
@@ -1147,6 +1157,8 @@ export default function MatchDetailPage({ params }: PageProps) {
               homeLogo={match.homeTeam.logo}
               awayLogo={match.awayTeam.logo}
               allowDraw={!NO_DRAW_SPORTS.has(sport)}
+              matchStatus={match.status}
+              kickoffTime={match.kickoffTime}
             />
 
             {/* AI Auto-Prediction */}
@@ -2264,7 +2276,7 @@ function H2HRow({ game, timezone, homeName }: { game: H2HGame; timezone: string;
             <span className={cn(awayWon && "text-emerald-600")}>{game.away.score ?? '?'}</span>
           </div>
           <div className="text-[10px] text-muted-foreground flex items-center gap-1">
-            {game.date ? formatDate(game.date, timezone) : ''}
+            {game.date ? formatDate(game.date, timezone, { year: true }) : ''}
             {game.league ? ` • ${game.league}` : ''}
             <ChevronDown className={cn("h-3 w-3 transition-transform", expanded && "rotate-180")} />
           </div>
@@ -2296,7 +2308,7 @@ function H2HRow({ game, timezone, homeName }: { game: H2HGame; timezone: string;
             {game.date && (
               <div className="col-span-2">
                 <span className="text-muted-foreground/70">Played:</span>{' '}
-                <span className="font-medium text-foreground">{formatDate(game.date, timezone)}</span>
+                <span className="font-medium text-foreground">{formatDate(game.date, timezone, { year: true })}</span>
               </div>
             )}
           </div>

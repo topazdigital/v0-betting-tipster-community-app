@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import crypto from 'crypto';
 import { getUserVote, getVoteTotals, castVote, type VotePick } from '@/lib/votes-store';
+import { getMatchById } from '@/lib/api/unified-sports-api';
 
 export const dynamic = 'force-dynamic';
 
@@ -58,6 +59,31 @@ export async function POST(
   if (pick !== 'home' && pick !== 'draw' && pick !== 'away') {
     return NextResponse.json({ error: 'invalid_pick' }, { status: 400 });
   }
+
+  // Lock voting once the match has kicked off (live, halftime, or finished).
+  // Predictions don't make sense after the ball is already rolling — and
+  // letting them through would skew the pre-match crowd sentiment.
+  try {
+    const match = await getMatchById(matchId);
+    if (match) {
+      const lockedStatuses = new Set(['live', 'halftime', 'extra_time', 'penalties', 'finished']);
+      const kickoffMs = match.kickoffTime instanceof Date
+        ? match.kickoffTime.getTime()
+        : new Date(match.kickoffTime).getTime();
+      const isPastKickoff = Number.isFinite(kickoffMs) && kickoffMs <= Date.now();
+      if (lockedStatuses.has(match.status) || isPastKickoff) {
+        const totals = await getVoteTotals(matchId);
+        const myVote = await getUserVote(matchId, (await resolveVoterId()).id);
+        return NextResponse.json(
+          { matchId, ok: false, reason: 'voting_closed', totals, myVote },
+          { status: 409 },
+        );
+      }
+    }
+  } catch (e) {
+    console.warn('[vote] match status lookup failed, allowing vote:', e);
+  }
+
   const { id: voterId } = await resolveVoterId();
   const result = await castVote(matchId, voterId, pick);
   const status = result.ok ? 200 : 409;

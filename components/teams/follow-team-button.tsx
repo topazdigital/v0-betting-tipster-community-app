@@ -2,9 +2,9 @@
 
 import { useEffect, useState } from 'react';
 import { Star, Loader2, Check } from 'lucide-react';
-import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/auth-context';
+import { useAuthModal } from '@/contexts/auth-modal-context';
 import { ensurePushSubscribed, isPushSupported } from '@/lib/push-client';
 
 interface FollowTeamButtonProps {
@@ -39,7 +39,7 @@ export function FollowTeamButton({
   className,
   onChange,
 }: FollowTeamButtonProps) {
-  const router = useRouter();
+  const { open: openAuthModal } = useAuthModal();
   const { isAuthenticated } = useAuth();
   const [following, setFollowing] = useState<boolean | null>(null);
   const [busy, setBusy] = useState(false);
@@ -61,7 +61,11 @@ export function FollowTeamButton({
   async function toggle() {
     if (busy) return;
     if (!isAuthenticated) {
-      router.push(`/login?next=${encodeURIComponent(window.location.pathname)}`);
+      // Open the auth modal in place so the user stays on the same page
+      // (team / match / leaderboard / etc). Previously we used router.push to
+      // a /login route which dropped them on Compare Players via referrer
+      // resolution.
+      openAuthModal('login');
       return;
     }
     setBusy(true);

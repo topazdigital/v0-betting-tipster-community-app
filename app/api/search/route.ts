@@ -23,15 +23,99 @@ function norm(s: string): string {
   return s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
 }
 
+// Common abbreviations / nicknames so users can type "PSG", "MUFC", "Spurs"
+// and still get the right team. Keys must already be normalised (lowercase,
+// accents stripped). Multiple aliases for the same team are fine.
+const TEAM_ALIASES: Record<string, string[]> = {
+  'paris saint-germain': ['psg'],
+  'paris saint germain': ['psg'],
+  'manchester united': ['mufc', 'man u', 'man utd', 'united'],
+  'manchester city': ['mcfc', 'man city', 'city'],
+  'tottenham hotspur': ['spurs', 'thfc'],
+  'tottenham': ['spurs', 'thfc'],
+  'arsenal': ['afc', 'gunners'],
+  'chelsea': ['cfc', 'blues'],
+  'liverpool': ['lfc', 'reds'],
+  'newcastle united': ['nufc', 'magpies'],
+  'real madrid': ['rma', 'madrid'],
+  'atletico madrid': ['atleti', 'atm'],
+  'fc barcelona': ['barca', 'fcb'],
+  'barcelona': ['barca', 'fcb'],
+  'bayern munich': ['bayern', 'fcb', 'bmu'],
+  'borussia dortmund': ['bvb', 'dortmund'],
+  'juventus': ['juve'],
+  'internazionale': ['inter'],
+  'inter milan': ['inter'],
+  'ac milan': ['milan'],
+  'olympique de marseille': ['om', 'marseille'],
+  'olympique lyonnais': ['ol', 'lyon'],
+  'ajax amsterdam': ['ajax'],
+  'paris fc': ['pfc'],
+};
+
+// Build an `alias → canonical-name` reverse lookup once at module load.
+const ALIAS_LOOKUP: Map<string, Set<string>> = (() => {
+  const m = new Map<string, Set<string>>();
+  for (const [canonical, aliases] of Object.entries(TEAM_ALIASES)) {
+    for (const a of aliases) {
+      const key = norm(a);
+      if (!m.has(key)) m.set(key, new Set());
+      m.get(key)!.add(norm(canonical));
+    }
+  }
+  return m;
+})();
+
+// Squads we never want clogging the team typeahead — women's, youth and
+// reserve sides. The user's main interest is the senior men's team and the
+// duplicate clutter (Marseille, Marseille W, Marseille U23, Marseille U19,
+// Marseille B…) was making the picker unusable.
+const TEAM_NOISE_PATTERNS = [
+  /\bwomen('s)?\b/i,
+  /\bw(?:omen)?fc\b/i,
+  /\bféminin(es)?\b/i,
+  /\bfemenin[ao]s?\b/i,
+  /\bfeminin[ao]s?\b/i,
+  /\bdamen\b/i,
+  /\bladies\b/i,
+  /\(w\)\s*$/i,
+  /\bu-?(15|16|17|18|19|20|21|23)\b/i,
+  /\b(reserves?|reserve|ii|iii|b)\s*$/i,
+  /\byouth\b/i,
+];
+
+function isNoisyTeamName(name: string): boolean {
+  return TEAM_NOISE_PATTERNS.some(rx => rx.test(name));
+}
+
 // Tiny scorer so "man u" beats "Manchester City" for matches starting with the query.
+// Also checks aliases — typing "PSG" should score Paris Saint-Germain as if
+// the user typed the canonical name directly.
 function scoreMatch(q: string, candidate: string): number {
   const c = norm(candidate);
-  if (!c.includes(q)) return -1;
-  if (c === q) return 100;
-  if (c.startsWith(q)) return 80;
-  // Word-prefix match — "man" matches "Manchester"
-  if (c.split(/\s+/).some(w => w.startsWith(q))) return 60;
-  return 30;
+  // Direct text matches first.
+  let best = -1;
+  if (c === q) best = 100;
+  else if (c.startsWith(q)) best = 80;
+  else if (c.split(/\s+/).some(w => w.startsWith(q))) best = 60;
+  else if (c.includes(q)) best = 30;
+
+  // Alias matches — if any of the candidate's aliases equals or starts with
+  // the query, treat that as a strong hit too.
+  const canonicals = ALIAS_LOOKUP.get(q);
+  if (canonicals && canonicals.has(c)) best = Math.max(best, 95);
+
+  // Reverse: if the candidate has aliases that include the query, score it.
+  const candAliases = TEAM_ALIASES[c];
+  if (candAliases) {
+    for (const a of candAliases) {
+      const an = norm(a);
+      if (an === q) { best = Math.max(best, 95); break; }
+      if (an.startsWith(q)) { best = Math.max(best, 70); }
+    }
+  }
+
+  return best;
 }
 
 interface DbTipsterRow {
@@ -85,7 +169,10 @@ export async function GET(request: NextRequest) {
       const matchScore = Math.max(homeS, awayS);
 
       // Team hits — dedupe by team id, keep best scoring instance, surface both teams.
+      // Skip noisy variants (women's, U-teams, reserves) so the senior side
+      // surfaces cleanly when a user searches "Marseille" / "Liverpool" etc.
       for (const t of [m.homeTeam, m.awayTeam]) {
+        if (isNoisyTeamName(t.name)) continue;
         const ts = scoreMatch(q, t.name);
         if (ts <= 0) continue;
         if (!teamMap.has(t.id)) {

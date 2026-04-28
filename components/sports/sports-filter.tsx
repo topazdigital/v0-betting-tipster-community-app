@@ -1,6 +1,5 @@
 'use client';
 
-import { useState } from 'react';
 import { cn } from '@/lib/utils';
 import { ALL_SPORTS, getSportIcon } from '@/lib/sports-data';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
@@ -28,17 +27,20 @@ export function SportsFilter({
   matchCounts = {},
   variant = 'horizontal'
 }: SportsFilterProps) {
-  const [showAll, setShowAll] = useState(false);
-  
-  // Popular sports to show first
+  // Show every sport in the horizontal pill row, ordered popular-first.
+  // The strip is fully horizontally scrollable, so users can swipe / scroll
+  // to discover Esports, Chess, Cycling, etc. without any "show more" toggle.
   const popularSports = ALL_SPORTS.filter(s => s.category === 'popular');
   const otherSports = ALL_SPORTS.filter(s => s.category !== 'popular');
-  
-  const displayedSports = showAll ? ALL_SPORTS : popularSports;
-  
+  const displayedSports = [...popularSports, ...otherSports];
+
   const selectedSport = selectedSportId 
     ? ALL_SPORTS.find(s => s.id === selectedSportId) 
     : null;
+
+  // The dropdown variant still benefits from a separate "Popular" group, so
+  // it keeps its own popularSports/otherSports references below.
+  void otherSports;
 
   if (variant === 'dropdown') {
     return (
@@ -144,26 +146,8 @@ export function SportsFilter({
               )}
             </button>
           ))}
-
-          {/* Show More/Less */}
-          {!showAll && otherSports.length > 0 && (
-            <button
-              onClick={() => setShowAll(true)}
-              className="flex shrink-0 items-center gap-1 rounded-full border border-dashed border-border px-4 py-2 text-sm font-medium text-muted-foreground transition-all hover:border-primary/50 hover:text-foreground"
-            >
-              <span>+{otherSports.length} more</span>
-            </button>
-          )}
-          {showAll && (
-            <button
-              onClick={() => setShowAll(false)}
-              className="flex shrink-0 items-center gap-1 rounded-full border border-dashed border-border px-4 py-2 text-sm font-medium text-muted-foreground transition-all hover:border-primary/50 hover:text-foreground"
-            >
-              <span>Show less</span>
-            </button>
-          )}
         </div>
-        <ScrollBar orientation="horizontal" className="invisible" />
+        <ScrollBar orientation="horizontal" />
       </ScrollArea>
     </div>
   );

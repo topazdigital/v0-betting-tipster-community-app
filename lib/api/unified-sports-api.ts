@@ -2732,14 +2732,31 @@ export async function getMatchById(matchId: string): Promise<UnifiedMatch | null
     // so we leave it as "now" if absent (the detail page formats it gracefully).
     const kickoff = (summary as unknown as { header?: { competitions?: Array<{ date?: string }> } })?.header?.competitions?.[0]?.date;
 
-    // Best-effort status — if both competitors have a "winner" flag set,
-    // the game is finished; otherwise we treat it as scheduled.
-    const isFinished = competition.competitors?.some(c => typeof c.winner === 'boolean');
-    const status: UnifiedMatch['status'] = isFinished ? 'finished' : 'scheduled';
+    // Best-effort status — derive from ESPN's status block on the competition.
+    // We previously used `competitors.some(c => typeof c.winner === 'boolean')`
+    // which matched scheduled games too (`winner: false` is a boolean), so
+    // upcoming fixtures were being shown as FT 0:0. Use the canonical
+    // `status.type.{state,completed}` instead, which is set even for the
+    // direct-summary path.
+    const compStatus = (competition as { status?: { type?: { state?: string; completed?: boolean; name?: string } } }).status
+      || (summary?.header as { competitions?: Array<{ status?: { type?: { state?: string; completed?: boolean; name?: string } } }> })?.competitions?.[0]?.status;
+    const stateRaw = (compStatus?.type?.state || '').toLowerCase();
+    const nameRaw = (compStatus?.type?.name || '').toLowerCase();
+    let status: UnifiedMatch['status'];
+    if (compStatus?.type?.completed || stateRaw === 'post' || nameRaw.includes('final')) {
+      status = 'finished';
+    } else if (stateRaw === 'in' || nameRaw.includes('in_progress') || nameRaw.includes('halftime')) {
+      status = nameRaw.includes('halftime') ? 'halftime' : 'live';
+    } else {
+      status = 'scheduled';
+    }
 
-    const homeScoreNum = homeComp.score !== undefined && homeComp.score !== null && homeComp.score !== ''
+    // Don't trust score values for unstarted games — ESPN sometimes returns "0"
+    // even before kickoff which makes the UI show 0:0.
+    const isStartedOrFinished = status === 'live' || status === 'halftime' || status === 'finished';
+    const homeScoreNum = isStartedOrFinished && homeComp.score !== undefined && homeComp.score !== null && homeComp.score !== ''
       ? parseInt(String(homeComp.score), 10) : null;
-    const awayScoreNum = awayComp.score !== undefined && awayComp.score !== null && awayComp.score !== ''
+    const awayScoreNum = isStartedOrFinished && awayComp.score !== undefined && awayComp.score !== null && awayComp.score !== ''
       ? parseInt(String(awayComp.score), 10) : null;
 
     const sportMeta = ALL_SPORTS.find(s => s.id === cfg.sportId);

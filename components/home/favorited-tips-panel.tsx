@@ -142,13 +142,13 @@ export function FavoritedTipMarqueeCard({ item }: { item: FeaturedItem }) {
         <div className="flex items-center gap-2">
           <TeamLogo teamName={match.homeTeam.name} logoUrl={match.homeTeam.logo} size="sm" />
           <span className="text-sm font-semibold text-foreground group-hover:text-primary truncate">
-            {match.homeTeam.shortName || match.homeTeam.name}
+            {match.homeTeam.name}
           </span>
         </div>
         <div className="flex items-center gap-2">
           <TeamLogo teamName={match.awayTeam.name} logoUrl={match.awayTeam.logo} size="sm" />
           <span className="text-sm font-semibold text-foreground group-hover:text-primary truncate">
-            {match.awayTeam.shortName || match.awayTeam.name}
+            {match.awayTeam.name}
           </span>
         </div>
       </div>
@@ -211,11 +211,11 @@ function FavoritedTipCard({ item }: { item: FeaturedItem }) {
       </div>
       <div className="mb-3 space-y-0.5">
         <p className="text-sm font-semibold text-foreground group-hover:text-primary truncate">
-          {match.homeTeam.shortName || match.homeTeam.name}
+          {match.homeTeam.name}
         </p>
         <p className="text-xs text-muted-foreground">vs</p>
         <p className="text-sm font-semibold text-foreground group-hover:text-primary truncate">
-          {match.awayTeam.shortName || match.awayTeam.name}
+          {match.awayTeam.name}
         </p>
       </div>
       <div className="rounded-lg border border-border bg-muted/40 p-2 space-y-1.5">
