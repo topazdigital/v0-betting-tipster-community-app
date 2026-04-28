@@ -80,66 +80,73 @@ export async function GET() {
 // Update settings
 export async function POST(request: NextRequest) {
   const pool = getPool();
-  
+
+  // Parse body ONCE — re-reading after the body is consumed throws and used
+  // to surface as the misleading "Failed to save settings" toast on the
+  // Social Links tab.
+  let settings: Record<string, unknown> | undefined;
   try {
     const body = await request.json();
-    const { settings } = body;
-    
-    if (!settings || typeof settings !== 'object') {
-      return NextResponse.json(
-        { error: 'Invalid settings data' },
-        { status: 400 }
-      );
-    }
-    
-    // Always update in-memory copy so non-DB readers + cache reflect change
-    Object.assign(memorySettings, settings);
-    invalidateSiteSettingsCache();
-
-    // If no database, store in memory only
-    if (!pool) {
-      return NextResponse.json({ 
-        success: true, 
-        message: 'Settings saved to memory (no database connection)',
-        source: 'memory'
-      });
-    }
-    
-    // Upsert each setting to database
-    for (const [key, value] of Object.entries(settings)) {
-      await execute(`
-        INSERT INTO site_settings (setting_key, setting_value)
-        VALUES (?, ?)
-        ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)
-      `, [key, String(value)]);
-    }
-    
-    return NextResponse.json({ 
-      success: true, 
-      message: 'Settings saved to database',
-      source: 'database'
-    });
-  } catch (error) {
-    console.error('[Admin API] Failed to save settings:', error);
-    
-    // Try to save to memory as fallback
-    try {
-      const body = await request.json();
-      if (body.settings) {
-        Object.assign(memorySettings, body.settings);
-        return NextResponse.json({ 
-          success: true, 
-          message: 'Settings saved to memory (database error)',
-          source: 'memory'
-        });
-      }
-    } catch {
-      // Ignore
-    }
-    
-    return NextResponse.json(
-      { error: 'Failed to save settings' },
-      { status: 500 }
-    );
+    settings = body?.settings;
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
   }
+
+  if (!settings || typeof settings !== 'object' || Array.isArray(settings)) {
+    return NextResponse.json({ error: 'Invalid settings data' }, { status: 400 });
+  }
+
+  // Always update in-memory copy so non-DB readers + cache reflect change
+  // immediately, regardless of whether DB write succeeds.
+  Object.assign(memorySettings, settings);
+  invalidateSiteSettingsCache();
+
+  // If no database configured, memory store is the source of truth.
+  if (!pool) {
+    return NextResponse.json({
+      success: true,
+      message: 'Settings saved to memory (no database connection)',
+      source: 'memory',
+    });
+  }
+
+  // Upsert each setting. If any individual upsert fails (DB unreachable,
+  // missing column, etc) we still consider the save successful because the
+  // change is already live in memory + cache. We surface the warning so an
+  // admin can investigate, but the UI doesn't show a scary error toast.
+  let dbFailures = 0;
+  let lastError: unknown = null;
+  for (const [key, value] of Object.entries(settings)) {
+    try {
+      await execute(
+        `INSERT INTO site_settings (setting_key, setting_value)
+         VALUES (?, ?)
+         ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)`,
+        [key, String(value ?? '')],
+      );
+    } catch (err) {
+      dbFailures++;
+      lastError = err;
+    }
+  }
+
+  if (dbFailures === 0) {
+    return NextResponse.json({
+      success: true,
+      message: 'Settings saved to database',
+      source: 'database',
+    });
+  }
+
+  console.warn(
+    `[Admin API] settings: ${dbFailures} of ${Object.keys(settings).length} writes failed; ` +
+    `kept memory copy. Last error:`,
+    lastError,
+  );
+  return NextResponse.json({
+    success: true,
+    message: 'Settings saved (database currently unreachable — kept in memory)',
+    source: 'memory',
+    dbFailures,
+  });
 }

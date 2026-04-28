@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { ALL_LEAGUES, ALL_SPORTS } from '@/lib/sports-data';
 import { getAllMatches } from '@/lib/api/unified-sports-api';
 import { query } from '@/lib/db';
+import { teamHref } from '@/lib/utils/slug';
 
 // Unified search endpoint backing the header typeahead.
 // Returns up to ~5 hits per category for: leagues, matches, teams, tipsters.
@@ -93,7 +94,7 @@ export async function GET(request: NextRequest) {
             id: t.id,
             title: t.name,
             subtitle: `${m.league.name} • ${m.league.country}`,
-            href: `/teams/${encodeURIComponent(t.id)}`,
+            href: teamHref(t.name, t.id),
             logoUrl: t.logo,
             sportSlug: m.sport?.slug,
           });

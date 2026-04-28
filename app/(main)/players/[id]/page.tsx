@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation';
 import Image from 'next/image';
 import { ChevronLeft, MapPin, Calendar, Ruler, Weight, Star, GitCompareArrows } from 'lucide-react';
 import { getSiteSettings } from '@/lib/site-settings';
+import { extractNumericPlayerId } from '@/lib/utils/slug';
 
 interface PlayerProfile {
   id: string;
@@ -95,7 +96,7 @@ export default async function PlayerProfilePage({ params }: { params: Promise<{ 
           Back to matches
         </Link>
         <Link
-          href={`/players/compare?a=${encodeURIComponent(player.id)}`}
+          href={`/players/compare?a=${encodeURIComponent(extractNumericPlayerId(String(player.id)) || player.id)}`}
           className="inline-flex items-center gap-1.5 rounded-lg border border-primary/40 bg-primary/5 px-3 py-1.5 text-xs font-semibold text-primary hover:bg-primary/10"
         >
           <GitCompareArrows className="h-3.5 w-3.5" />

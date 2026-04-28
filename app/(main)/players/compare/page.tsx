@@ -8,6 +8,7 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import { ChevronLeft, Search, X, Plus, Minus, Equal } from 'lucide-react';
 import { Spinner } from '@/components/ui/spinner';
 import { cn } from '@/lib/utils';
+import { playerHref } from '@/lib/utils/slug';
 
 interface PlayerProfile {
   id: string;
@@ -321,7 +322,7 @@ function PlayerSlot({
         )}
         <div className="min-w-0 flex-1">
           <div className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Player {slot}</div>
-          <Link href={`/players/${player.id}`} className="block truncate text-base font-bold hover:text-primary">
+          <Link href={playerHref(player.name, player.id)} className="block truncate text-base font-bold hover:text-primary">
             {player.name}
           </Link>
           <div className="truncate text-xs text-muted-foreground">

@@ -2,21 +2,157 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getEspnLeagueConfigForId } from '@/lib/api/unified-sports-api';
 import { ALL_LEAGUES } from '@/lib/sports-data';
 import { listFollowersOfTeam } from '@/lib/follows-store';
+import { extractNumericTeamId } from '@/lib/utils/slug';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 300;
 
 const ESPN_BASE = 'https://site.api.espn.com/apis/site/v2/sports';
 
+// Soccer country-prefix → top-flight league code. ESPN team slugs follow the
+// `<country>.<abbrev>` convention (e.g. `fra.psg`, `eng.man_city`,
+// `esp.real_madrid`), so once we read the slug from any team-detail
+// payload we can deterministically map to the team's domestic league —
+// which is the league we want as the canonical home page (PSG → Ligue 1,
+// not UEFA Champions League).
+const SOCCER_COUNTRY_TO_LEAGUE: Record<string, string> = {
+  eng: 'eng.1', esp: 'esp.1', ita: 'ita.1', ger: 'ger.1', fra: 'fra.1',
+  ned: 'ned.1', por: 'por.1', sco: 'sco.1', tur: 'tur.1', bel: 'bel.1',
+  usa: 'usa.1', mex: 'mex.1',
+  bra: 'bra.1', arg: 'arg.1', col: 'col.1', chi: 'chi.1',
+  sau: 'sau.1', aus: 'aus.1', jpn: 'jpn.1', kor: 'kor.1',
+  rus: 'rus.1', ukr: 'ukr.1', gre: 'gre.1', den: 'den.1', swe: 'swe.1',
+  nor: 'nor.1', sui: 'sui.1', aut: 'aut.1', cze: 'cze.1', pol: 'pol.1',
+  rou: 'rou.1', irl: 'irl.1', wal: 'wal.1', nir: 'nir.1',
+  uae: 'uae.1', qat: 'qat.1', irn: 'irn.1', isr: 'isr.1',
+  egy: 'egy.1', mar: 'mar.1', tun: 'tun.1', alg: 'alg.1', rsa: 'rsa.1',
+  per: 'per.1', uru: 'uru.1', ven: 'ven.1', ecu: 'ecu.1', par: 'par.1',
+  bol: 'bol.1', cri: 'crc.1', hon: 'hon.1', gua: 'gua.1', sal: 'slv.1',
+  ind: 'ind.1', chn: 'chn.1', tha: 'tha.1', mly: 'mas.1', sgp: 'sgp.1',
+};
+
+// Soccer fallback domestic-league probe order (only used when the slug
+// trick fails). Domestic before continental keeps PSG → Ligue 1.
+const TEAM_RESOLVER_CANDIDATES: Array<[string, string]> = [
+  ['soccer', 'eng.1'], ['soccer', 'esp.1'], ['soccer', 'ita.1'], ['soccer', 'ger.1'], ['soccer', 'fra.1'],
+  ['soccer', 'eng.2'], ['soccer', 'esp.2'], ['soccer', 'ita.2'], ['soccer', 'ger.2'], ['soccer', 'fra.2'],
+  ['soccer', 'ned.1'], ['soccer', 'por.1'], ['soccer', 'sco.1'], ['soccer', 'tur.1'], ['soccer', 'bel.1'],
+  ['soccer', 'usa.1'], ['soccer', 'usa.2'], ['soccer', 'mex.1'],
+  ['soccer', 'bra.1'], ['soccer', 'arg.1'], ['soccer', 'col.1'], ['soccer', 'chi.1'],
+  ['soccer', 'sau.1'], ['soccer', 'aus.1'], ['soccer', 'jpn.1'], ['soccer', 'kor.1'],
+  ['soccer', 'uefa.champions'], ['soccer', 'uefa.europa'], ['soccer', 'uefa.europa.conf'],
+  ['soccer', 'uefa.nations'], ['soccer', 'uefa.euro'],
+  ['soccer', 'concacaf.champions'], ['soccer', 'concacaf.gold'],
+  ['soccer', 'conmebol.libertadores'], ['soccer', 'conmebol.sudamericana'], ['soccer', 'conmebol.america'],
+  ['soccer', 'caf.champions'], ['soccer', 'caf.cup_of_nations'],
+  ['soccer', 'afc.champions'], ['soccer', 'afc.asian'],
+  ['soccer', 'fifa.world'], ['soccer', 'fifa.wwc'], ['soccer', 'fifa.cwc'],
+  ['basketball', 'nba'], ['basketball', 'wnba'], ['basketball', 'mens-college-basketball'],
+  ['football', 'nfl'], ['football', 'college-football'],
+  ['baseball', 'mlb'], ['hockey', 'nhl'],
+];
+
+// In-memory cache: <espnTeamId> → resolved {sport, league}. ESPN team ids are
+// globally unique within a sport, so we cache permanently per worker.
+const teamLeagueCache = new Map<string, { sport: string; league: string } | null>();
+
+interface TeamProbeData {
+  team?: { id?: string; slug?: string };
+}
+
+async function probeTeam(sport: string, league: string, teamId: string): Promise<TeamProbeData | null> {
+  const url = `${ESPN_BASE}/${sport}/${league}/teams/${teamId}`;
+  try {
+    const r = await fetch(url, { headers: { Accept: 'application/json' }, next: { revalidate: 86400 } });
+    if (!r.ok) return null;
+    const data = (await r.json()) as TeamProbeData;
+    return data?.team?.id ? data : null;
+  } catch {
+    return null;
+  }
+}
+
+// Read the soccer team's `<country>.<abbrev>` slug and map it to the
+// top-flight domestic league. Returns null when the slug doesn't follow
+// that convention or the country isn't in the table.
+function leagueFromSlug(slug?: string): string | null {
+  if (!slug) return null;
+  const dot = slug.indexOf('.');
+  if (dot <= 0) return null;
+  const country = slug.slice(0, dot).toLowerCase();
+  return SOCCER_COUNTRY_TO_LEAGUE[country] ?? null;
+}
+
+async function resolveTeamSportLeague(
+  espnTeamId: string,
+  hint?: { sport: string; league: string },
+): Promise<{ sport: string; league: string } | null> {
+  const cached = teamLeagueCache.get(espnTeamId);
+  if (cached !== undefined) return cached;
+
+  // Strategy 1 (fast & accurate for soccer): fetch the team payload using
+  // the hint (or any soccer league) and read its slug country prefix.
+  const probeSport = hint?.sport || 'soccer';
+  const probeLeague = hint?.league || 'eng.1';
+  const probed = await probeTeam(probeSport, probeLeague, espnTeamId);
+  if (probed && probeSport === 'soccer') {
+    const domestic = leagueFromSlug(probed.team?.slug);
+    if (domestic) {
+      const choice = { sport: 'soccer', league: domestic };
+      teamLeagueCache.set(espnTeamId, choice);
+      return choice;
+    }
+  }
+  if (probed && hint) {
+    teamLeagueCache.set(espnTeamId, hint);
+    return hint;
+  }
+
+  // Strategy 2 (fallback): probe candidates in priority order. Used when
+  // the slug doesn't match our country table (rare leagues), or when the
+  // hint sport isn't soccer.
+  const BATCH = 8;
+  for (let i = 0; i < TEAM_RESOLVER_CANDIDATES.length; i += BATCH) {
+    const batch = TEAM_RESOLVER_CANDIDATES.slice(i, i + BATCH);
+    const results = await Promise.all(
+      batch.map(async ([sport, league]) => {
+        const data = await probeTeam(sport, league, espnTeamId);
+        if (!data) return null;
+        if (sport === 'soccer') {
+          const domestic = leagueFromSlug(data.team?.slug);
+          if (domestic) return { sport: 'soccer', league: domestic };
+        }
+        return { sport, league };
+      }),
+    );
+    const hit = results.find((r): r is { sport: string; league: string } => !!r);
+    if (hit) {
+      teamLeagueCache.set(espnTeamId, hit);
+      return hit;
+    }
+  }
+
+  teamLeagueCache.set(espnTeamId, null);
+  return null;
+}
+
 function parseTeamId(teamId: string): { sport: string; league: string; espnTeamId: string; leagueId?: number } | null {
-  const m = teamId.match(/^espn_([a-z0-9]+)_(\d+)$/i);
-  if (!m) return null;
-  const leagueSlug = m[1];
-  const espnTeamId = m[2];
-  const fake = `espn_${leagueSlug}_999999`;
-  const cfg = getEspnLeagueConfigForId(fake);
-  if (!cfg) return null;
-  return { sport: cfg.sport, league: cfg.league, espnTeamId, leagueId: cfg.leagueId };
+  // Legacy shape: espn_<league>_<id>
+  const espn = teamId.match(/^espn_([a-z0-9.]+)_(\d+)$/i);
+  if (espn) {
+    const leagueSlug = espn[1];
+    const espnTeamId = espn[2];
+    const fake = `espn_${leagueSlug}_999999`;
+    const cfg = getEspnLeagueConfigForId(fake);
+    if (cfg) return { sport: cfg.sport, league: cfg.league, espnTeamId, leagueId: cfg.leagueId };
+  }
+  // New canonical shape: <slug>-<id> OR bare <id>.
+  const numeric = extractNumericTeamId(teamId);
+  if (numeric) {
+    // Sport/league are unknown at parse time — caller must resolve.
+    return { sport: '', league: '', espnTeamId: numeric };
+  }
+  return null;
 }
 
 async function fetchTeamInfo(sport: string, league: string, teamId: string) {
@@ -135,7 +271,26 @@ export async function GET(
     return NextResponse.json({ error: 'Invalid team ID format' }, { status: 400 });
   }
 
-  const { sport, league, espnTeamId } = parsed;
+  // For the new canonical shape (`<slug>-<id>`), parsed.sport/league are
+  // empty and we must probe ESPN to figure out the team's primary league.
+  // For the legacy shape we still probe to find a *better* (more domestic)
+  // league when the URL came in via a continental cup. The result is cached
+  // in-process so subsequent hits don't pay the resolver tax.
+  const hint = parsed.sport && parsed.league
+    ? { sport: parsed.sport, league: parsed.league }
+    : undefined;
+  const resolved = await resolveTeamSportLeague(parsed.espnTeamId, hint);
+  if (!resolved) {
+    return NextResponse.json({ error: 'Team not found in any known league' }, { status: 404 });
+  }
+  const { sport, league } = resolved;
+  const { espnTeamId } = parsed;
+
+  // Re-derive leagueId/leagueRow from the *resolved* league (not the URL hint),
+  // so PSG always shows "Ligue 1" even when reached via a UCL link.
+  const fakeId = `espn_${league}_999999`;
+  const resolvedCfg = getEspnLeagueConfigForId(fakeId);
+  const resolvedLeagueId = resolvedCfg?.leagueId ?? parsed.leagueId;
 
   const [teamData, scheduleData, rosterData, injuriesData, coachName, followers] = await Promise.all([
     fetchTeamInfo(sport, league, espnTeamId),
@@ -143,7 +298,7 @@ export async function GET(
     fetchTeamRoster(sport, league, espnTeamId),
     fetchTeamInjuries(sport, league, espnTeamId),
     fetchTeamCoach(sport, league, espnTeamId),
-    listFollowersOfTeam(id).catch(() => [] as number[]),
+    listFollowersOfTeam(espnTeamId).catch(() => [] as number[]),
   ]);
 
   if (!teamData?.team) {
@@ -152,8 +307,8 @@ export async function GET(
 
   const t = teamData.team;
 
-  // League / country lookup using the parsed league slug → ESPN config.
-  const leagueRow = ALL_LEAGUES.find(l => l.id === parsed.leagueId);
+  // League / country lookup using the *resolved* league id (not the URL hint).
+  const leagueRow = ALL_LEAGUES.find(l => l.id === resolvedLeagueId);
 
   // Find the official website link if ESPN exposed one.
   type RawLink = { rel?: string[]; href?: string; text?: string };
@@ -185,8 +340,26 @@ export async function GET(
     }
   }
 
+  // Canonical SEO id = `<slug>-<espnTeamId>`. Used by callers to redirect
+  // legacy URLs (e.g. `espn_uefa.champions_160`) to the canonical page.
+  const teamName = t.displayName || t.name || '';
+  const slugify = (s: string) => s
+    .toLowerCase()
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/&/g, ' and ')
+    .replace(/[^a-z0-9\s-]+/g, ' ')
+    .trim()
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-+|-+$/g, '');
+  const nameSlug = slugify(teamName);
+  const canonicalId = nameSlug ? `${nameSlug}-${t.id}` : String(t.id);
+
   const team = {
     id: t.id,
+    canonicalId,
+    canonicalHref: `/teams/${canonicalId}`,
     name: t.displayName || t.name,
     shortName: t.abbreviation,
     nickname: t.nickname || t.shortDisplayName,

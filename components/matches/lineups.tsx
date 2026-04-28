@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button"
 import { User, AlertCircle, CheckCircle2, ChevronDown, ChevronUp } from "lucide-react"
 import Image from "next/image"
 import { cn } from "@/lib/utils"
+import { playerHref } from "@/lib/utils/slug"
 
 interface Player {
   id?: string
@@ -43,7 +44,7 @@ function PlayerRow({ player, bench }: { player: Player; bench?: boolean }) {
   // Larger headshot (40px) when we have one — much more recognisable than the
   // tiny 24px chips. Players become a clickable link when an id is present.
   const Wrapper: React.ElementType = player.id ? Link : 'div'
-  const wrapperProps = player.id ? { href: `/players/${player.id}` } : {}
+  const wrapperProps = player.id ? { href: playerHref(player.fullName || player.name, player.id) } : {}
 
   return (
     <Wrapper

@@ -285,8 +285,16 @@ export function TeamLogo({
   countryCode,
 }: TeamLogoProps) {
   const [hasError, setHasError] = useState(false)
-  // Real provided URL (e.g. ESPN) wins; otherwise consult curated map.
-  const logoUrl = providedLogoUrl || TEAM_LOGOS[teamName]
+  // Resolve a logo URL in priority order:
+  //   1. Caller-provided URL (e.g. ESPN team payload)
+  //   2. Curated static map by name
+  //   3. ESPN CDN guess by team id (covers most soccer/NBA/NFL teams the
+  //      curated map doesn't list — works because ESPN serves logos at
+  //      a deterministic path keyed by team id).
+  const cdnGuessUrl = teamId
+    ? `https://a.espncdn.com/i/teamlogos/soccer/500/${teamId}.png`
+    : undefined
+  const logoUrl = providedLogoUrl || TEAM_LOGOS[teamName] || cdnGuessUrl
   // Auto-pick athlete variant for individual sports.
   const effectiveVariant = variant ?? (isIndividualSport(sportSlug) ? 'athlete' : 'team')
   const isAthlete = effectiveVariant === 'athlete'

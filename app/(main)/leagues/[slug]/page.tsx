@@ -19,6 +19,7 @@ import { TeamLogo } from "@/components/ui/team-logo"
 import { FlagIcon } from "@/components/ui/flag-icon"
 import { cn } from "@/lib/utils"
 import { ALL_LEAGUES, getSportIcon } from "@/lib/sports-data"
+import { playerHref } from "@/lib/utils/slug"
 import { resolveLeagueSlug } from "@/lib/league-aliases"
 import { useMatches } from "@/lib/hooks/use-matches"
 
@@ -494,7 +495,7 @@ export default function LeaguePage({ params }: PageProps) {
                       {scorers.slice(0, 10).map((s) => {
                         const hasId = !!s.player.id;
                         const Wrapper: React.ElementType = hasId ? Link : 'div';
-                        const wrapperProps = hasId ? { href: `/players/${encodeURIComponent(s.player.id)}` } : {};
+                        const wrapperProps = hasId ? { href: playerHref(s.player.name, s.player.id) } : {};
                         return (
                         <li key={`${s.position}-${s.player.id}`}>
                           <Wrapper

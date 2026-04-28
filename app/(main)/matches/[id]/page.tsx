@@ -20,6 +20,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Spinner } from "@/components/ui/spinner"
 import { TeamLogo } from "@/components/ui/team-logo"
 import { cn } from "@/lib/utils"
+import { teamHref } from "@/lib/utils/slug"
 import { formatTime, formatDate, getBrowserTimezone, getDayLabel } from "@/lib/utils/timezone"
 import { FlagIcon } from "@/components/ui/flag-icon"
 import { liveStatusLabel } from "@/lib/utils/live-status"
@@ -949,9 +950,9 @@ export default function MatchDetailPage({ params }: PageProps) {
                 <div className="mb-3">
                   <TeamLogo teamName={match.homeTeam.name} logoUrl={match.homeTeam.logo} size="lg" />
                 </div>
-                {match.homeTeam.espnTeamId && match.homeTeam.leagueSlug ? (
+                {match.homeTeam.espnTeamId ? (
                   <Link
-                    href={`/teams/espn_${match.homeTeam.leagueSlug}_${match.homeTeam.espnTeamId}`}
+                    href={teamHref(match.homeTeam.name, match.homeTeam.espnTeamId)}
                     className="text-base md:text-lg font-bold text-white line-clamp-2 hover:text-white/80 hover:underline"
                     onClick={e => e.stopPropagation()}
                   >
@@ -1015,9 +1016,9 @@ export default function MatchDetailPage({ params }: PageProps) {
                 <div className="mb-3">
                   <TeamLogo teamName={match.awayTeam.name} logoUrl={match.awayTeam.logo} size="lg" />
                 </div>
-                {match.awayTeam.espnTeamId && match.awayTeam.leagueSlug ? (
+                {match.awayTeam.espnTeamId ? (
                   <Link
-                    href={`/teams/espn_${match.awayTeam.leagueSlug}_${match.awayTeam.espnTeamId}`}
+                    href={teamHref(match.awayTeam.name, match.awayTeam.espnTeamId)}
                     className="text-base md:text-lg font-bold text-white line-clamp-2 hover:text-white/80 hover:underline"
                     onClick={e => e.stopPropagation()}
                   >
@@ -1844,9 +1845,9 @@ export default function MatchDetailPage({ params }: PageProps) {
                                     </span>
                                   </td>
                                   <td className="py-2">
-                                    {r.teamId && match.homeTeam.leagueSlug ? (
+                                    {r.teamId ? (
                                       <Link
-                                        href={`/teams/espn_${match.homeTeam.leagueSlug}_${r.teamId}`}
+                                        href={teamHref(r.teamName, r.teamId)}
                                         className="group flex items-center gap-2 hover:text-primary"
                                         onClick={e => e.stopPropagation()}
                                       >

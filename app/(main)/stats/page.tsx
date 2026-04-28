@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { TeamLogo } from '@/components/ui/team-logo';
 import { Loader2, BarChart3, Trophy, Goal } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { playerHref } from '@/lib/utils/slug';
 
 const fetcher = (url: string) => fetch(url).then(r => r.json());
 
@@ -101,7 +102,7 @@ function ScorersTable({ leagueId }: { leagueId: number }) {
       {rows.map((s, i) => {
         const pid = s.athlete?.id;
         const Wrapper: React.ElementType = pid ? Link : 'div';
-        const wrapperProps = pid ? { href: `/players/${encodeURIComponent(pid)}` } : {};
+        const wrapperProps = pid ? { href: playerHref(s.athlete?.displayName || s.athlete?.shortName, pid) } : {};
         return (
         <Wrapper
           key={pid || i}

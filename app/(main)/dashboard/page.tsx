@@ -12,6 +12,7 @@ import { useAuthModal } from '@/contexts/auth-modal-context';
 import { formatDate, formatTime, getBrowserTimezone } from '@/lib/utils/timezone';
 import { cn } from '@/lib/utils';
 import { matchIdToSlug } from '@/lib/utils/match-url';
+import { teamHref } from '@/lib/utils/slug';
 
 interface FollowedTeam {
   teamId: string;
@@ -241,7 +242,7 @@ export default function DashboardPage() {
             {data.teams.map(t => (
               <Link
                 key={t.teamId}
-                href={`/teams/${encodeURIComponent(t.teamId)}`}
+                href={teamHref(t.teamName, t.teamId)}
                 className="flex items-center gap-2 rounded-full border border-border bg-card px-3 py-1.5 text-sm hover:border-primary/40"
               >
                 <div className="h-6 w-6 overflow-hidden rounded-full">

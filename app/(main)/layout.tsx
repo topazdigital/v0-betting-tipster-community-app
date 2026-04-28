@@ -9,7 +9,7 @@ import {
   Star, Wallet, User
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
+import { HeaderSearch } from "@/components/layout/header-search"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -204,9 +204,12 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
             <Menu className="h-5 w-5" />
           </Button>
 
-          <div className="relative hidden flex-1 max-w-md md:block">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input placeholder="Search..." className="pl-9" />
+          <div className="hidden flex-1 max-w-md md:block">
+            <HeaderSearch inline />
+          </div>
+          {/* Mobile: collapsed icon-button search keeps the header tidy. */}
+          <div className="md:hidden">
+            <HeaderSearch />
           </div>
 
           <div className="ml-auto flex items-center gap-2">
