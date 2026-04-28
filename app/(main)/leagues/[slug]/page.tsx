@@ -13,6 +13,7 @@ import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { SidebarNew } from "@/components/layout/sidebar-new"
 import { MatchCardNew } from "@/components/matches/match-card-new"
+import { KnockoutBracket } from "@/components/leagues/knockout-bracket"
 import { Spinner } from "@/components/ui/spinner"
 import { TeamLogo } from "@/components/ui/team-logo"
 import { FlagIcon } from "@/components/ui/flag-icon"
@@ -244,6 +245,12 @@ export default function LeaguePage({ params }: PageProps) {
               </div>
             </div>
           </Card>
+
+          {/* Knockout bracket — silently renders nothing for league-format
+              competitions, so we can include it unconditionally. */}
+          <div className="mb-4">
+            <KnockoutBracket leagueId={league.id} />
+          </div>
 
           {/* Two-column layout: matches main, sidebar with standings/outrights/scorers */}
           <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
@@ -484,11 +491,19 @@ export default function LeaguePage({ params }: PageProps) {
                     />
                   ) : (
                     <ol className="space-y-2">
-                      {scorers.slice(0, 10).map((s) => (
-                        <li
-                          key={`${s.position}-${s.player.id}`}
-                          className="flex items-center gap-3 rounded-lg bg-muted/30 p-2"
-                        >
+                      {scorers.slice(0, 10).map((s) => {
+                        const hasId = !!s.player.id;
+                        const Wrapper: React.ElementType = hasId ? Link : 'div';
+                        const wrapperProps = hasId ? { href: `/players/${encodeURIComponent(s.player.id)}` } : {};
+                        return (
+                        <li key={`${s.position}-${s.player.id}`}>
+                          <Wrapper
+                            {...wrapperProps}
+                            className={cn(
+                              "flex items-center gap-3 rounded-lg bg-muted/30 p-2",
+                              hasId && "transition-colors hover:bg-primary/10"
+                            )}
+                          >
                           <span className={cn(
                             "flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-bold",
                             s.position === 1 && "bg-yellow-500 text-yellow-950",
@@ -499,14 +514,18 @@ export default function LeaguePage({ params }: PageProps) {
                             {s.position}
                           </span>
                           <div className="min-w-0 flex-1">
-                            <p className="truncate text-sm font-semibold">{s.player.name}</p>
+                            <p className={cn(
+                              "truncate text-sm font-semibold",
+                              hasId && "group-hover:text-primary"
+                            )}>{s.player.name}</p>
                             <p className="truncate text-[11px] text-muted-foreground">{s.team.name}</p>
                           </div>
                           <span className="shrink-0 font-mono text-sm font-bold text-success">
                             {s.stats.goals}
                           </span>
+                          </Wrapper>
                         </li>
-                      ))}
+                      );})}
                     </ol>
                   )}
                 </CardContent>

@@ -81,6 +81,8 @@ const CREDENTIAL_LABELS: Record<string, string> = {
   routing_number: 'Routing Number (USA)',
   iban: 'IBAN',
   swift: 'SWIFT / BIC',
+  gateway_merchant_id: 'Gateway Merchant ID',
+  gateway: 'Underlying Gateway (stripe / adyen / braintree)',
 }
 
 function GatewayCard({

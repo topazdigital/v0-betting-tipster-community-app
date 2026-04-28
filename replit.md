@@ -36,6 +36,18 @@ Key architectural decisions include:
 
 ## Recent Changes
 
+### Batch 3 — Player Profiles & Dashboard Buildout (April 28, 2026)
+- **Player profile page** (`app/(main)/players/[id]/page.tsx`) — now sports a top-bar with a "Compare with another player" CTA that deep-links into the new compare flow with the current player pre-selected.
+- **Player compare page** (`app/(main)/players/compare/page.tsx`) — fully client-side compare view that fetches two players via `/api/players/:id`, flattens their stats into a unified label map, groups rows by stat category, and highlights which side wins each numeric stat. Supports picking players via the unified search typeahead or pasting a numeric ESPN athlete id. Vital-stats card covers position, team, age, height, weight, nationality, and experience.
+- **Clickable players in top-scorers**: League page top-scorers list (`app/(main)/leagues/[slug]/page.tsx`) and the standalone Stats page (`app/(main)/stats/page.tsx`) now wrap rows with `Link` to `/players/{id}` whenever an athlete id is available, with hover styling. Falls back to a non-clickable row when ESPN doesn't surface an id.
+- **Dashboard API expansion** (`app/api/dashboard/route.ts`) — fetches followed-tipster details + recent tips from `/api/tipsters/:id?includeStats=false` in parallel with team data, returns a flattened `recentTips` feed sorted by recency, a `tipsters` summary array, and a `stats` block (teams/tipsters followed, win rate across followed tipsters, average ROI, recent W/L/pending counts).
+- **Dashboard UI buildout** (`app/(main)/dashboard/page.tsx`) — added a 4-card stats summary banner, a new "Following tipsters" grid (TipsterCard with avatar, win-rate / ROI / total-tips trio plus a flame badge for ≥3-tip streaks), and a "Latest tips from your tipsters" feed (FeedTipCard showing tipster, market, selection, odds, confidence, status pill, plus a deep-link to the match). Empty state now welcomes both team-only and tipster-only users with two CTAs.
+
+### Batch 2 — Search, Brackets & Logo Fallbacks (April 28, 2026)
+- **Header search typeahead** — `/api/search` returns leagues, matches, teams, and tipsters scored against the query; `components/layout/header-search.tsx` adds a debounced (200 ms) dropdown with arrow-key + Enter + Esc keyboard navigation, grouped sections, TeamLogo / LeagueLogo / avatar previews, and gracefully falls back if the DB is unreachable for the tipsters lookup.
+- **Knockout bracket UI** — `app/api/leagues/[id]/bracket/route.ts` parses ESPN scoreboard `notes[0].headline` into R64 → Final, pairs two-legged ties by sorted team-id key, computes aggregate scores respecting the leg-1 home convention, and fetches a ±9/+6 month window in parallel via `Promise.allSettled`. `components/leagues/knockout-bracket.tsx` renders a horizontal column-per-round layout with TieCard showing aggregate + per-leg scores; silently renders nothing for non-cup leagues.
+- **TeamLogo small-league fallback** — `components/ui/team-logo.tsx` accepts an optional `countryCode` prop and overlays a small `FlagIcon` chip in the bottom-right of the initials avatar so users still get a visual cue when ESPN has no crest for an obscure team.
+
 ### Locality, Smart AI & Match-Lookup Fixes (April 26, 2026 — later)
 - **"Match not found" eliminated**: Two fixes in `lib/api/unified-sports-api.ts`:
   1. `getEspnLeagueConfigForId` / `getEspnEventIdFromMatchId` regexes now allow dots in the league key (`[a-z0-9.]+`) so IDs like `espn_ita.1_737118`, `espn_uefa.champions_xxx`, and `espn_conmebol.libertadores_xxx` parse correctly.

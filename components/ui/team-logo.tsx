@@ -23,6 +23,13 @@ interface TeamLogoProps {
   variant?: 'team' | 'athlete'
   /** Sport slug — when provided, automatically picks athlete variant for individual sports. */
   sportSlug?: string
+  /**
+   * ISO country code (e.g. 'GB-ENG', 'KE', 'BR'). When the logo can't be
+   * found, we render a small country-flag chip on top of the initials so
+   * users still get visual context — particularly valuable for small leagues
+   * where ESPN doesn't supply a crest.
+   */
+  countryCode?: string
 }
 
 // Sports where each "team" is actually an individual competitor (use portrait avatars).
@@ -275,6 +282,7 @@ export function TeamLogo({
   showFallback = true,
   variant,
   sportSlug,
+  countryCode,
 }: TeamLogoProps) {
   const [hasError, setHasError] = useState(false)
   // Real provided URL (e.g. ESPN) wins; otherwise consult curated map.
@@ -304,19 +312,36 @@ export function TeamLogo({
     )
   }
   
-  // Fallback to initials
+  // Fallback to initials. For "small league" teams (where ESPN often has no
+  // crest), if we know the country we render a tiny flag chip in the corner
+  // so users still get a regional cue ("oh, that's a Kenyan side") instead of
+  // a meaningless coloured circle.
   if (showFallback) {
     const initials = getInitials(teamName)
     const bgColor = getColorFromName(teamName)
-    
+    // Flag chip is only useful for non-tiny avatars; on xs it would be
+    // illegible and make the badge feel cluttered.
+    const showFlag = !!countryCode && size !== 'xs'
+
     return (
       <div className={cn(
-        "flex shrink-0 items-center justify-center rounded-full font-bold text-white",
+        "relative flex shrink-0 items-center justify-center rounded-full font-bold text-white",
         sizeClasses[size],
         bgColor,
         className
       )}>
         {initials}
+        {showFlag && (
+          <span
+            className={cn(
+              "absolute -bottom-0.5 -right-0.5 overflow-hidden rounded-sm ring-1 ring-background",
+              size === 'sm' ? "h-3 w-4" : size === 'md' ? "h-3.5 w-5" : "h-4 w-6",
+            )}
+            aria-hidden
+          >
+            <FlagIcon countryCode={countryCode!} className="h-full w-full" />
+          </span>
+        )}
       </div>
     )
   }

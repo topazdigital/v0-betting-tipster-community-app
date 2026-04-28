@@ -11,6 +11,44 @@ interface TeamApiResponse {
   upcoming?: unknown[];
 }
 
+interface RecentTip {
+  id: number;
+  market: string;
+  selection: string;
+  odds: number;
+  stake: number;
+  status: 'pending' | 'won' | 'lost' | 'void' | string;
+  confidence: number;
+  createdAt: string;
+  match: {
+    id: string;
+    homeTeam: string;
+    awayTeam: string;
+    league: string;
+    sport: string;
+    homeScore: number | null;
+    awayScore: number | null;
+    kickoffTime: string;
+  };
+}
+
+interface TipsterApiResponse {
+  tipster?: {
+    id: number;
+    username: string;
+    displayName: string;
+    avatar: string | null;
+    countryCode?: string | null;
+    winRate: number;
+    roi: number;
+    totalTips: number;
+    streak: number;
+    isPro?: boolean;
+    verified?: boolean;
+  };
+  recentTips?: RecentTip[];
+}
+
 async function fetchTeamData(teamId: string, baseUrl: string): Promise<TeamApiResponse | null> {
   try {
     const r = await fetch(`${baseUrl}/api/teams/${encodeURIComponent(teamId)}`, {
@@ -19,6 +57,19 @@ async function fetchTeamData(teamId: string, baseUrl: string): Promise<TeamApiRe
     });
     if (!r.ok) return null;
     return (await r.json()) as TeamApiResponse;
+  } catch {
+    return null;
+  }
+}
+
+async function fetchTipsterData(tipsterId: number, baseUrl: string): Promise<TipsterApiResponse | null> {
+  try {
+    const r = await fetch(`${baseUrl}/api/tipsters/${tipsterId}?includeStats=false`, {
+      headers: { Accept: 'application/json' },
+      next: { revalidate: 120 },
+    });
+    if (!r.ok) return null;
+    return (await r.json()) as TipsterApiResponse;
   } catch {
     return null;
   }
@@ -39,21 +90,23 @@ export async function GET(req: Request) {
     listFollowedTeams(user.userId),
     listFollowedTipsters(user.userId),
   ]);
-  if (followedTeams.length === 0) {
-    return NextResponse.json({
-      authenticated: true,
-      teams: [],
-      upcomingMatches: [],
-      recentResults: [],
-      followedTipsters: followedTipsterIds,
-    });
-  }
 
   const url = new URL(req.url);
   const baseUrl = `${url.protocol}//${url.host}`;
-  const teamData = await Promise.all(
-    followedTeams.slice(0, 12).map(t => fetchTeamData(t.teamId, baseUrl).then(d => ({ follow: t, data: d })))
-  );
+
+  // Run team + tipster data fetches in parallel.
+  const [teamData, tipsterData] = await Promise.all([
+    Promise.all(
+      followedTeams.slice(0, 12).map((t) =>
+        fetchTeamData(t.teamId, baseUrl).then((d) => ({ follow: t, data: d })),
+      ),
+    ),
+    Promise.all(
+      followedTipsterIds.slice(0, 8).map((id) =>
+        fetchTipsterData(id, baseUrl).then((d) => ({ id, data: d })),
+      ),
+    ),
+  ]);
 
   const upcomingMatches: Array<Record<string, unknown>> = [];
   const recentResults: Array<Record<string, unknown>> = [];
@@ -74,11 +127,61 @@ export async function GET(req: Request) {
   upcomingMatches.sort((a, b) => new Date(a.date as string).getTime() - new Date(b.date as string).getTime());
   recentResults.sort((a, b) => new Date(b.date as string).getTime() - new Date(a.date as string).getTime());
 
+  // Build tipster summaries + flatten recent tips
+  const tipsterSummaries = tipsterData
+    .filter((x): x is { id: number; data: TipsterApiResponse } => !!x.data?.tipster)
+    .map(({ data }) => data.tipster!);
+
+  const tipsterFeed: Array<RecentTip & { tipster: { id: number; displayName: string; username: string; avatar: string | null } }> = [];
+  for (const { data } of tipsterData) {
+    if (!data?.tipster || !data.recentTips) continue;
+    for (const tip of data.recentTips) {
+      tipsterFeed.push({
+        ...tip,
+        tipster: {
+          id: data.tipster.id,
+          displayName: data.tipster.displayName,
+          username: data.tipster.username,
+          avatar: data.tipster.avatar,
+        },
+      });
+    }
+  }
+  tipsterFeed.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+  // Aggregate W/L/Pending across followed tipsters' visible recent tips
+  let won = 0, lost = 0, pending = 0;
+  for (const t of tipsterFeed) {
+    if (t.status === 'won') won++;
+    else if (t.status === 'lost') lost++;
+    else if (t.status === 'pending') pending++;
+  }
+  const settled = won + lost;
+  const winRate = settled > 0 ? Math.round((won / settled) * 1000) / 10 : 0;
+  const avgFollowedWinRate = tipsterSummaries.length > 0
+    ? Math.round((tipsterSummaries.reduce((s, t) => s + (t.winRate || 0), 0) / tipsterSummaries.length) * 10) / 10
+    : 0;
+  const avgFollowedRoi = tipsterSummaries.length > 0
+    ? Math.round((tipsterSummaries.reduce((s, t) => s + (t.roi || 0), 0) / tipsterSummaries.length) * 10) / 10
+    : 0;
+
   return NextResponse.json({
     authenticated: true,
     teams: followedTeams,
     upcomingMatches: upcomingMatches.slice(0, 20),
     recentResults: recentResults.slice(0, 20),
     followedTipsters: followedTipsterIds,
+    tipsters: tipsterSummaries,
+    recentTips: tipsterFeed.slice(0, 12),
+    stats: {
+      teamsFollowed: followedTeams.length,
+      tipstersFollowed: followedTipsterIds.length,
+      tipsWon: won,
+      tipsLost: lost,
+      tipsPending: pending,
+      winRate,
+      avgFollowedWinRate,
+      avgFollowedRoi,
+    },
   });
 }

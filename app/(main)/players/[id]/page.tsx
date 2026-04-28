@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import Image from 'next/image';
-import { ChevronLeft, MapPin, Calendar, Ruler, Weight, Star } from 'lucide-react';
+import { ChevronLeft, MapPin, Calendar, Ruler, Weight, Star, GitCompareArrows } from 'lucide-react';
 import { getSiteSettings } from '@/lib/site-settings';
 
 interface PlayerProfile {
@@ -86,13 +86,22 @@ export default async function PlayerProfilePage({ params }: { params: Promise<{ 
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-6">
-      <Link
-        href="/matches"
-        className="mb-4 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
-      >
-        <ChevronLeft className="h-4 w-4" />
-        Back to matches
-      </Link>
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <Link
+          href="/matches"
+          className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+        >
+          <ChevronLeft className="h-4 w-4" />
+          Back to matches
+        </Link>
+        <Link
+          href={`/players/compare?a=${encodeURIComponent(player.id)}`}
+          className="inline-flex items-center gap-1.5 rounded-lg border border-primary/40 bg-primary/5 px-3 py-1.5 text-xs font-semibold text-primary hover:bg-primary/10"
+        >
+          <GitCompareArrows className="h-3.5 w-3.5" />
+          Compare with another player
+        </Link>
+      </div>
 
       {/* Header card */}
       <div className="overflow-hidden rounded-2xl border border-border bg-gradient-to-br from-primary/5 via-background to-background">

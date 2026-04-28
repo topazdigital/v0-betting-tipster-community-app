@@ -7,7 +7,6 @@ import { ALL_LEAGUES } from './sports-data';
 export const ESPN_LEAGUE_ALIASES: Record<string, string> = {
   // England
   'eng-1': 'premier-league',
-  'eng-2': 'premier-league',
   'eng.1': 'premier-league',
   'eng_premier': 'premier-league',
   // Spain

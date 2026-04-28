@@ -19,6 +19,10 @@ interface FollowTeamButtonProps {
   size?: 'sm' | 'md' | 'lg';
   variant?: 'default' | 'compact' | 'icon';
   className?: string;
+  /** Optional callback fired AFTER a successful follow/unfollow round-trip.
+   *  The team page passes a SWR `mutate` here so the followers counter on
+   *  screen refreshes immediately without a hard reload. */
+  onChange?: (followingNow: boolean) => void;
 }
 
 export function FollowTeamButton({
@@ -33,6 +37,7 @@ export function FollowTeamButton({
   size = 'md',
   variant = 'default',
   className,
+  onChange,
 }: FollowTeamButtonProps) {
   const router = useRouter();
   const { isAuthenticated } = useAuth();
@@ -63,7 +68,10 @@ export function FollowTeamButton({
     try {
       if (following) {
         const r = await fetch(`/api/teams/${encodeURIComponent(teamId)}/follow`, { method: 'DELETE' });
-        if (r.ok) setFollowing(false);
+        if (r.ok) {
+          setFollowing(false);
+          onChange?.(false);
+        }
       } else {
         const r = await fetch(`/api/teams/${encodeURIComponent(teamId)}/follow`, {
           method: 'POST',
@@ -74,6 +82,7 @@ export function FollowTeamButton({
           setFollowing(true);
           setShowHint(true);
           setTimeout(() => setShowHint(false), 4000);
+          onChange?.(true);
           if (isPushSupported()) {
             ensurePushSubscribed({ topics: ['match_reminders', 'team_news'], countryCode: countryCode || null }).catch(() => {});
           }

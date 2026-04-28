@@ -144,7 +144,7 @@ export default function TeamPage({ params }: PageProps) {
   const { id } = use(params);
   const timezone = getBrowserTimezone();
 
-  const { data, isLoading, error } = useSWR(
+  const { data, isLoading, error, mutate } = useSWR(
     `/api/teams/${encodeURIComponent(id)}`,
     fetcher,
     { revalidateOnFocus: false }
@@ -259,9 +259,17 @@ export default function TeamPage({ params }: PageProps) {
                       </span>
                     )}
                     {team.standing?.position && (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-white/20 px-2 py-0.5 font-semibold">
+                      <span
+                        className="inline-flex items-center gap-1 rounded-full bg-white/20 px-2 py-0.5 font-semibold"
+                        title={team.standing.raw || `${team.standing.position}${team.standing.competition ? ` in ${team.standing.competition}` : ''}`}
+                      >
                         <Trophy className="h-3 w-3" />
                         {team.standing.position}
+                        {team.standing.competition && (
+                          <span className="ml-1 hidden font-normal text-white/85 sm:inline">
+                            in {team.standing.competition}
+                          </span>
+                        )}
                       </span>
                     )}
                   </div>
@@ -277,6 +285,17 @@ export default function TeamPage({ params }: PageProps) {
                     sportSlug={sportSlug ?? null}
                     countryCode={countryCode ?? null}
                     size="md"
+                    onChange={(now) => {
+                      // Optimistically bump the visible counter so the UI
+                      // reflects the action instantly, then re-fetch the
+                      // canonical count from the server.
+                      mutate(
+                        (current: any) => current
+                          ? { ...current, followersCount: Math.max(0, (current.followersCount ?? 0) + (now ? 1 : -1)) }
+                          : current,
+                        { revalidate: true }
+                      );
+                    }}
                   />
                   <span className="inline-flex items-center gap-1 text-[11px] font-medium text-white/80">
                     <Users className="h-3 w-3" />
@@ -447,9 +466,16 @@ export default function TeamPage({ params }: PageProps) {
                 </div>
               )}
               {team.standing?.position && (
-                <div className="flex items-center justify-between gap-3">
-                  <dt className="text-muted-foreground">League Position</dt>
-                  <dd className="font-medium">{team.standing.position}</dd>
+                <div className="flex items-start justify-between gap-3">
+                  <dt className="text-muted-foreground">Position</dt>
+                  <dd className="text-right font-medium">
+                    {team.standing.position}
+                    {team.standing.competition && (
+                      <div className="text-[11px] font-normal text-muted-foreground">
+                        in {team.standing.competition}
+                      </div>
+                    )}
+                  </dd>
                 </div>
               )}
               {team.record && (

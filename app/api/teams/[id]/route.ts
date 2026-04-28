@@ -163,6 +163,28 @@ export async function GET(
     links.find(l => /official/i.test(l.text || ''))?.href;
   const espnLink = links.find(l => l.rel?.includes('clubhouse'))?.href;
 
+  // ESPN's `standingSummary` is usually a string like "1st in English Premier League"
+  // OR just "11th" depending on the endpoint. We split it so the UI can render
+  // the position and the actual competition it refers to clearly. When ESPN
+  // returns just a bare position with no league name, we fall back to the
+  // league derived from the URL (which is the competition the team was
+  // queried under — e.g. Champions League if you opened the team via the CL
+  // page). This fixes the "PSG showing 11th in EPL" mislabel by NEVER assuming
+  // the position belongs to the team's domestic league.
+  const rawStanding = (t.standingSummary || '').trim();
+  let standingPosition: string | undefined;
+  let standingCompetition: string | undefined;
+  if (rawStanding) {
+    const m = rawStanding.match(/^(.+?)\s+in\s+(.+)$/i);
+    if (m) {
+      standingPosition = m[1].trim();
+      standingCompetition = m[2].trim();
+    } else {
+      standingPosition = rawStanding;
+      standingCompetition = leagueRow?.name;
+    }
+  }
+
   const team = {
     id: t.id,
     name: t.displayName || t.name,
@@ -182,14 +204,16 @@ export async function GET(
     countryCode: leagueRow?.countryCode,
     website: officialSite,
     description: [
-      t.standingSummary,
+      rawStanding,
       t.location && t.franchise?.venue?.fullName
         ? `Plays home matches at ${t.franchise.venue.fullName} in ${t.franchise.venue.address?.city || t.location}.`
         : null,
     ].filter(Boolean).join(' ') || undefined,
     record: t.record?.items?.find((r: { type?: string }) => r.type === 'total')?.summary,
     standing: {
-      position: t.standingSummary,
+      position: standingPosition,
+      competition: standingCompetition,
+      raw: rawStanding || undefined,
     },
     links: {
       espn: espnLink,

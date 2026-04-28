@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { TeamLogo } from '@/components/ui/team-logo';
 import { Loader2, BarChart3, Trophy, Goal } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 const fetcher = (url: string) => fetch(url).then(r => r.json());
 
@@ -97,12 +98,23 @@ function ScorersTable({ leagueId }: { leagueId: number }) {
   if (rows.length === 0) return <p className="py-6 text-center text-sm text-muted-foreground">No top scorers data available.</p>;
   return (
     <div className="space-y-2">
-      {rows.map((s, i) => (
-        <div key={s.athlete?.id || i} className="flex items-center justify-between rounded-lg border border-border bg-card px-3 py-2 hover:bg-muted/30">
+      {rows.map((s, i) => {
+        const pid = s.athlete?.id;
+        const Wrapper: React.ElementType = pid ? Link : 'div';
+        const wrapperProps = pid ? { href: `/players/${encodeURIComponent(pid)}` } : {};
+        return (
+        <Wrapper
+          key={pid || i}
+          {...wrapperProps}
+          className={cn(
+            "flex items-center justify-between rounded-lg border border-border bg-card px-3 py-2 transition-colors",
+            pid ? "hover:border-primary/40 hover:bg-primary/5" : "hover:bg-muted/30"
+          )}
+        >
           <div className="flex items-center gap-3 min-w-0">
             <span className="w-6 text-center text-xs font-bold text-muted-foreground">{s.rank ?? i + 1}</span>
             <div className="min-w-0">
-              <p className="truncate text-sm font-medium">{s.athlete?.displayName || s.athlete?.shortName || '—'}</p>
+              <p className={cn("truncate text-sm font-medium", pid && "group-hover:text-primary")}>{s.athlete?.displayName || s.athlete?.shortName || '—'}</p>
               <p className="truncate text-xs text-muted-foreground">{s.team?.displayName || ''}</p>
             </div>
           </div>
@@ -110,8 +122,8 @@ function ScorersTable({ leagueId }: { leagueId: number }) {
             <Goal className="h-4 w-4" />
             <span className="font-bold">{s.value ?? '-'}</span>
           </div>
-        </div>
-      ))}
+        </Wrapper>
+      );})}
     </div>
   );
 }

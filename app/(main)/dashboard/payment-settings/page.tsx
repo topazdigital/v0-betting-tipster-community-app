@@ -18,7 +18,7 @@ import { Switch } from "@/components/ui/switch"
 import Link from "next/link"
 import { cn } from "@/lib/utils"
 
-type MethodType = 'paypal' | 'bank' | 'mobile_money' | 'crypto' | 'stripe'
+type MethodType = 'paypal' | 'bank' | 'mobile_money' | 'crypto' | 'stripe' | 'gpay'
 
 interface PayoutMethod {
   id: string
@@ -87,9 +87,19 @@ const METHOD_META: Record<MethodType, {
       { key: 'email', label: 'Stripe Account Email', placeholder: 'your@stripe.email', type: 'email' },
     ],
   },
+  gpay: {
+    label: 'Google Pay',
+    icon: Wallet,
+    color: 'text-sky-500',
+    fields: [
+      { key: 'email', label: 'Google Pay Account Email', placeholder: 'your@gmail.com', type: 'email' },
+      { key: 'phone', label: 'Linked Phone (optional)', placeholder: '+1 555 123 4567' },
+      { key: 'country', label: 'Country', placeholder: 'e.g. United States, Kenya, India' },
+    ],
+  },
 }
 
-const METHOD_TYPES: MethodType[] = ['paypal', 'mobile_money', 'bank', 'crypto', 'stripe']
+const METHOD_TYPES: MethodType[] = ['paypal', 'gpay', 'mobile_money', 'bank', 'crypto', 'stripe']
 
 export default function PaymentSettingsPage() {
   const { user, isLoading: authLoading } = useAuth()

@@ -12,12 +12,113 @@ interface ChatMsg {
   ts: number
 }
 
-const SUGGESTIONS = [
-  "What is a good value bet?",
-  "Explain Over 2.5 goals",
-  "How should I size my stakes?",
-  "Help — I lost 3 in a row",
-]
+// ───────────────────────────────────────────────────────────────────────
+// Dynamic suggestion engine
+// ───────────────────────────────────────────────────────────────────────
+// We never want the same 4 canned chips on every page load — feels stale and
+// makes the AI look dumb. Instead we keep a large POOL split into general
+// betting questions and per-page contextual questions, then pick 4 fresh
+// suggestions for each chat session that:
+//   1. Are relevant to the user's current page (match / tipster / dashboard…)
+//   2. Rotate randomly so opening the chat twice in a row feels different
+//   3. Always include at least one "discoverable feature" prompt so users
+//      learn what the app can do (compare odds, AI prediction, etc.)
+const SUGGESTION_POOL = {
+  generic: [
+    "What's a value bet?",
+    "How big should my stake be?",
+    "Explain Over 2.5 goals",
+    "Explain BTTS in plain English",
+    "Help — I lost 3 in a row",
+    "What's a safe accumulator?",
+    "How does your AI Prediction work?",
+    "Best market for low-scoring matches?",
+    "How do I read American vs Decimal odds?",
+    "What's the Kelly criterion?",
+    "How do I compare bookmaker odds here?",
+    "What's the difference between 1X2 and Double Chance?",
+    "Tips for live (in-play) betting?",
+    "How do I follow my favourite team?",
+    "Where do I see today's best picks?",
+  ],
+  match: [
+    "Who do you fancy in this match?",
+    "What's the value bet here?",
+    "Will both teams score?",
+    "Over 2.5 goals — yes or no?",
+    "Read me the H2H — any pattern?",
+    "Best market for this fixture?",
+    "Is the home team good value?",
+    "Suggest a safe Double Chance pick",
+    "What confidence would you give this pick?",
+    "Any injury concerns I should know?",
+    "How does the AI Prediction widget see this?",
+  ],
+  tipster: [
+    "Is this tipster worth following?",
+    "How is their ROI calculated?",
+    "What does their streak mean?",
+    "Compare them to the leaderboard average",
+    "Explain win-rate vs ROI — which matters more?",
+    "Should I copy a tipster's stake size?",
+  ],
+  league: [
+    "Which team is in best form here?",
+    "Show me the top scorers in this league",
+    "Any upsets brewing this round?",
+    "Best Over 2.5 league for tonight?",
+    "Which fixtures have the sharpest odds?",
+  ],
+  live: [
+    "Any value in the live odds right now?",
+    "Best live market for late goals?",
+    "Should I cash out a winning bet?",
+    "How do you read momentum from the live timer?",
+  ],
+  dashboard: [
+    "Help me set a daily loss limit",
+    "How do I track my ROI?",
+    "Suggest a 7-day strategy",
+    "What's healthy bankroll discipline?",
+    "How do I add a new payout method?",
+  ],
+} as const
+
+type SuggestionContext = keyof typeof SUGGESTION_POOL
+
+function pickContextFromPath(pathname: string | null): SuggestionContext {
+  if (!pathname) return 'generic'
+  if (/^\/matches\/[^/]+/.test(pathname)) return 'match'
+  if (/^\/tipsters\/[^/]+/.test(pathname)) return 'tipster'
+  if (/^\/leagues\/[^/]+/.test(pathname)) return 'league'
+  if (pathname.startsWith('/live')) return 'live'
+  if (pathname.startsWith('/dashboard')) return 'dashboard'
+  return 'generic'
+}
+
+function shuffle<T>(arr: readonly T[]): T[] {
+  const out = [...arr]
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[out[i], out[j]] = [out[j], out[i]]
+  }
+  return out
+}
+
+function buildSuggestions(pathname: string | null, count = 4): string[] {
+  const ctx = pickContextFromPath(pathname)
+  const contextual = ctx === 'generic' ? [] : shuffle(SUGGESTION_POOL[ctx])
+  const generic = shuffle(SUGGESTION_POOL.generic)
+  // Mix: roughly 60% contextual + 40% generic so the chips feel grounded in
+  // what the user is looking at but still surface app-wide tricks.
+  const contextualCount = Math.min(contextual.length, Math.ceil(count * 0.6))
+  const merged = [
+    ...contextual.slice(0, contextualCount),
+    ...generic.slice(0, count - contextualCount),
+  ]
+  // De-duplicate and trim
+  return Array.from(new Set(merged)).slice(0, count)
+}
 
 const STORAGE_KEY = "bcz_ai_chat_v1"
 const SESSION_KEY = "bcz_ai_session_v1"
@@ -46,8 +147,24 @@ export function AIChatButton() {
   const [input, setInput] = useState("")
   const [busy, setBusy] = useState(false)
   const [unread, setUnread] = useState(false)
+  const [suggestions, setSuggestions] = useState<string[]>([])
   const scrollRef = useRef<HTMLDivElement | null>(null)
   const pathname = usePathname()
+
+  // Refresh the suggestion chips every time the user opens the chat OR the
+  // page changes underneath them. This guarantees the prompts feel fresh and
+  // contextual ("Who do you fancy?" on a match page, "Help me set a loss
+  // limit" on the dashboard, etc.) — not the same 4 stale placeholders.
+  useEffect(() => {
+    if (open) setSuggestions(buildSuggestions(pathname))
+  }, [open, pathname])
+
+  // Also seed an initial set on mount so the chips are ready instantly when
+  // the user pops open the chat for the first time.
+  useEffect(() => {
+    setSuggestions(buildSuggestions(pathname))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // Build a small "what page am I on" hint so the LLM can answer
   // questions like "explain this match" with the right context.
@@ -236,12 +353,12 @@ export function AIChatButton() {
             )}
           </div>
 
-          {/* Suggestions (only when chat is fresh) */}
-          {msgs.length <= 2 && (
-            <div className="px-3 pb-2 flex flex-wrap gap-1.5">
-              {SUGGESTIONS.map((s, i) => (
+          {/* Suggestions — contextual & rotated each time you open the chat */}
+          {msgs.length <= 2 && suggestions.length > 0 && (
+            <div className="px-3 pb-2 flex flex-wrap gap-1.5 items-center">
+              {suggestions.map((s, i) => (
                 <button
-                  key={i}
+                  key={`${s}-${i}`}
                   onClick={() => send(s)}
                   disabled={busy}
                   className="text-[11px] px-2.5 py-1 rounded-full border border-border bg-background hover:bg-muted/50 transition-colors disabled:opacity-50 text-muted-foreground hover:text-foreground"
@@ -249,6 +366,15 @@ export function AIChatButton() {
                   {s}
                 </button>
               ))}
+              <button
+                onClick={() => setSuggestions(buildSuggestions(pathname))}
+                disabled={busy}
+                title="Show different suggestions"
+                aria-label="Refresh suggestions"
+                className="ml-auto inline-flex h-6 w-6 items-center justify-center rounded-full border border-border bg-background text-muted-foreground hover:text-foreground hover:bg-muted/50 disabled:opacity-50"
+              >
+                <MessageSquare className="h-3 w-3" />
+              </button>
             </div>
           )}
 

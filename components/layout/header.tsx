@@ -2,8 +2,9 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import { Search, Bell, User, ChevronDown, Settings, LogOut, Menu, X } from 'lucide-react';
+import { Bell, User, ChevronDown, Settings, LogOut, Menu, X } from 'lucide-react';
 import { ThemeToggle } from '@/components/theme-toggle';
+import { HeaderSearch } from '@/components/layout/header-search';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -12,7 +13,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Input } from '@/components/ui/input';
 import { useAuth } from '@/contexts/auth-context';
 import { useAuthModal } from '@/contexts/auth-modal-context';
 import { useUserSettings } from '@/contexts/user-settings-context';
@@ -29,7 +29,6 @@ export function Header() {
   const { user, isAuthenticated, logout } = useAuth();
   const { open: openAuthModal } = useAuthModal();
   const { settings, setOddsFormat } = useUserSettings();
-  const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [branding, setBranding] = useState<{ siteName: string; logoUrl: string; logoDarkUrl: string }>({
     siteName: 'Betcheza',
@@ -107,26 +106,9 @@ export function Header() {
 
         {/* Right Section */}
         <div className="flex items-center gap-2">
-          {/* Search */}
+          {/* Search — typeahead across matches, leagues, teams, tipsters */}
           <div className="relative hidden sm:block">
-            {isSearchOpen ? (
-              <div className="flex items-center gap-2">
-                <Input
-                  type="search"
-                  placeholder="Search matches, tipsters..."
-                  className="w-64"
-                  autoFocus
-                  onBlur={() => setIsSearchOpen(false)}
-                />
-                <Button variant="ghost" size="icon" onClick={() => setIsSearchOpen(false)}>
-                  <X className="h-4 w-4" />
-                </Button>
-              </div>
-            ) : (
-              <Button variant="ghost" size="icon" onClick={() => setIsSearchOpen(true)}>
-                <Search className="h-4 w-4" />
-              </Button>
-            )}
+            <HeaderSearch />
           </div>
 
           {/* Theme Toggle */}
