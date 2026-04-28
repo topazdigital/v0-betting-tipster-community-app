@@ -43,7 +43,7 @@ interface StandingRow {
   points: number
 }
 
-interface OutrightOutcome { name: string; price: number }
+interface OutrightOutcome { name: string; price: number; link?: string }
 interface OutrightMarket { id: string; name: string; outcomes: OutrightOutcome[] }
 
 interface ScorerRow {
@@ -465,9 +465,22 @@ export default function LeaguePage({ params }: PageProps) {
                             <Star className="h-3 w-3 shrink-0 text-warning" />
                           )}
                         </div>
-                        <span className="ml-2 shrink-0 font-mono font-bold text-success">
-                          {o.price.toFixed(2)}
-                        </span>
+                        <div className="ml-2 flex shrink-0 items-center gap-2">
+                          <span className="font-mono font-bold text-success">
+                            {o.price.toFixed(2)}
+                          </span>
+                          {o.link && (
+                            <a
+                              href={o.link}
+                              target="_blank"
+                              rel="nofollow noopener sponsored"
+                              className="rounded-md bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-500 text-[10px] font-semibold px-1.5 py-0.5"
+                              title="Open the bookmaker's bet slip"
+                            >
+                              Bet
+                            </a>
+                          )}
+                        </div>
                       </div>
                     ))
                   )}

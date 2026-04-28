@@ -803,6 +803,40 @@ export async function GET(_request: NextRequest, context: RouteContext) {
     );
 
     const bookmakerOdds = summary ? buildBookmakerOdds(summary, hasDraw) : [];
+
+    // Enrich with SportsGameOdds bookmakers (FanDuel, DraftKings, ESPN BET,
+    // Bet365, William Hill, Paddy Power, Polymarket, ...). SGO is the only
+    // provider that ships per-book deeplinks, which lets the UI offer an
+    // Oddspedia-style "Bet now" link for each row.
+    try {
+      const { getSgoBookmakerLines } = await import('@/lib/api/sportsgameodds');
+      // `match.kickoffTime` is a Date — convert to ISO so SGO can date-filter.
+      const isoKickoff = match.kickoffTime instanceof Date
+        ? match.kickoffTime.toISOString()
+        : new Date(match.kickoffTime as unknown as string).toISOString();
+      const sgoLines = await getSgoBookmakerLines(
+        match.homeTeam.name,
+        match.awayTeam.name,
+        isoKickoff,
+        hasDraw,
+      );
+      const seen = new Set(bookmakerOdds.map(o => o.bookmaker.toLowerCase()));
+      for (const sl of sgoLines) {
+        if (seen.has(sl.display.toLowerCase())) continue;
+        bookmakerOdds.push({
+          bookmaker: sl.display,
+          home: sl.home,
+          draw: sl.draw,
+          away: sl.away,
+          // Surface deeplinks so the UI can render "Bet now" buttons.
+          links: sl.links,
+        } as typeof bookmakerOdds[number] & { links?: { home?: string; draw?: string; away?: string } });
+        seen.add(sl.display.toLowerCase());
+      }
+    } catch (err) {
+      // SGO is best-effort — never block the match details response.
+      console.warn('[match details] SGO enrichment failed:', err);
+    }
     const lineups = summary ? buildLineups(summary) : null;
     let h2h = summary ? buildH2H(summary) : null;
     // Fallback: when ESPN's summary doesn't include H2H (common for smaller

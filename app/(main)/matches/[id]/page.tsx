@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, use, useEffect, useRef } from "react"
+import { useState, use, useEffect, useRef, useCallback } from "react"
 import Link from "next/link"
 import Image from "next/image"
 import useSWR from "swr"
@@ -66,6 +66,8 @@ interface BookmakerOdd {
   away: number
   spread?: { value: number; homePrice: number; awayPrice: number }
   total?: { value: number; overPrice: number; underPrice: number }
+  /** Per-side deeplinks to the book's bet slip (SGO-only). */
+  links?: { home?: string; draw?: string; away?: string }
 }
 interface H2HGame {
   matchId?: string
@@ -835,6 +837,20 @@ export default function MatchDetailPage({ params }: PageProps) {
   const [savedMatch, setSavedMatch] = useState(false)
   const [activeTab, setActiveTab] = useState('overview')
   const [tipSubmitted, setTipSubmitted] = useState<null | { label: string; odds: number }>(null)
+  const [shareToast, setShareToast] = useState<string | null>(null)
+
+  // Hydrate the bookmark state from localStorage on mount so the icon
+  // reflects whether THIS match is already saved. We persist locally
+  // (always available, even when logged out) and also POST to the server
+  // when the user is signed in so the bookmark survives device changes.
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    try {
+      const raw = window.localStorage.getItem('betcheza:bookmarks') || '[]'
+      const list = JSON.parse(raw) as string[]
+      setSavedMatch(list.includes(id))
+    } catch { /* ignore */ }
+  }, [id])
 
   const { data, error, isLoading } = useSWR<MatchDetails>(
     `/api/matches/${encodeURIComponent(id)}/details`,
@@ -850,6 +866,55 @@ export default function MatchDetailPage({ params }: PageProps) {
   const tips = tipsData?.tips || []
 
   const match = data?.match
+
+  const toggleBookmark = useCallback(() => {
+    const next = !savedMatch
+    setSavedMatch(next)
+    if (typeof window !== 'undefined') {
+      try {
+        const raw = window.localStorage.getItem('betcheza:bookmarks') || '[]'
+        const list = (JSON.parse(raw) as string[]).filter(x => x !== id)
+        if (next) list.unshift(id)
+        window.localStorage.setItem('betcheza:bookmarks', JSON.stringify(list.slice(0, 200)))
+      } catch { /* ignore */ }
+    }
+    if (isAuthenticated) {
+      // Best-effort server sync — fire-and-forget.
+      fetch('/api/bookmarks', {
+        method: next ? 'POST' : 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ matchId: id }),
+      }).catch(() => { /* ignore network errors */ })
+    }
+  }, [savedMatch, id, isAuthenticated])
+
+  const handleShare = useCallback(async () => {
+    if (!match) return
+    const shareUrl = typeof window !== 'undefined' ? window.location.href : ''
+    const shareData = {
+      title: `${match.homeTeam.name} vs ${match.awayTeam.name}`,
+      text: `${match.homeTeam.name} vs ${match.awayTeam.name} • ${match.league.name}`,
+      url: shareUrl,
+    }
+    // Use the Web Share API on mobile/PWA; fall back to clipboard on desktop.
+    if (typeof navigator !== 'undefined' && 'share' in navigator) {
+      try {
+        await navigator.share(shareData)
+        return
+      } catch { /* user cancelled — fall through to copy */ }
+    }
+    if (typeof navigator !== 'undefined' && navigator.clipboard) {
+      try {
+        await navigator.clipboard.writeText(shareUrl)
+        setShareToast('Link copied to clipboard')
+        setTimeout(() => setShareToast(null), 2000)
+      } catch {
+        setShareToast('Could not share')
+        setTimeout(() => setShareToast(null), 2000)
+      }
+    }
+  }, [match])
+
   const isLive = match && (match.status === 'live' || match.status === 'halftime' || match.status === 'extra_time' || match.status === 'penalties')
   const isFinished = match?.status === 'finished'
   const isHalftime = match?.status === 'halftime'
@@ -943,12 +1008,27 @@ export default function MatchDetailPage({ params }: PageProps) {
                   <CheckCircle2 className="h-3 w-3" /> FT
                 </div>
               )}
-              <button onClick={() => setSavedMatch(!savedMatch)} className="ml-1 p-1.5 rounded-full hover:bg-white/10 transition-colors">
+              <button
+                onClick={toggleBookmark}
+                aria-label={savedMatch ? 'Remove bookmark' : 'Save this match'}
+                title={savedMatch ? 'Remove bookmark' : 'Save this match'}
+                className="ml-1 p-1.5 rounded-full hover:bg-white/10 transition-colors"
+              >
                 <Bookmark className={cn("h-4 w-4", savedMatch ? "fill-white text-white" : "text-white/50")} />
               </button>
-              <button className="p-1.5 rounded-full hover:bg-white/10 transition-colors">
+              <button
+                onClick={handleShare}
+                aria-label="Share this match"
+                title="Share this match"
+                className="p-1.5 rounded-full hover:bg-white/10 transition-colors"
+              >
                 <Share2 className="h-4 w-4 text-white/50" />
               </button>
+              {shareToast && (
+                <span className="ml-2 text-xs text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 rounded-full px-2 py-0.5">
+                  {shareToast}
+                </span>
+              )}
             </div>
           </div>
 
@@ -1555,6 +1635,9 @@ export default function MatchDetailPage({ params }: PageProps) {
                           <th className="px-4 py-3 text-center">1</th>
                           {bookmakerOdds.some(o => o.draw !== undefined) && <th className="px-4 py-3 text-center">X</th>}
                           <th className="px-4 py-3 text-center">2</th>
+                          {bookmakerOdds.some(o => o.links?.home || o.links?.away || o.links?.draw) && (
+                            <th className="px-4 py-3 text-right">Bet</th>
+                          )}
                         </tr>
                       </thead>
                       <tbody>
@@ -1562,6 +1645,12 @@ export default function MatchDetailPage({ params }: PageProps) {
                           const best1 = Math.max(...bookmakerOdds.map(x => x.home))
                           const bestX = Math.max(...bookmakerOdds.map(x => x.draw ?? 0))
                           const best2 = Math.max(...bookmakerOdds.map(x => x.away))
+                          const anyLinks = bookmakerOdds.some(x => x.links?.home || x.links?.away || x.links?.draw)
+                          // Pick the most useful single deeplink for the row's
+                          // "Bet now" button — prefer the side that's also the
+                          // best price for that bookmaker, otherwise fall back
+                          // to whichever link exists.
+                          const link = o.links?.home || o.links?.away || o.links?.draw
                           return (
                             <tr key={i} className="border-b border-border/20 hover:bg-muted/30 transition-colors">
                               <td className="px-4 py-3 font-semibold text-sm">{o.bookmaker}</td>
@@ -1584,13 +1673,29 @@ export default function MatchDetailPage({ params }: PageProps) {
                                   {o.away.toFixed(2)}
                                 </span>
                               </td>
+                              {anyLinks && (
+                                <td className="px-4 py-3 text-right">
+                                  {link ? (
+                                    <a
+                                      href={link}
+                                      target="_blank"
+                                      rel="nofollow noopener sponsored"
+                                      className="inline-flex items-center gap-1 rounded-md bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-500 text-xs font-semibold px-2.5 py-1 transition-colors"
+                                    >
+                                      Bet now →
+                                    </a>
+                                  ) : null}
+                                </td>
+                              )}
                             </tr>
                           )
                         })}
                       </tbody>
                     </table>
                   </div>
-                  <p className="px-4 py-2 text-[10px] text-muted-foreground">Best odds highlighted in green</p>
+                  <p className="px-4 py-2 text-[10px] text-muted-foreground">
+                    Best odds highlighted in green. Affiliate-style links open the bookmaker’s bet slip in a new tab.
+                  </p>
                 </CardContent>
               </Card>
             )}

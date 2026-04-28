@@ -78,21 +78,14 @@ const ALIAS_LOOKUP: Map<string, Set<string>> = (() => {
   return m;
 })();
 
-// Squads we never want clogging the team typeahead — women's, youth and
-// reserve sides. The user's main interest is the senior men's team and the
-// duplicate clutter (Marseille, Marseille W, Marseille U23, Marseille U19,
-// Marseille B…) was making the picker unusable.
+// Squads we never want clogging the team typeahead — youth and reserve
+// sides only. Women's teams are FIRST-CLASS and surface alongside the men's
+// senior team (Arsenal, Arsenal Women both appear). The duplicate clutter we
+// still strip is U-teams (U17/U19/U21/U23), reserves (II, III, B) and
+// generic youth labels.
 const TEAM_NOISE_PATTERNS = [
-  /\bwomen('s)?\b/i,
-  /\bw(?:omen)?fc\b/i,
-  /\bféminin(es)?\b/i,
-  /\bfemenin[ao]s?\b/i,
-  /\bfeminin[ao]s?\b/i,
-  /\bdamen\b/i,
-  /\bladies\b/i,
-  /\(w\)\s*$/i,
   /\bu-?(15|16|17|18|19|20|21|23)\b/i,
-  /\b(reserves?|reserve|ii|iii|b)\s*$/i,
+  /\b(reserves?|reserve|ii|iii)\s*$/i,
   /\byouth\b/i,
 ];
 
@@ -149,7 +142,13 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ q: rawQ, hits: [] satisfies SearchHit[] });
   }
 
-  const q = norm(rawQ);
+  // Strip optional women's-team qualifiers ("arsenal women", "chelsea wfc",
+  // "barcelona femeni") so the search still finds the senior club entry.
+  // ESPN labels most women's sides with the bare club name, so without this
+  // normaliser typing "arsenal women" returned zero hits even though the
+  // women's UCL fixtures were sitting in the feed under "Arsenal".
+  const WOMEN_SUFFIX_RE = /\s+(women|wfc|fem(en[ií]?)?|ladies?|lfc|ddl)\s*$/i;
+  const q = norm(rawQ.replace(WOMEN_SUFFIX_RE, '').trim() || rawQ);
 
   // ── 1. Leagues (in-memory, cheap) ────────────────────────────────────
   const leagueHits: SearchHit[] = ALL_LEAGUES

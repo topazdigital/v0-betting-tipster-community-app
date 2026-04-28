@@ -38,6 +38,14 @@ interface Settings {
   social_links: string
   cookie_banner_enabled: string
   cookie_banner_message: string
+  // API keys (stored in site_settings; env vars take precedence at read time
+  // unless overridden by the dedicated *_override flag).
+  the_odds_api_key: string
+  sportsgameodds_api_key: string
+  openai_api_key: string
+  vapid_public_key: string
+  vapid_private_key: string
+  vapid_subject: string
 }
 
 interface SocialLink {
@@ -108,6 +116,12 @@ const defaultSettings: Settings = {
   cookie_banner_enabled: "true",
   cookie_banner_message:
     'We use cookies to improve your experience, analyse site traffic and personalise content. By clicking "Accept", you consent to our use of cookies.',
+  the_odds_api_key: "",
+  sportsgameodds_api_key: "",
+  openai_api_key: "",
+  vapid_public_key: "",
+  vapid_private_key: "",
+  vapid_subject: "",
 }
 
 interface SeoPageEntry { path: string; title?: string; description?: string; keywords?: string; ogImage?: string; noIndex?: boolean }
@@ -223,7 +237,7 @@ export default function AdminSettingsPage() {
       )}
 
       <Tabs defaultValue="general" className="space-y-3">
-        <TabsList className="grid w-full grid-cols-2 md:w-auto md:grid-cols-10">
+        <TabsList className="grid w-full grid-cols-2 md:w-auto md:grid-cols-11">
           <TabsTrigger value="general" className="gap-2">
             <Globe className="h-4 w-4" /> General
           </TabsTrigger>
@@ -253,6 +267,9 @@ export default function AdminSettingsPage() {
           </TabsTrigger>
           <TabsTrigger value="social" className="gap-2">
             <Share2 className="h-4 w-4" /> Social
+          </TabsTrigger>
+          <TabsTrigger value="apikeys" className="gap-2">
+            <KeyRound className="h-4 w-4" /> API Keys
           </TabsTrigger>
         </TabsList>
 
@@ -621,6 +638,67 @@ export default function AdminSettingsPage() {
             onChange={(next) => updateSetting('social_links', next)}
           />
         </TabsContent>
+
+        {/* API Keys */}
+        <TabsContent value="apikeys">
+          <Card>
+            <CardHeader>
+              <CardTitle>External API keys</CardTitle>
+              <CardDescription>
+                Stored securely in the site settings table. When set here, these keys override the matching environment variables — leave blank to use the env var instead. Click Save at the top of the page to apply.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-5">
+              <ApiKeyField
+                label="The Odds API key"
+                hint="Powers outright winners and US/EU bookmaker odds. Get one at the-odds-api.com."
+                value={settings.the_odds_api_key}
+                onChange={(v) => updateSetting('the_odds_api_key', v)}
+              />
+              <ApiKeyField
+                label="SportsGameOdds API key"
+                hint="Optional. Adds extra bookmakers (FanDuel, DraftKings, Bet365, William Hill...) and deeplinks to the odds comparison panel."
+                value={settings.sportsgameodds_api_key}
+                onChange={(v) => updateSetting('sportsgameodds_api_key', v)}
+              />
+              <ApiKeyField
+                label="OpenAI API key"
+                hint="Used by the AI tip-generation features. Falls back to OPENAI_API_KEY when blank."
+                value={settings.openai_api_key}
+                onChange={(v) => updateSetting('openai_api_key', v)}
+              />
+              <div className="border-t pt-4 space-y-4">
+                <div>
+                  <h4 className="text-sm font-semibold">Web push (VAPID)</h4>
+                  <p className="text-xs text-muted-foreground">
+                    Required to send browser push notifications. Generate a VAPID key pair with <code className="rounded bg-muted px-1">npx web-push generate-vapid-keys</code>.
+                  </p>
+                </div>
+                <ApiKeyField
+                  label="VAPID public key"
+                  hint="Shared with browsers when they subscribe."
+                  value={settings.vapid_public_key}
+                  onChange={(v) => updateSetting('vapid_public_key', v)}
+                  reveal
+                />
+                <ApiKeyField
+                  label="VAPID private key"
+                  hint="Used by the server to sign push messages. Keep this secret."
+                  value={settings.vapid_private_key}
+                  onChange={(v) => updateSetting('vapid_private_key', v)}
+                />
+                <div className="space-y-1.5">
+                  <Label className="text-xs">VAPID subject (email or URL)</Label>
+                  <Input
+                    placeholder="mailto:admin@betcheza.com"
+                    value={settings.vapid_subject}
+                    onChange={(e) => updateSetting('vapid_subject', e.target.value)}
+                  />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
       </Tabs>
     </div>
   )
@@ -849,4 +927,43 @@ function RewritesEditor({ value, onChange }: { value: RewriteEntry[]; onChange: 
       </CardContent>
     </Card>
   );
+}
+
+function ApiKeyField({
+  label,
+  hint,
+  value,
+  onChange,
+  reveal: initialReveal = false,
+}: {
+  label: string
+  hint?: string
+  value: string
+  onChange: (next: string) => void
+  reveal?: boolean
+}) {
+  const [reveal, setReveal] = useState(initialReveal)
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-center justify-between gap-2">
+        <Label className="text-xs">{label}</Label>
+        <button
+          type="button"
+          onClick={() => setReveal((r) => !r)}
+          className="text-[11px] text-muted-foreground hover:text-foreground underline-offset-2 hover:underline"
+        >
+          {reveal ? 'Hide' : 'Show'}
+        </button>
+      </div>
+      <Input
+        type={reveal ? 'text' : 'password'}
+        autoComplete="off"
+        spellCheck={false}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={value ? '' : 'Leave blank to use environment variable'}
+      />
+      {hint && <p className="text-[11px] text-muted-foreground">{hint}</p>}
+    </div>
+  )
 }

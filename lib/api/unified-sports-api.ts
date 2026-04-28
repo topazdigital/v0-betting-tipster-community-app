@@ -191,6 +191,8 @@ export interface Outright {
   outcomes: {
     name: string;
     price: number;
+    /** Optional deeplink to the bookmaker's bet slip (SGO only). */
+    link?: string;
   }[];
 }
 
@@ -2154,7 +2156,10 @@ export async function fetchTheOddsAPI(
   endpoint: string,
   params: Record<string, string> = {}
 ): Promise<unknown> {
-  const apiKey = process.env.THE_ODDS_API_KEY;
+  // Read from admin DB first, fall back to env var. Allows admins to
+  // rotate the key from /admin/settings → API Keys without redeploy.
+  const { getApiKey } = await import('@/lib/api-keys');
+  const apiKey = await getApiKey('the_odds_api_key');
   if (!apiKey || apiKey === 'your_api_key_here') {
     return null;
   }
@@ -2338,7 +2343,8 @@ async function fetchOddsForSport(sportKey: string): Promise<TheOddsApiEvent[]> {
 
 // Build a lookup of real odds keyed by normalized team pair
 async function buildRealOddsIndex(): Promise<Map<string, { odds: MatchOdds; markets: Market[] }>> {
-  const apiKey = process.env.THE_ODDS_API_KEY;
+  const { getApiKey } = await import('@/lib/api-keys');
+  const apiKey = await getApiKey('the_odds_api_key');
   if (!apiKey || apiKey === 'your_api_key_here') return new Map();
 
   const sportKeys = Object.keys(THE_ODDS_API_SPORTS);
@@ -2703,10 +2709,15 @@ export async function getLeagueOutrights(leagueId: number): Promise<Outright[]> 
   const cached = getCached<Outright[]>(cacheKey, CACHE_DURATION.outrights);
   if (cached) return cached;
 
+  // First try SportsGameOdds (covers UCL + MLS on free tier; richer book coverage).
+  // Their data is keyed differently so we run both providers and concat.
+  const { getSgoOutrights } = await import('@/lib/api/sportsgameodds');
+  const sgoOutrights = await getSgoOutrights(leagueId).catch(() => []);
+
   const sportKeys = LEAGUE_TO_ODDS_KEYS[leagueId];
   if (!sportKeys || sportKeys.length === 0) {
-    setCache(cacheKey, []);
-    return [];
+    setCache(cacheKey, sgoOutrights);
+    return sgoOutrights;
   }
 
   // Filter to only sport keys actually active right now in The Odds API —
@@ -2765,6 +2776,17 @@ export async function getLeagueOutrights(leagueId: number): Promise<Outright[]> 
         name: ev.sport_title || 'Outright Winner',
         outcomes,
       });
+    }
+  }
+
+  // Merge in any SGO outrights (de-dup on (name, top outcome)) so we never
+  // show the same market twice if both providers return it.
+  const seen = new Set(outrights.map(o => `${o.name}::${o.outcomes[0]?.name || ''}`));
+  for (const sgo of sgoOutrights) {
+    const key = `${sgo.name}::${sgo.outcomes[0]?.name || ''}`;
+    if (!seen.has(key)) {
+      outrights.push(sgo);
+      seen.add(key);
     }
   }
 
