@@ -41,9 +41,10 @@ function getOpenAI(): OpenAI | null {
   }
 }
 
-// Default model — overridable via env so swapping providers requires no code
-// changes (e.g. set OPENAI_MODEL=gpt-4o when not using AI Integrations).
-const MODEL = process.env.OPENAI_MODEL || 'gpt-4o-mini';
+// Default model — overridable via env. We use gpt-5-mini through Replit AI
+// Integrations: cost-effective, fast and chat-optimised. Override with
+// OPENAI_MODEL=gpt-5.4 etc. if you want a smarter (more expensive) brain.
+const MODEL = process.env.OPENAI_MODEL || 'gpt-5-mini';
 
 // ----- App-knowledge system prompt -----
 // Detailed, opinionated, structured. The LLM answers grounded in this app's
@@ -296,16 +297,23 @@ export async function POST(request: NextRequest) {
     const sessionId = (body.sessionId || '').slice(0, 80) || 'anon';
     const pick = pickAngle(sessionId, lastUserText);
     const nowIso = new Date().toISOString();
-    const repeatNote = pick.repeated
-      ? `\n  - The user has asked essentially the same question again (${pick.repeated ? 'repeat' : 'first time'}). Do NOT reuse your previous reply. Pivot to the angle above and lead with something genuinely new.`
-      : '';
+
+    // Build the anti-repetition instructions. The two strongest signals are:
+    //   (a) the literal text of the last 1-3 replies — we forbid reusing them
+    //   (b) a per-turn rotating angle that genuinely changes the lens
     const banList = pick.bannedOpenings.length
-      ? `\n  - Forbidden opening phrases this turn (you used these recently — paraphrase): ${pick.bannedOpenings.map((o) => `"${o}"`).join(', ')}.`
+      ? `\n  - Forbidden opening phrases this turn (paraphrase, do not reuse): ${pick.bannedOpenings.map((o) => `"${o}"`).join(', ')}.`
+      : '';
+    const priorBlock = pick.recentReplies.length
+      ? `\n\nPRIOR ASSISTANT REPLIES (most recent first) — you MUST NOT repeat these. Don't restate the same facts in the same order, don't reuse the same sentence structure, and don't open with the same wording. Take a different angle, surface different numbers, give a new actionable detail.\n${pick.recentReplies.map((r, i) => `[${i + 1}] ${r}`).join('\n\n')}`
+      : '';
+    const repeatNote = pick.repeated
+      ? `\n  - The user is asking essentially the same question again (streak: ${pick.repeatStreak}). They want MORE/DIFFERENT info. Do not paraphrase your last reply — surface a NEW fact, a NEW market, a NEW number, or a NEW recommendation.`
       : '';
     const freshness = `RESPONSE-VARIETY DIRECTIVE
   - Current time: ${nowIso}
-  - For this reply: ${pick.angle}.
-  - Avoid templated openings like "The match between…", "Based on the data…", "Looking at the…".${banList}${repeatNote}
+  - This turn's lens: ${pick.angle}.
+  - Avoid templated openings ("The match between…", "Based on the data…", "Looking at the…", "Over 2.5 lands…").${banList}${repeatNote}${priorBlock}
 
 `;
 
@@ -318,31 +326,37 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ reply: localReply(lastUserText), source: 'fallback' });
     }
 
-    const completion = await openai.chat.completions.create({
+    // gpt-5 series is a thinking model: max_completion_tokens covers BOTH the
+    // hidden reasoning tokens AND the visible reply. With a small budget it
+    // burns the whole allowance on reasoning and returns an empty string
+    // (finish_reason="length"). For a chat assistant we want a fast, low-
+    // reasoning response, so we set reasoning.effort=minimal and give it a
+    // generous budget. These params are silently ignored by older models.
+    type ReasoningCreate = Parameters<typeof openai.chat.completions.create>[0] & {
+      reasoning_effort?: 'minimal' | 'low' | 'medium' | 'high';
+    };
+    const params: ReasoningCreate = {
       model: MODEL,
       messages: [
         { role: 'system', content: system },
         ...history.map((m) => ({ role: m.role, content: m.content })),
       ],
-      max_completion_tokens: 600,
-      // Higher temperature + light frequency penalty so the model genuinely
-      // varies wording across replies instead of falling back to the same
-      // template every time.
-      temperature: 0.85,
-      frequency_penalty: 0.4,
-      presence_penalty: 0.3,
-    });
+      max_completion_tokens: 2500,
+      reasoning_effort: 'minimal',
+    };
+    const completion = await openai.chat.completions.create(params);
 
     const reply = completion.choices?.[0]?.message?.content?.trim();
     if (!reply) {
-      return NextResponse.json({ reply: localReply(lastUserText), source: 'fallback' });
+      console.warn('[ai/chat] empty completion', { model: MODEL, finish: completion.choices?.[0]?.finish_reason });
+      return NextResponse.json({ reply: localReply(lastUserText), source: 'fallback-empty' });
     }
     rememberReply(sessionId, reply);
-    return NextResponse.json({ reply, source: 'openai' });
+    return NextResponse.json({ reply, source: 'openai', model: MODEL });
   } catch (e) {
     console.error('[ai/chat] error', e);
     return NextResponse.json(
-      { reply: localReply(lastUserText) || "I had a hiccup — try again in a moment. Meanwhile check the AI Prediction widget on any match page.", source: 'fallback' },
+      { reply: localReply(lastUserText) || "I had a hiccup — try again in a moment. Meanwhile check the AI Prediction widget on any match page.", source: 'fallback-error' },
       { status: 200 } // soft-fail so chat keeps working
     );
   }

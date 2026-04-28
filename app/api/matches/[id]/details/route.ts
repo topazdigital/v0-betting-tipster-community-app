@@ -95,15 +95,31 @@ function positionRank(pos?: string): number {
 
 function mapRoster(r: RosterEntry | undefined) {
   if (!r) return null;
-  const players = (r.roster || []).map(p => ({
-    id: (p.athlete as { id?: string | number })?.id ? String((p.athlete as { id?: string | number }).id) : undefined,
-    name: p.athlete?.shortName || p.athlete?.displayName || 'Unknown',
-    fullName: p.athlete?.displayName,
-    position: p.position?.abbreviation || p.position?.name,
-    jersey: p.jersey,
-    starter: !!p.starter,
-    headshot: p.athlete?.headshot,
-  }));
+  const players = (r.roster || []).map(p => {
+    // ESPN sometimes omits athlete.id in soccer rosters even though every
+    // headshot URL embeds the athlete id like
+    //   https://a.espncdn.com/i/headshots/soccer/players/full/123456.png
+    // So we always derive a stable id by inspecting both fields and fall
+    // back to the headshot regex — that gives us a clickable profile in
+    // basically every case.
+    const rawId = (p.athlete as { id?: string | number })?.id;
+    let id = rawId !== undefined && rawId !== null && String(rawId).length > 0
+      ? String(rawId)
+      : undefined;
+    if (!id && p.athlete?.headshot) {
+      const m = String(p.athlete.headshot).match(/players\/full\/(\d+)\.(?:png|jpg)/i);
+      if (m) id = m[1];
+    }
+    return {
+      id,
+      name: p.athlete?.shortName || p.athlete?.displayName || 'Unknown',
+      fullName: p.athlete?.displayName,
+      position: p.position?.abbreviation || p.position?.name,
+      jersey: p.jersey,
+      starter: !!p.starter,
+      headshot: p.athlete?.headshot,
+    };
+  });
   // Sort starters back→front so the goalkeeper is first, then defenders,
   // then midfielders, then forwards. This matches how the FormationPitch
   // component slices players into [GK, defence, midfield, attack] columns.

@@ -7,6 +7,9 @@ interface SessionMemory {
   recentAngles: number[];
   /** First 3 words of recent assistant replies — used to ban repeat openings. */
   recentOpenings: string[];
+  /** Full text of the last few assistant replies. We feed these back into the
+   *  prompt so the model is forced to write something genuinely different. */
+  recentReplies: string[];
   /** Last user question (lower-cased) so we can detect "asked the same thing". */
   lastUserText?: string;
   /** Counter of how many times the user repeated essentially the same question in a row. */
@@ -36,10 +39,11 @@ function evictOld() {
 export function getSession(id: string): SessionMemory {
   let s = sessions.get(id);
   if (!s) {
-    s = { recentAngles: [], recentOpenings: [], repeatCount: 0, ts: Date.now() };
+    s = { recentAngles: [], recentOpenings: [], recentReplies: [], repeatCount: 0, ts: Date.now() };
     sessions.set(id, s);
     evictOld();
   }
+  if (!s.recentReplies) s.recentReplies = [];
   s.ts = Date.now();
   return s;
 }
@@ -67,8 +71,12 @@ export interface AnglePick {
   index: number;
   /** True when the user is asking the same thing again — push the angle harder. */
   repeated: boolean;
+  /** How many turns in a row the user has repeated this question (0 = fresh). */
+  repeatStreak: number;
   /** Banned openings the model must avoid this turn. */
   bannedOpenings: string[];
+  /** Full prior assistant replies (most-recent first) we feed back to the model. */
+  recentReplies: string[];
 }
 
 export const ANGLES = [
@@ -117,14 +125,18 @@ export function pickAngle(sessionId: string, userText: string): AnglePick {
     angle: ANGLES[chosenIndex],
     index: chosenIndex,
     repeated,
+    repeatStreak: s.repeatCount,
     bannedOpenings: [...s.recentOpenings],
+    recentReplies: [...s.recentReplies],
   };
 }
 
-/** Record the assistant's reply opening so we can ban it next turn. */
+/** Record the assistant's reply opening + full text so we can force the next
+ *  turn to be genuinely different. */
 export function rememberReply(sessionId: string, reply: string) {
   const s = getSession(sessionId);
-  const opening = reply
+  const cleaned = reply.trim();
+  const opening = cleaned
     .replace(/[^A-Za-z0-9 .,!?'-]/g, ' ')
     .trim()
     .split(/\s+/)
@@ -132,5 +144,8 @@ export function rememberReply(sessionId: string, reply: string) {
     .join(' ');
   if (opening) {
     s.recentOpenings = [opening, ...s.recentOpenings.filter((o) => o !== opening)].slice(0, 5);
+  }
+  if (cleaned) {
+    s.recentReplies = [cleaned.slice(0, 600), ...s.recentReplies].slice(0, 3);
   }
 }
