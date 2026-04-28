@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import Link from "next/link"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -10,6 +11,7 @@ import Image from "next/image"
 import { cn } from "@/lib/utils"
 
 interface Player {
+  id?: string
   name: string
   fullName?: string
   position?: string
@@ -38,11 +40,19 @@ interface LineupsProps {
 
 function PlayerRow({ player, bench }: { player: Player; bench?: boolean }) {
   const [imgError, setImgError] = useState(false)
+  // Larger headshot (40px) when we have one — much more recognisable than the
+  // tiny 24px chips. Players become a clickable link when an id is present.
+  const Wrapper: React.ElementType = player.id ? Link : 'div'
+  const wrapperProps = player.id ? { href: `/players/${player.id}` } : {}
+
   return (
-    <div className={cn(
-      "flex items-center gap-2.5 rounded-lg px-3 py-2 hover:bg-muted/50 transition-colors",
-      bench && "opacity-70"
-    )}>
+    <Wrapper
+      {...(wrapperProps as Record<string, unknown>)}
+      className={cn(
+        "group flex items-center gap-2.5 rounded-lg px-3 py-2 transition-colors",
+        player.id ? "hover:bg-primary/10" : "hover:bg-muted/50",
+        bench && "opacity-70"
+      )}>
       <span className="w-6 text-center font-mono text-xs font-bold text-muted-foreground shrink-0">
         {player.jersey || "—"}
       </span>
@@ -50,24 +60,29 @@ function PlayerRow({ player, bench }: { player: Player; bench?: boolean }) {
         <Image
           src={player.headshot}
           alt={player.name}
-          width={24}
-          height={24}
+          width={36}
+          height={36}
           className="rounded-full ring-1 ring-border shrink-0 object-cover"
           onError={() => setImgError(true)}
           unoptimized
         />
       ) : (
-        <div className="h-6 w-6 rounded-full bg-primary/10 shrink-0 flex items-center justify-center text-[9px] font-bold text-primary">
+        <div className="h-9 w-9 rounded-full bg-primary/10 shrink-0 flex items-center justify-center text-[11px] font-bold text-primary">
           {(player.fullName || player.name).slice(0, 1)}
         </div>
       )}
-      <span className="flex-1 truncate text-sm font-medium">{player.fullName || player.name}</span>
+      <span className={cn(
+        "flex-1 truncate text-sm font-medium",
+        player.id && "group-hover:text-primary group-hover:underline underline-offset-2"
+      )}>
+        {player.fullName || player.name}
+      </span>
       {player.position && (
         <Badge variant="outline" className="text-[9px] py-0 px-1.5 shrink-0 uppercase">
           {player.position}
         </Badge>
       )}
-    </div>
+    </Wrapper>
   )
 }
 

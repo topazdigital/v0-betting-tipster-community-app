@@ -5,6 +5,9 @@
 
 import { ALL_SPORTS, ALL_LEAGUES, type LeagueConfig } from '@/lib/sports-data';
 import { fetchTSDBMatches } from './the-sports-db';
+import { fetchOpenLigaDBMatches } from './openligadb';
+import { fetchFootballDataOrgMatches } from './football-data-org';
+import { fetchFotMobMatches } from './fotmob';
 
 // ============================================
 // Types
@@ -2123,11 +2126,22 @@ export async function getAllMatches(): Promise<UnifiedMatch[]> {
     }
   };
 
-  // Fetch ESPN matches, real odds index AND TheSportsDB extra leagues in parallel
-  const [espnResults, realOddsIndex, tsdbMatches] = await Promise.all([
+  // Fetch ESPN matches, real odds index AND every supplementary feed in parallel.
+  // Each .catch() ensures one source going down never blocks the others.
+  const [
+    espnResults,
+    realOddsIndex,
+    tsdbMatches,
+    oldbMatches,
+    fdMatches,
+    fmMatches,
+  ] = await Promise.all([
     Promise.allSettled(ESPN_LEAGUES.map(config => getESPNMatches(config))),
     buildRealOddsIndex(),
     fetchTSDBMatches().catch(() => [] as UnifiedMatch[]),
+    fetchOpenLigaDBMatches().catch(() => [] as UnifiedMatch[]),
+    fetchFootballDataOrgMatches().catch(() => [] as UnifiedMatch[]),
+    fetchFotMobMatches().catch(() => [] as UnifiedMatch[]),
   ]);
 
   for (const result of espnResults) {
@@ -2153,22 +2167,27 @@ export async function getAllMatches(): Promise<UnifiedMatch[]> {
     }
   }
 
-  // Merge in TheSportsDB matches (Kenya, Tanzania, Uganda, Cyprus, etc.)
-  // ESPN doesn't cover these leagues, so we won't have duplicates in practice,
-  // but the dedupe in addMatch is a belt-and-braces guard.
-  for (const match of tsdbMatches) {
-    // Try to enrich with real bookmaker odds (unlikely for small leagues but worth probing)
-    if (realOddsIndex.size > 0) {
-      const homeNorm = normalizeTeamName(match.homeTeam.name);
-      const awayNorm = normalizeTeamName(match.awayTeam.name);
-      const dateKey = new Date(match.kickoffTime).toISOString().split('T')[0];
-      const real = realOddsIndex.get(`${homeNorm}_${awayNorm}_${dateKey}`);
-      if (real) {
-        match.odds = real.odds;
-        match.markets = real.markets;
+  // Merge in supplementary sources (TheSportsDB, OpenLigaDB, football-data.org,
+  // FotMob). Order matters because addMatch() dedupes by team-pair+date and
+  // keeps the first source seen — we put higher-trust feeds first.
+  // ESPN already added above. Then football-data.org (top-tier, named teams),
+  // then OpenLigaDB (German depth), then TheSportsDB (African/exotic),
+  // then FotMob (catch-all).
+  const supplementarySources: UnifiedMatch[][] = [fdMatches, oldbMatches, tsdbMatches, fmMatches];
+  for (const source of supplementarySources) {
+    for (const match of source) {
+      if (realOddsIndex.size > 0) {
+        const homeNorm = normalizeTeamName(match.homeTeam.name);
+        const awayNorm = normalizeTeamName(match.awayTeam.name);
+        const dateKey = new Date(match.kickoffTime).toISOString().split('T')[0];
+        const real = realOddsIndex.get(`${homeNorm}_${awayNorm}_${dateKey}`);
+        if (real) {
+          match.odds = real.odds;
+          match.markets = real.markets;
+        }
       }
+      addMatch(match);
     }
-    addMatch(match);
   }
 
   // Fire-and-forget: persist teams + leagues into MySQL when available.

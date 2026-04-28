@@ -20,6 +20,20 @@ const SUGGESTIONS = [
 ]
 
 const STORAGE_KEY = "bcz_ai_chat_v1"
+const SESSION_KEY = "bcz_ai_session_v1"
+
+function getOrCreateSessionId(): string {
+  if (typeof window === "undefined") return "anon"
+  try {
+    const existing = localStorage.getItem(SESSION_KEY)
+    if (existing && existing.length >= 8) return existing
+    const fresh = `s_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`
+    localStorage.setItem(SESSION_KEY, fresh)
+    return fresh
+  } catch {
+    return "anon"
+  }
+}
 const WELCOME: ChatMsg = {
   role: "assistant",
   content: "Hey 👋 I'm Betcheza AI — your betting copilot. Ask me about picks, markets, value, bankroll, or anything on the app.",
@@ -91,6 +105,7 @@ export function AIChatButton() {
         body: JSON.stringify({
           messages: [...msgs, userMsg].map(({ role, content }) => ({ role, content })),
           context: buildPageContext(),
+          sessionId: getOrCreateSessionId(),
         }),
       })
       let reply = "I'm here — give me a second and try again."

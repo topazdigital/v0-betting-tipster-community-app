@@ -156,6 +156,9 @@ export function Footer() {
               <Link href="/competitions" className="text-sm text-muted-foreground hover:text-foreground">
                 Competitions
               </Link>
+              <Link href="/about" className="text-sm text-muted-foreground hover:text-foreground">
+                About Us
+              </Link>
             </nav>
           </div>
 

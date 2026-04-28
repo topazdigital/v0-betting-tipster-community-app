@@ -96,6 +96,7 @@ function positionRank(pos?: string): number {
 function mapRoster(r: RosterEntry | undefined) {
   if (!r) return null;
   const players = (r.roster || []).map(p => ({
+    id: (p.athlete as { id?: string | number })?.id ? String((p.athlete as { id?: string | number }).id) : undefined,
     name: p.athlete?.shortName || p.athlete?.displayName || 'Unknown',
     fullName: p.athlete?.displayName,
     position: p.position?.abbreviation || p.position?.name,

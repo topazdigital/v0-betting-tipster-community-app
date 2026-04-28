@@ -1,7 +1,7 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { Save, Globe, Bell, Shield, Palette, Database, Loader2, CheckCircle2, AlertCircle, Search, ImageIcon, Link2, KeyRound, Plus, Trash2, Share2 } from "lucide-react"
+import { useState, useEffect, useRef } from "react"
+import { Save, Globe, Bell, Shield, Palette, Database, Loader2, CheckCircle2, AlertCircle, Search, ImageIcon, Link2, KeyRound, Plus, Trash2, Share2, Upload } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -477,23 +477,38 @@ export default function AdminSettingsPage() {
             <CardContent className="space-y-4">
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
-                  <Label htmlFor="logoUrl">Logo URL (light theme)</Label>
+                  <Label htmlFor="logoUrl">Logo (light theme)</Label>
                   <Input id="logoUrl" placeholder="https://… or /uploads/logo.png" value={settings.logo_url} onChange={(e) => updateSetting('logo_url', e.target.value)} />
+                  <BrandingFileUpload
+                    label="Upload light logo"
+                    accept="image/png,image/jpeg,image/webp,image/svg+xml"
+                    onUploaded={(url) => updateSetting('logo_url', url)}
+                  />
                   {settings.logo_url && (
                     <div className="rounded-md border border-border bg-muted/40 p-3"><img src={settings.logo_url} alt="logo preview" className="h-10 object-contain" /></div>
                   )}
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="logoDarkUrl">Logo URL (dark theme — optional)</Label>
+                  <Label htmlFor="logoDarkUrl">Logo (dark theme — optional)</Label>
                   <Input id="logoDarkUrl" placeholder="https://… or /uploads/logo-dark.png" value={settings.logo_dark_url} onChange={(e) => updateSetting('logo_dark_url', e.target.value)} />
+                  <BrandingFileUpload
+                    label="Upload dark logo"
+                    accept="image/png,image/jpeg,image/webp,image/svg+xml"
+                    onUploaded={(url) => updateSetting('logo_dark_url', url)}
+                  />
                   {settings.logo_dark_url && (
                     <div className="rounded-md border border-border bg-slate-900 p-3"><img src={settings.logo_dark_url} alt="dark logo preview" className="h-10 object-contain" /></div>
                   )}
                 </div>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="faviconUrl">Favicon URL (PNG, ICO or SVG)</Label>
+                <Label htmlFor="faviconUrl">Favicon (PNG, ICO or SVG)</Label>
                 <Input id="faviconUrl" placeholder="https://… or /uploads/favicon.png" value={settings.favicon_url} onChange={(e) => updateSetting('favicon_url', e.target.value)} />
+                <BrandingFileUpload
+                  label="Upload favicon"
+                  accept="image/png,image/x-icon,image/svg+xml,image/vnd.microsoft.icon"
+                  onUploaded={(url) => updateSetting('favicon_url', url)}
+                />
                 {settings.favicon_url && (
                   <div className="flex items-center gap-3 rounded-md border border-border bg-muted/40 p-3">
                     <img src={settings.favicon_url} alt="favicon preview" className="h-8 w-8 rounded" />
@@ -502,7 +517,7 @@ export default function AdminSettingsPage() {
                 )}
               </div>
               <p className="text-xs text-muted-foreground">
-                Tip: paste a public image URL (or upload to <code className="rounded bg-muted px-1">/public/uploads/</code> and reference it as <code className="rounded bg-muted px-1">/uploads/your-file.png</code>).
+                Tip: you can paste a public image URL or upload a file directly. Don&apos;t forget to click <strong>Save changes</strong> after uploading.
               </p>
             </CardContent>
           </Card>
@@ -581,6 +596,64 @@ export default function AdminSettingsPage() {
       </Tabs>
     </div>
   )
+}
+
+function BrandingFileUpload({
+  label,
+  accept,
+  onUploaded,
+}: {
+  label: string;
+  accept: string;
+  onUploaded: (url: string) => void;
+}) {
+  const inputRef = useRef<HTMLInputElement | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+
+  const handleFile = async (file: File | null | undefined) => {
+    if (!file) return;
+    setErr('');
+    setBusy(true);
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      fd.append('folder', 'branding');
+      const res = await fetch('/api/admin/upload', { method: 'POST', body: fd });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Upload failed');
+      onUploaded(data.url);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'Upload failed');
+    } finally {
+      setBusy(false);
+      if (inputRef.current) inputRef.current.value = '';
+    }
+  };
+
+  return (
+    <div className="space-y-1">
+      <input
+        ref={inputRef}
+        type="file"
+        accept={accept}
+        className="hidden"
+        onChange={(e) => handleFile(e.target.files?.[0])}
+      />
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        disabled={busy}
+        onClick={() => inputRef.current?.click()}
+        className="gap-2"
+      >
+        <Upload className="h-3.5 w-3.5" />
+        {busy ? 'Uploading…' : label}
+      </Button>
+      {err && <p className="text-xs text-destructive">{err}</p>}
+    </div>
+  );
 }
 
 function SocialLinksEditor({ value, onChange }: { value: string; onChange: (next: string) => void }) {

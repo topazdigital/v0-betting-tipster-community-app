@@ -31,6 +31,7 @@ import { BestBetsPanel } from '@/components/home/best-bets-panel';
 import { FavoritedTipsPanel, FavoritedTipMarqueeCard, useFavoritedTips, type FeaturedItem } from '@/components/home/favorited-tips-panel';
 import { useAuthModal } from '@/contexts/auth-modal-context';
 import { matchIdToSlug } from '@/lib/utils/match-url';
+import { NewsletterSection } from '@/components/sections/newsletter';
 
 interface ApiTipster {
   id: number;
@@ -515,6 +516,9 @@ export default function HomePage() {
                   </div>
                 </div>
               </section>
+
+              {/* Newsletter signup */}
+              <NewsletterSection />
             </>
           )}
         </div>

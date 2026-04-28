@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
 import { getLiveMatches, getUpcomingMatches, getMatchById } from '@/lib/api/unified-sports-api';
 import { slugToMatchId } from '@/lib/utils/match-url';
+import { pickAngle, rememberReply } from '@/lib/ai-session-store';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -14,6 +15,7 @@ interface ChatMessage {
 interface ChatRequestBody {
   messages: ChatMessage[];
   context?: string; // optional match/team context the UI may attach
+  sessionId?: string; // stable per-browser id so we can vary replies across turns
 }
 
 // Lazy-init the OpenAI client. We support several env-var names so the same
@@ -288,22 +290,24 @@ export async function POST(request: NextRequest) {
     // the LLM can answer "should I bet on Arsenal?" with form, odds, H2H, etc.
     const matchContext = await buildMatchContext(body.context || '');
 
-    // Inject a per-request "freshness seed" so the model deliberately varies
-    // its tone/opening — same question + same match should still produce a
-    // genuinely different reply across reloads.
-    const angles = [
-      'open with the in-form team',
-      'open with the value side of the line',
-      'open with a tactical or stylistic note',
-      'open with the goals trend (BTTS / Over/Under)',
-      'open with venue or home/away record',
-      'open with discipline / stake-management advice',
-      'open with the contrarian read against the public favourite',
-      'open by reframing what the user actually needs',
-    ];
-    const angle = angles[Math.floor(Math.random() * angles.length)];
+    // Per-session memory: pick an angle this user/browser hasn't seen recently and
+    // ban opening phrases the model used in earlier turns. This is the core of
+    // "smarter chat" — same question → genuinely different angle every time.
+    const sessionId = (body.sessionId || '').slice(0, 80) || 'anon';
+    const pick = pickAngle(sessionId, lastUserText);
     const nowIso = new Date().toISOString();
-    const freshness = `RESPONSE-VARIETY DIRECTIVE\nCurrent time: ${nowIso}\nFor this reply: ${angle}. Do not start with the same word/phrase you used in your previous reply. Avoid templated openings like "The match between…" or "Based on the data…".\n\n`;
+    const repeatNote = pick.repeated
+      ? `\n  - The user has asked essentially the same question again (${pick.repeated ? 'repeat' : 'first time'}). Do NOT reuse your previous reply. Pivot to the angle above and lead with something genuinely new.`
+      : '';
+    const banList = pick.bannedOpenings.length
+      ? `\n  - Forbidden opening phrases this turn (you used these recently — paraphrase): ${pick.bannedOpenings.map((o) => `"${o}"`).join(', ')}.`
+      : '';
+    const freshness = `RESPONSE-VARIETY DIRECTIVE
+  - Current time: ${nowIso}
+  - For this reply: ${pick.angle}.
+  - Avoid templated openings like "The match between…", "Based on the data…", "Looking at the…".${banList}${repeatNote}
+
+`;
 
     const system = `${SYSTEM_BASE}\n\n${freshness}${liveContext ? liveContext + '\n\n' : ''}${matchContext ? matchContext + '\n\n' : ''}${body.context ? `EXTRA CONTEXT FROM CURRENT PAGE:\n${body.context}\n\n` : ''}Answer the user now.`;
 
@@ -333,6 +337,7 @@ export async function POST(request: NextRequest) {
     if (!reply) {
       return NextResponse.json({ reply: localReply(lastUserText), source: 'fallback' });
     }
+    rememberReply(sessionId, reply);
     return NextResponse.json({ reply, source: 'openai' });
   } catch (e) {
     console.error('[ai/chat] error', e);
