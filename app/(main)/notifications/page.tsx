@@ -85,20 +85,20 @@ export default function NotificationsPage() {
   }
 
   if (authLoading || loading) {
-    return <div className="flex h-[60vh] items-center justify-center"><Spinner /></div>;
+    return <div className="flex h-[60vh] items-center justify-center"><Spinner className="h-6 w-6" /></div>;
   }
 
   if (!user) {
     return (
-      <div className="container mx-auto max-w-xl px-4 py-12">
-        <div className="rounded-2xl border border-border bg-card p-8 text-center">
-          <Bell className="mx-auto h-12 w-12 text-primary" />
-          <h1 className="mt-4 text-2xl font-bold">Stay in the loop</h1>
-          <p className="mt-2 text-muted-foreground">Sign in to manage your notification preferences, or just enable browser push below.</p>
-          <div className="mt-6 flex justify-center gap-2">
-            <Link href="/login?next=/notifications" className="rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90">Sign in</Link>
+      <div className="container mx-auto max-w-lg px-3 py-8">
+        <div className="rounded-xl border border-border bg-card p-6 text-center">
+          <Bell className="mx-auto h-10 w-10 text-primary" />
+          <h1 className="mt-3 text-lg font-bold">Stay in the loop</h1>
+          <p className="mt-1 text-xs text-muted-foreground">Sign in to manage your notification preferences.</p>
+          <div className="mt-4 flex justify-center gap-2">
+            <Link href="/login?next=/notifications" className="rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground hover:bg-primary/90">Sign in</Link>
           </div>
-          <div className="mt-6 border-t border-border pt-6">
+          <div className="mt-4 border-t border-border pt-4">
             <PushBlock supported={pushSupported} permission={pushPermission} onEnable={enablePush} busy={pushBusy} error={pushError} />
           </div>
         </div>
@@ -115,27 +115,27 @@ export default function NotificationsPage() {
   ];
 
   return (
-    <div className="container mx-auto max-w-2xl px-4 py-6">
-      <h1 className="text-2xl font-bold mb-1">Notifications</h1>
-      <p className="text-sm text-muted-foreground mb-6">Choose what you want to hear about.</p>
+    <div className="container mx-auto max-w-xl px-3 py-4">
+      <h1 className="text-lg font-bold mb-0.5">Notifications</h1>
+      <p className="text-xs text-muted-foreground mb-4">Choose what you want to hear about.</p>
 
       <PushBlock supported={pushSupported} permission={pushPermission} onEnable={enablePush} busy={pushBusy} error={pushError} compact />
 
-      <div className="mt-6 space-y-6">
+      <div className="mt-4 space-y-4">
         {groups.map(g => {
           const Icon = g.icon;
           return (
-            <section key={g.key} className="rounded-xl border border-border bg-card overflow-hidden">
-              <header className="flex items-center gap-2 border-b border-border bg-muted/30 px-4 py-3">
-                <Icon className="h-4 w-4 text-primary" />
-                <h2 className="text-sm font-semibold">{g.title}</h2>
+            <section key={g.key} className="rounded-lg border border-border bg-card overflow-hidden">
+              <header className="flex items-center gap-1.5 border-b border-border bg-muted/30 px-3 py-2">
+                <Icon className="h-3.5 w-3.5 text-primary" />
+                <h2 className="text-xs font-semibold">{g.title}</h2>
               </header>
               <div className="divide-y divide-border">
                 {TOGGLES.filter(t => t.group === g.key).map(t => (
-                  <label key={t.key} className="flex items-center justify-between gap-4 px-4 py-3 cursor-pointer hover:bg-muted/30">
+                  <label key={t.key} className="flex items-center justify-between gap-3 px-3 py-2 cursor-pointer hover:bg-muted/30 transition-colors">
                     <div className="flex-1 min-w-0">
-                      <div className="text-sm font-medium">{t.label}</div>
-                      <div className="text-xs text-muted-foreground">{t.description}</div>
+                      <div className="text-xs font-medium">{t.label}</div>
+                      <div className="text-[10px] text-muted-foreground leading-tight">{t.description}</div>
                     </div>
                     <ToggleSwitch
                       checked={prefs[t.key]}
@@ -161,16 +161,16 @@ function ToggleSwitch({ checked, onChange, busy }: { checked: boolean; onChange:
       onClick={onChange}
       disabled={busy}
       className={cn(
-        'relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors',
+        'relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors',
         checked ? 'bg-primary' : 'bg-muted',
         busy && 'opacity-60'
       )}
     >
       <span className={cn(
-        'inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform',
-        checked ? 'translate-x-5' : 'translate-x-0.5'
+        'inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform',
+        checked ? 'translate-x-4' : 'translate-x-0.5'
       )} />
-      {busy && <Loader2 className="absolute inset-0 m-auto h-3 w-3 animate-spin text-foreground/60" />}
+      {busy && <Loader2 className="absolute inset-0 m-auto h-2.5 w-2.5 animate-spin text-foreground/60" />}
     </button>
   );
 }
@@ -178,39 +178,39 @@ function ToggleSwitch({ checked, onChange, busy }: { checked: boolean; onChange:
 function PushBlock({ supported, permission, onEnable, busy, error, compact }: { supported: boolean; permission: NotificationPermission; onEnable: () => void; busy: boolean; error: string | null; compact?: boolean }) {
   if (!supported) {
     return (
-      <div className={cn('rounded-xl border border-border p-4 text-sm text-muted-foreground', compact ? '' : 'mt-4')}>
-        <div className="flex items-center gap-2"><BellOff className="h-4 w-4" /> Browser push isn’t supported on this device or browser.</div>
+      <div className={cn('rounded-lg border border-border p-3 text-[11px] text-muted-foreground', compact ? '' : 'mt-3')}>
+        <div className="flex items-center gap-1.5"><BellOff className="h-3.5 w-3.5" /> Browser push isn’t supported on this device.</div>
       </div>
     );
   }
   if (permission === 'granted') {
     return (
-      <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-4 text-sm">
-        <div className="flex items-center gap-2 text-emerald-600 font-semibold"><Check className="h-4 w-4" /> Push notifications enabled on this device.</div>
-        <p className="mt-1 text-xs text-muted-foreground">Toggle individual push categories below to control what you receive.</p>
+      <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-3 text-[11px]">
+        <div className="flex items-center gap-1.5 text-emerald-600 font-semibold"><Check className="h-3.5 w-3.5" /> Push notifications enabled on this device.</div>
+        <p className="mt-0.5 text-[10px] text-muted-foreground">Toggle categories below to control what you receive.</p>
       </div>
     );
   }
   return (
-    <div className="rounded-xl border border-border bg-card p-4">
-      <div className="flex items-start gap-3">
-        <Smartphone className="h-5 w-5 text-primary shrink-0 mt-0.5" />
+    <div className="rounded-lg border border-border bg-card p-3">
+      <div className="flex items-start gap-2.5">
+        <Smartphone className="h-4 w-4 text-primary shrink-0 mt-0.5" />
         <div className="flex-1 min-w-0">
-          <h3 className="text-sm font-semibold">Enable browser push</h3>
-          <p className="text-xs text-muted-foreground">Get real-time alerts for matches, tips, and odds — even with the tab closed.</p>
+          <h3 className="text-xs font-semibold">Enable browser push</h3>
+          <p className="text-[10px] text-muted-foreground leading-tight">Get real-time alerts for matches and tips — even with the tab closed.</p>
           {error && (
-            <p className="mt-2 text-xs text-rose-500 flex items-center gap-1"><AlertCircle className="h-3 w-3" /> {error}</p>
+            <p className="mt-1 text-[10px] text-rose-500 flex items-center gap-1"><AlertCircle className="h-3 w-3" /> {error}</p>
           )}
           {permission === 'denied' && (
-            <p className="mt-2 text-xs text-amber-600">Push is blocked. Enable notifications for this site in your browser settings.</p>
+            <p className="mt-1 text-[10px] text-amber-600">Push is blocked. Enable in your browser settings.</p>
           )}
         </div>
         <button
           onClick={onEnable}
           disabled={busy || permission === 'denied'}
-          className="shrink-0 rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+          className="shrink-0 rounded-lg bg-primary px-3 py-1.5 text-[10px] font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-50 h-7"
         >
-          {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Enable'}
+          {busy ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Enable'}
         </button>
       </div>
     </div>

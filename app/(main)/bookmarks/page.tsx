@@ -89,26 +89,26 @@ export default function BookmarksPage() {
   if (authLoading) {
     return (
       <div className="flex h-[60vh] items-center justify-center">
-        <Spinner className="h-8 w-8" />
+        <Spinner className="h-6 w-6" />
       </div>
     );
   }
 
   if (!user) {
     return (
-      <div className="container mx-auto max-w-xl px-4 py-16">
-        <div className="rounded-2xl border border-border bg-card p-10 text-center">
-          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10">
-            <Bookmark className="h-8 w-8 text-primary" />
+      <div className="container mx-auto max-w-lg px-3 py-12">
+        <div className="rounded-xl border border-border bg-card p-8 text-center">
+          <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-xl bg-primary/10">
+            <Bookmark className="h-7 w-7 text-primary" />
           </div>
-          <h1 className="text-2xl font-bold">My Bookmarks</h1>
-          <p className="mt-2 text-muted-foreground">Sign in to save matches and revisit them anytime from one place.</p>
-          <div className="mt-6 flex justify-center gap-3">
-            <Button onClick={() => openAuthModal('login')}>
-              <LogIn className="mr-2 h-4 w-4" />
+          <h1 className="text-xl font-bold">My Bookmarks</h1>
+          <p className="mt-1 text-xs text-muted-foreground">Sign in to save matches and revisit them anytime.</p>
+          <div className="mt-4 flex justify-center gap-2">
+            <Button size="sm" className="h-8 text-xs" onClick={() => openAuthModal('login')}>
+              <LogIn className="mr-1.5 h-3.5 w-3.5" />
               Sign In
             </Button>
-            <Button variant="outline" onClick={() => openAuthModal('register')}>
+            <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => openAuthModal('register')}>
               Create Account
             </Button>
           </div>
@@ -120,22 +120,22 @@ export default function BookmarksPage() {
   const isLoading = loadingBookmarks || matchesLoading;
 
   return (
-    <div className="container mx-auto max-w-4xl px-4 py-6">
+    <div className="container mx-auto max-w-4xl px-3 py-4">
       {/* Header */}
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-4 flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <Bookmark className="h-6 w-6 text-primary" />
+          <h1 className="text-lg font-bold flex items-center gap-1.5">
+            <Bookmark className="h-5 w-5 text-primary" />
             My Bookmarks
           </h1>
-          <p className="mt-0.5 text-sm text-muted-foreground">
+          <p className="mt-0 text-xs text-muted-foreground">
             {bookmarks.length} saved {bookmarks.length === 1 ? 'match' : 'matches'}
           </p>
         </div>
         {bookmarks.length > 0 && (
           <Link href="/matches">
-            <Button variant="outline" size="sm">
-              Browse more matches
+            <Button variant="outline" size="sm" className="h-7 text-xs">
+              Browse matches
             </Button>
           </Link>
         )}
@@ -143,21 +143,21 @@ export default function BookmarksPage() {
 
       {isLoading ? (
         <div className="flex h-48 items-center justify-center">
-          <Spinner className="h-8 w-8" />
+          <Spinner className="h-6 w-6" />
         </div>
       ) : bookmarks.length === 0 ? (
         /* Empty state */
-        <div className="rounded-2xl border border-dashed border-border bg-card/50 p-12 text-center">
-          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-muted">
-            <Bookmark className="h-8 w-8 text-muted-foreground/50" />
+        <div className="rounded-xl border border-dashed border-border bg-card/50 p-8 text-center">
+          <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-xl bg-muted">
+            <Bookmark className="h-7 w-7 text-muted-foreground/50" />
           </div>
-          <h2 className="text-lg font-semibold">No bookmarks yet</h2>
-          <p className="mt-2 text-sm text-muted-foreground max-w-sm mx-auto">
-            Save matches from the matches page by clicking the bookmark icon. They'll all appear here.
+          <h2 className="text-sm font-semibold">No bookmarks yet</h2>
+          <p className="mt-1 text-xs text-muted-foreground max-w-xs mx-auto">
+            Save matches by clicking the bookmark icon. They'll all appear here.
           </p>
-          <Button asChild className="mt-6">
+          <Button size="sm" asChild className="mt-4 h-8 text-xs">
             <Link href="/matches">
-              <Trophy className="mr-2 h-4 w-4" />
+              <Trophy className="mr-1.5 h-3.5 w-3.5" />
               Browse Matches
             </Link>
           </Button>
@@ -165,14 +165,14 @@ export default function BookmarksPage() {
       ) : (
         <>
           {/* Filter Tabs */}
-          <div className="mb-4 flex flex-wrap items-center gap-2">
-            <div className="inline-flex rounded-lg border border-border bg-card p-1">
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            <div className="inline-flex rounded-lg border border-border bg-card p-0.5">
               {tabs.map(t => (
                 <button
                   key={t.key}
                   onClick={() => setTab(t.key)}
                   className={cn(
-                    'flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors',
+                    'flex items-center gap-1 rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors',
                     tab === t.key
                       ? 'bg-primary text-primary-foreground shadow-sm'
                       : 'text-muted-foreground hover:text-foreground'
@@ -181,7 +181,7 @@ export default function BookmarksPage() {
                   {t.label}
                   {t.count > 0 && (
                     <span className={cn(
-                      'rounded-full px-1.5 py-0.5 text-[10px] font-semibold',
+                      'ml-1 rounded-full px-1 py-0 text-[9px] font-bold',
                       tab === t.key ? 'bg-primary-foreground/20 text-primary-foreground' : 'bg-muted text-muted-foreground'
                     )}>
                       {t.count}
@@ -192,42 +192,42 @@ export default function BookmarksPage() {
             </div>
 
             {/* Search */}
-            <div className="relative flex-1 max-w-xs">
-              <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+            <div className="relative flex-1 max-w-[200px]">
+              <Search className="absolute left-2.5 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground" />
               <Input
-                placeholder="Search bookmarks..."
+                placeholder="Search..."
                 value={search}
                 onChange={e => setSearch(e.target.value)}
-                className="pl-8 h-8 text-sm"
+                className="h-7 pl-7 text-[11px]"
               />
             </div>
           </div>
 
           {/* Match List */}
           {filtered.length > 0 ? (
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               {filtered.map(match => (
                 <div key={match.id} className="group relative">
                   <MatchCardNew match={match} variant="compact" showLeague />
                   <button
                     onClick={() => removeBookmark(String(match.id))}
                     disabled={removing === String(match.id)}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 flex h-7 w-7 items-center justify-center rounded-md bg-background/80 opacity-0 shadow-sm transition-opacity group-hover:opacity-100 hover:bg-destructive/10 hover:text-destructive"
+                    className="absolute right-1.5 top-1/2 -translate-y-1/2 flex h-6 w-6 items-center justify-center rounded-md bg-background/80 opacity-0 shadow-sm transition-opacity group-hover:opacity-100 hover:bg-destructive/10 hover:text-destructive"
                     title="Remove bookmark"
                   >
                     {removing === String(match.id)
-                      ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                      : <BookmarkX className="h-3.5 w-3.5" />
+                      ? <Loader2 className="h-3 w-3 animate-spin" />
+                      : <BookmarkX className="h-3 w-3" />
                     }
                   </button>
                 </div>
               ))}
             </div>
           ) : (
-            <div className="rounded-xl border border-dashed border-border bg-muted/20 p-8 text-center">
-              <Filter className="mx-auto h-8 w-8 text-muted-foreground/40" />
-              <p className="mt-3 text-sm text-muted-foreground">No matches for this filter</p>
-              <button onClick={() => { setTab('all'); setSearch(''); }} className="mt-2 text-xs text-primary hover:underline">
+            <div className="rounded-lg border border-dashed border-border bg-muted/10 p-6 text-center">
+              <Filter className="mx-auto h-6 w-6 text-muted-foreground/30" />
+              <p className="mt-2 text-xs text-muted-foreground">No matches found</p>
+              <button onClick={() => { setTab('all'); setSearch(''); }} className="mt-1 text-[10px] text-primary hover:underline">
                 Clear filters
               </button>
             </div>
@@ -235,17 +235,16 @@ export default function BookmarksPage() {
 
           {/* Missing matches (bookmarked but not in live feed) */}
           {missingIds.length > 0 && (
-            <div className="mt-4 rounded-lg border border-border bg-muted/30 p-4">
+            <div className="mt-3 rounded-lg border border-border bg-muted/20 p-3">
               <div className="flex items-start gap-2">
-                <Clock className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
-                <div className="text-sm text-muted-foreground">
-                  <span className="font-medium text-foreground">{missingIds.length}</span> saved {missingIds.length === 1 ? 'match is' : 'matches are'} no longer in the live feed
-                  (they may have ended long ago).{' '}
+                <Clock className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                <div className="text-[11px] text-muted-foreground leading-tight">
+                  <span className="font-medium text-foreground">{missingIds.length}</span> saved {missingIds.length === 1 ? 'match' : 'matches'} no longer in the live feed.{' '}
                   <button
                     onClick={async () => {
                       for (const id of missingIds) await removeBookmark(id);
                     }}
-                    className="text-primary hover:underline"
+                    className="text-primary font-semibold hover:underline"
                   >
                     Remove all
                   </button>

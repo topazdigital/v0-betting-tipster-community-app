@@ -90,26 +90,26 @@ export default function AdminStaticPagesPage() {
   const slugs = Object.keys(SLUG_LABELS);
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       <div>
         <h1 className="flex items-center gap-2 text-lg font-bold">
           <FileText className="h-5 w-5" /> Static Pages
         </h1>
-        <p className="text-muted-foreground">
+        <p className="text-xs text-muted-foreground">
           Edit the content shown on your footer pages. Changes are visible immediately.
         </p>
       </div>
 
       {errorMsg && (
-        <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive">
+        <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-2.5 text-xs text-destructive">
           {errorMsg}
         </div>
       )}
 
-      <Tabs defaultValue={slugs[0]}>
-        <TabsList className="flex flex-wrap gap-1">
+      <Tabs defaultValue={slugs[0]} className="space-y-3">
+        <TabsList className="h-auto flex flex-wrap gap-1 p-1 bg-muted/50">
           {slugs.map((s) => (
-            <TabsTrigger key={s} value={s}>
+            <TabsTrigger key={s} value={s} className="h-7 text-xs px-2.5">
               {SLUG_LABELS[s]}
             </TabsTrigger>
           ))}
@@ -119,57 +119,58 @@ export default function AdminStaticPagesPage() {
           const p = pages[slug];
           if (!p) return null;
           return (
-            <TabsContent key={slug} value={slug} className="space-y-4">
+            <TabsContent key={slug} value={slug} className="mt-0 focus-visible:outline-none">
               <Card>
-                <CardHeader>
-                  <CardTitle>{SLUG_LABELS[slug]}</CardTitle>
-                  <CardDescription>
+                <CardHeader className="py-2 pb-1.5 px-3">
+                  <CardTitle className="text-sm font-semibold">{SLUG_LABELS[slug]}</CardTitle>
+                  <CardDescription className="text-[10px]">
                     URL: <code className="rounded bg-muted px-1.5">/{slug}</code>
                   </CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor={`title-${slug}`}>Page Title</Label>
+                <CardContent className="space-y-3 p-3 pt-0">
+                  <div className="space-y-1">
+                    <Label htmlFor={`title-${slug}`} className="text-[10px] uppercase font-bold text-muted-foreground px-0.5">Page Title</Label>
                     <Input
                       id={`title-${slug}`}
+                      className="h-8 text-xs"
                       value={p.title}
                       onChange={(e) => update(slug, 'title', e.target.value)}
                     />
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor={`meta-${slug}`}>SEO Meta Description (max 160 chars)</Label>
+                  <div className="space-y-1">
+                    <Label htmlFor={`meta-${slug}`} className="text-[10px] uppercase font-bold text-muted-foreground px-0.5">SEO Meta Description (max 160 chars)</Label>
                     <Input
                       id={`meta-${slug}`}
+                      className="h-8 text-xs"
                       value={p.meta_description ?? ''}
                       maxLength={160}
                       placeholder="Short summary shown in Google results"
                       onChange={(e) => update(slug, 'meta_description', e.target.value)}
                     />
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor={`body-${slug}`}>Page Content</Label>
+                  <div className="space-y-1">
+                    <Label htmlFor={`body-${slug}`} className="text-[10px] uppercase font-bold text-muted-foreground px-0.5">Page Content</Label>
                     <Textarea
                       id={`body-${slug}`}
                       value={p.body}
                       onChange={(e) => update(slug, 'body', e.target.value)}
-                      className="min-h-[400px] font-mono text-xs"
+                      className="min-h-[300px] font-mono text-[11px] p-3 leading-relaxed"
                     />
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-[10px] text-muted-foreground px-0.5">
                       Tip: Separate paragraphs with blank lines. Lines starting with{' '}
-                      <code className="rounded bg-muted px-1">-</code> become bullet points. Short
-                      Title Case lines become section headings.
+                      <code className="rounded bg-muted px-1">-</code> become bullets.
                     </p>
                   </div>
-                  <div className="flex justify-end">
-                    <Button onClick={() => save(slug)} disabled={savingSlug === slug} className="gap-2">
+                  <div className="flex justify-end pt-1">
+                    <Button onClick={() => save(slug)} disabled={savingSlug === slug} size="sm" className="h-8 text-xs gap-1.5 px-4">
                       {savingSlug === slug ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
                       ) : savedSlug === slug ? (
-                        <CheckCircle2 className="h-4 w-4" />
+                        <CheckCircle2 className="h-3.5 w-3.5" />
                       ) : (
-                        <Save className="h-4 w-4" />
+                        <Save className="h-3.5 w-3.5" />
                       )}
-                      {savingSlug === slug ? 'Saving...' : savedSlug === slug ? 'Saved!' : 'Save'}
+                      {savingSlug === slug ? 'Saving...' : savedSlug === slug ? 'Saved!' : 'Save Page'}
                     </Button>
                   </div>
                 </CardContent>

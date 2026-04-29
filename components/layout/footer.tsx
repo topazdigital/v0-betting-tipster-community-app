@@ -105,108 +105,80 @@ export function Footer() {
     (l) => l.enabled !== false && l.url,
   );
 
+  const linkCls = "text-xs text-muted-foreground hover:text-foreground";
   return (
-    <footer className="border-t border-border bg-card pb-20 md:pb-0">
+    <footer className="border-t border-border bg-card pb-16 md:pb-0">
       {/* Promoted "Follow us" social bar — sits above the footer columns */}
       {socialLinks.length > 0 && (
         <div className="border-b border-border bg-muted/40">
-          <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-3 px-4 py-4 sm:flex-row">
+          <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-2 px-3 py-2.5 sm:flex-row">
             <div className="text-center sm:text-left">
-              <p className="text-sm font-semibold text-foreground">
+              <p className="text-xs font-semibold text-foreground">
                 Join our sports betting community
               </p>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-[11px] text-muted-foreground">
                 Follow {siteName} on your favourite social network
               </p>
             </div>
-            <SocialIcons links={socialLinks} size="lg" />
+            <SocialIcons links={socialLinks} size="sm" />
           </div>
         </div>
       )}
 
-      <div className="mx-auto max-w-7xl px-4 py-8">
-        <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="mx-auto max-w-7xl px-3 py-4">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {/* Brand */}
           <div>
             <Link href="/" className="flex items-center gap-2">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
-                <span className="font-mono text-lg font-bold text-primary-foreground">B</span>
+              <div className="flex h-6 w-6 items-center justify-center rounded-md bg-primary">
+                <span className="font-mono text-sm font-bold text-primary-foreground">B</span>
               </div>
-              <span className="font-semibold text-foreground">{siteName}</span>
+              <span className="text-sm font-semibold text-foreground">{siteName}</span>
             </Link>
-            <p className="mt-4 text-sm text-muted-foreground">{description}</p>
+            <p className="mt-2 text-xs text-muted-foreground">{description}</p>
           </div>
 
           {/* Quick Links */}
           <div>
-            <h3 className="mb-3 text-sm font-semibold text-foreground">Quick Links</h3>
-            <nav className="flex flex-col gap-2">
-              <Link href="/matches" className="text-sm text-muted-foreground hover:text-foreground">
-                Matches
-              </Link>
-              <Link href="/results" className="text-sm text-muted-foreground hover:text-foreground">
-                Results
-              </Link>
-              <Link href="/tipsters" className="text-sm text-muted-foreground hover:text-foreground">
-                Tipsters
-              </Link>
-              <Link href="/leaderboard" className="text-sm text-muted-foreground hover:text-foreground">
-                Leaderboard
-              </Link>
-              <Link href="/competitions" className="text-sm text-muted-foreground hover:text-foreground">
-                Competitions
-              </Link>
-              <Link href="/about" className="text-sm text-muted-foreground hover:text-foreground">
-                About Us
-              </Link>
+            <h3 className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-foreground">Quick Links</h3>
+            <nav className="grid grid-cols-2 gap-x-3 gap-y-1 sm:flex sm:flex-col">
+              <Link href="/matches" className={linkCls}>Matches</Link>
+              <Link href="/results" className={linkCls}>Results</Link>
+              <Link href="/tipsters" className={linkCls}>Tipsters</Link>
+              <Link href="/leaderboard" className={linkCls}>Leaderboard</Link>
+              <Link href="/competitions" className={linkCls}>Competitions</Link>
+              <Link href="/about" className={linkCls}>About Us</Link>
             </nav>
           </div>
 
           {/* Support */}
           <div>
-            <h3 className="mb-3 text-sm font-semibold text-foreground">Support</h3>
-            <nav className="flex flex-col gap-2">
-              <Link href="/help" className="text-sm text-muted-foreground hover:text-foreground">
-                Help Center
-              </Link>
-              <Link href="/faq" className="text-sm text-muted-foreground hover:text-foreground">
-                FAQ
-              </Link>
-              <Link href="/contact" className="text-sm text-muted-foreground hover:text-foreground">
-                Contact Us
-              </Link>
-              <Link
-                href="/responsible-gambling"
-                className="text-sm text-muted-foreground hover:text-foreground"
-              >
-                Responsible Gambling
-              </Link>
+            <h3 className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-foreground">Support</h3>
+            <nav className="grid grid-cols-2 gap-x-3 gap-y-1 sm:flex sm:flex-col">
+              <Link href="/help" className={linkCls}>Help Center</Link>
+              <Link href="/faq" className={linkCls}>FAQ</Link>
+              <Link href="/contact" className={linkCls}>Contact Us</Link>
+              <Link href="/responsible-gambling" className={linkCls}>Responsible Gambling</Link>
             </nav>
           </div>
 
           {/* Legal */}
           <div>
-            <h3 className="mb-3 text-sm font-semibold text-foreground">Legal</h3>
-            <nav className="flex flex-col gap-2">
-              <Link href="/terms" className="text-sm text-muted-foreground hover:text-foreground">
-                Terms of Service
-              </Link>
-              <Link href="/privacy" className="text-sm text-muted-foreground hover:text-foreground">
-                Privacy Policy
-              </Link>
-              <Link href="/cookies" className="text-sm text-muted-foreground hover:text-foreground">
-                Cookie Policy
-              </Link>
+            <h3 className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-foreground">Legal</h3>
+            <nav className="grid grid-cols-2 gap-x-3 gap-y-1 sm:flex sm:flex-col">
+              <Link href="/terms" className={linkCls}>Terms of Service</Link>
+              <Link href="/privacy" className={linkCls}>Privacy Policy</Link>
+              <Link href="/cookies" className={linkCls}>Cookie Policy</Link>
             </nav>
           </div>
         </div>
 
         {/* Bottom */}
-        <div className="mt-8 flex flex-col items-center justify-between gap-4 border-t border-border pt-8 sm:flex-row">
-          <p className="text-xs text-muted-foreground">
+        <div className="mt-3 flex flex-col items-center justify-between gap-2 border-t border-border pt-3 sm:flex-row">
+          <p className="text-[11px] text-muted-foreground">
             &copy; {new Date().getFullYear()} {siteName}. All rights reserved.
           </p>
-          <p className="text-xs text-muted-foreground">
+          <p className="text-[11px] text-muted-foreground">
             18+ | Gamble Responsibly | BeGambleAware.org
           </p>
         </div>

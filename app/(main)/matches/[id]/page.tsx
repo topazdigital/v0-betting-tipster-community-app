@@ -980,64 +980,64 @@ export default function MatchDetailPage({ params }: PageProps) {
           background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%)'
         }}>
           {/* League strip */}
-          <div className="flex items-center justify-between px-3 py-2 border-b border-white/10">
-            <div className="flex items-center gap-2 min-w-0">
-              <span className="text-lg shrink-0" aria-hidden>{SPORT_EMOJI[sport] || '🏆'}</span>
-              <FlagIcon countryCode={match.league.countryCode} size="sm" className="shrink-0" title={match.league.country} />
+          <div className="flex items-center justify-between px-2.5 py-1.5 border-b border-white/10">
+            <div className="flex items-center gap-1.5 min-w-0">
+              <span className="text-base shrink-0" aria-hidden>{SPORT_EMOJI[sport] || '🏆'}</span>
+              <FlagIcon countryCode={match.league.countryCode} size="xs" className="shrink-0" title={match.league.country} />
               {match.league.slug ? (
                 <Link
                   href={`/leagues/${match.league.slug}`}
-                  className="text-sm font-semibold text-white/90 truncate hover:text-white hover:underline"
+                  className="text-[11px] font-bold text-white/90 truncate hover:text-white hover:underline uppercase tracking-wider"
                   onClick={e => e.stopPropagation()}
                 >
                   {match.league.name}
                 </Link>
               ) : (
-                <span className="text-sm font-semibold text-white/90 truncate">{match.league.name}</span>
+                <span className="text-[11px] font-bold text-white/90 truncate uppercase tracking-wider">{match.league.name}</span>
               )}
-              <span className="text-xs text-white/40 shrink-0 hidden sm:inline">• {match.league.country}</span>
+              <span className="text-[10px] text-white/40 shrink-0 hidden sm:inline">• {match.league.country}</span>
             </div>
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-1">
               {isLive && !isHalftime && (
-                <div className="flex items-center gap-1.5 bg-rose-500/20 border border-rose-500/40 text-rose-400 text-xs font-bold px-2.5 py-1 rounded-full">
-                  <span className="inline-block h-1.5 w-1.5 rounded-full bg-rose-400 animate-pulse" />
+                <div className="flex items-center gap-1 bg-rose-500/20 border border-rose-500/40 text-rose-400 text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+                  <span className="inline-block h-1 w-1 rounded-full bg-rose-400 animate-pulse" />
                   LIVE {liveLabel !== 'LIVE' ? liveLabel : ''}
                 </div>
               )}
               {isHalftime && (
-                <div className="flex items-center gap-1.5 bg-amber-500/20 border border-amber-500/40 text-amber-400 text-xs font-bold px-2.5 py-1 rounded-full">
+                <div className="flex items-center gap-1 bg-amber-500/20 border border-amber-500/40 text-amber-400 text-[10px] font-bold px-1.5 py-0.5 rounded-full">
                   HT
                 </div>
               )}
               {match.status === 'scheduled' && (
-                <div className="flex items-center gap-1.5 bg-white/10 text-white/70 text-xs font-medium px-2.5 py-1 rounded-full">
-                  <Clock className="h-3 w-3" />
+                <div className="flex items-center gap-1 bg-white/10 text-white/70 text-[10px] font-medium px-1.5 py-0.5 rounded-full">
+                  <Clock className="h-2.5 w-2.5" />
                   {getDayLabel(match.kickoffTime, timezone)} {formatTime(match.kickoffTime, timezone)}
                 </div>
               )}
               {isFinished && (
-                <div className="flex items-center gap-1.5 bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 text-xs font-bold px-2.5 py-1 rounded-full">
-                  <CheckCircle2 className="h-3 w-3" /> FT
+                <div className="flex items-center gap-1 bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+                  <CheckCircle2 className="h-2.5 w-2.5" /> FT
                 </div>
               )}
               <button
                 onClick={toggleBookmark}
                 aria-label={savedMatch ? 'Remove bookmark' : 'Save this match'}
                 title={savedMatch ? 'Remove bookmark' : 'Save this match'}
-                className="ml-1 p-1.5 rounded-full hover:bg-white/10 transition-colors"
+                className="ml-0.5 p-1 rounded-full hover:bg-white/10 transition-colors"
               >
-                <Bookmark className={cn("h-4 w-4", savedMatch ? "fill-white text-white" : "text-white/50")} />
+                <Bookmark className={cn("h-3.5 w-3.5", savedMatch ? "fill-white text-white" : "text-white/50")} />
               </button>
               <button
                 onClick={handleShare}
                 aria-label="Share this match"
                 title="Share this match"
-                className="p-1.5 rounded-full hover:bg-white/10 transition-colors"
+                className="p-1 rounded-full hover:bg-white/10 transition-colors"
               >
-                <Share2 className="h-4 w-4 text-white/50" />
+                <Share2 className="h-3.5 w-3.5 text-white/50" />
               </button>
               {shareToast && (
-                <span className="ml-2 text-xs text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 rounded-full px-2 py-0.5">
+                <span className="ml-1 text-[10px] text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 rounded-full px-1.5 py-0">
                   {shareToast}
                 </span>
               )}
@@ -1045,29 +1045,29 @@ export default function MatchDetailPage({ params }: PageProps) {
           </div>
 
           {/* Teams + Score (compact) */}
-          <div className="px-3 py-3 md:px-5 md:py-4">
-            <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 md:gap-6">
+          <div className="px-3 py-2 md:px-4 md:py-3">
+            <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 md:gap-4">
               {/* Home */}
               <div className="flex flex-col items-center text-center">
-                <div className="mb-1.5">
-                  <TeamLogo teamName={match.homeTeam.name} logoUrl={match.homeTeam.logo} size="md" />
+                <div className="mb-1">
+                  <TeamLogo teamName={match.homeTeam.name} logoUrl={match.homeTeam.logo} size="sm" />
                 </div>
                 {match.homeTeam.espnTeamId ? (
                   <Link
                     href={teamHref(match.homeTeam.name, match.homeTeam.espnTeamId)}
-                    className="text-sm md:text-base font-bold text-white line-clamp-2 hover:text-white/80 hover:underline"
+                    className="text-xs md:text-sm font-bold text-white line-clamp-2 hover:text-white/80 hover:underline"
                     onClick={e => e.stopPropagation()}
                   >
                     {match.homeTeam.name}
                   </Link>
                 ) : (
-                  <p className="text-sm md:text-base font-bold text-white line-clamp-2">{match.homeTeam.name}</p>
+                  <p className="text-xs md:text-sm font-bold text-white line-clamp-2">{match.homeTeam.name}</p>
                 )}
                 {match.homeTeam.record && (
-                  <p className="mt-0.5 text-[10px] text-white/40">{match.homeTeam.record}</p>
+                  <p className="mt-0.5 text-[9px] text-white/40">{match.homeTeam.record}</p>
                 )}
                 {match.homeTeam.form && (
-                  <div className="mt-1 flex gap-1 justify-center">
+                  <div className="mt-0.5 flex gap-0.5 justify-center">
                     {match.homeTeam.form.split('').slice(0, 5).map((r, i) => <FormBadge key={i} result={r} />)}
                   </div>
                 )}
@@ -1077,63 +1077,63 @@ export default function MatchDetailPage({ params }: PageProps) {
               </div>
 
               {/* Score / Time */}
-              <div className="flex flex-col items-center min-w-[80px] md:min-w-[110px]">
+              <div className="flex flex-col items-center min-w-[70px] md:min-w-[90px]">
                 {(isLive || isFinished) ? (
                   <>
-                    <div className="flex items-center gap-1.5 md:gap-3 tabular-nums">
-                      <span className="text-4xl md:text-5xl font-black text-white leading-none">
+                    <div className="flex items-center gap-1 md:gap-2 tabular-nums">
+                      <span className="text-3xl md:text-4xl font-black text-white leading-none">
                         {match.homeScore ?? 0}
                       </span>
-                      <span className="text-xl md:text-3xl font-light text-white/30">:</span>
-                      <span className="text-4xl md:text-5xl font-black text-white leading-none">
+                      <span className="text-lg md:text-2xl font-light text-white/30">:</span>
+                      <span className="text-3xl md:text-4xl font-black text-white leading-none">
                         {match.awayScore ?? 0}
                       </span>
                     </div>
                     {isLive && !isHalftime && (
-                      <div className="mt-1.5 flex items-center gap-1.5">
-                        <span className="inline-block h-1.5 w-1.5 rounded-full bg-rose-400 animate-pulse" />
-                        <span className="font-mono text-xs font-bold text-rose-400">
+                      <div className="mt-1 flex items-center gap-1">
+                        <span className="inline-block h-1 w-1 rounded-full bg-rose-400 animate-pulse" />
+                        <span className="font-mono text-[10px] font-bold text-rose-400">
                           {ticksByMinute ? `${liveMinute}'` : liveLabel}
                         </span>
                       </div>
                     )}
-                    {isHalftime && <p className="mt-1 text-[11px] font-bold text-amber-400">HALF TIME</p>}
-                    {isFinished && <p className="mt-1 text-[11px] text-white/40 font-medium">FULL TIME</p>}
+                    {isHalftime && <p className="mt-0.5 text-[10px] font-bold text-amber-400">HALF TIME</p>}
+                    {isFinished && <p className="mt-0.5 text-[10px] text-white/40 font-medium">FULL TIME</p>}
                   </>
                 ) : (
                   <>
-                    <p className="text-2xl md:text-4xl font-bold text-white tabular-nums">
+                    <p className="text-xl md:text-3xl font-bold text-white tabular-nums">
                       {formatTime(match.kickoffTime, timezone)}
                     </p>
-                    <p className="mt-1.5 text-xs text-white/40">
+                    <p className="mt-1 text-[10px] text-white/40">
                       {getDayLabel(match.kickoffTime, timezone)} • {formatDate(match.kickoffTime, timezone)}
                     </p>
-                    <div className="mt-3 text-2xl text-white/20 font-light">vs</div>
+                    <div className="mt-2 text-xl text-white/20 font-light">vs</div>
                   </>
                 )}
               </div>
 
               {/* Away */}
               <div className="flex flex-col items-center text-center">
-                <div className="mb-1.5">
-                  <TeamLogo teamName={match.awayTeam.name} logoUrl={match.awayTeam.logo} size="md" />
+                <div className="mb-1">
+                  <TeamLogo teamName={match.awayTeam.name} logoUrl={match.awayTeam.logo} size="sm" />
                 </div>
                 {match.awayTeam.espnTeamId ? (
                   <Link
                     href={teamHref(match.awayTeam.name, match.awayTeam.espnTeamId)}
-                    className="text-sm md:text-base font-bold text-white line-clamp-2 hover:text-white/80 hover:underline"
+                    className="text-xs md:text-sm font-bold text-white line-clamp-2 hover:text-white/80 hover:underline"
                     onClick={e => e.stopPropagation()}
                   >
                     {match.awayTeam.name}
                   </Link>
                 ) : (
-                  <p className="text-sm md:text-base font-bold text-white line-clamp-2">{match.awayTeam.name}</p>
+                  <p className="text-xs md:text-sm font-bold text-white line-clamp-2">{match.awayTeam.name}</p>
                 )}
                 {match.awayTeam.record && (
-                  <p className="mt-0.5 text-[10px] text-white/40">{match.awayTeam.record}</p>
+                  <p className="mt-0.5 text-[9px] text-white/40">{match.awayTeam.record}</p>
                 )}
                 {match.awayTeam.form && (
-                  <div className="mt-1 flex gap-1 justify-center">
+                  <div className="mt-0.5 flex gap-0.5 justify-center">
                     {match.awayTeam.form.split('').slice(0, 5).map((r, i) => <FormBadge key={i} result={r} />)}
                   </div>
                 )}
@@ -1146,9 +1146,9 @@ export default function MatchDetailPage({ params }: PageProps) {
 
           {/* Odds bar — always shown */}
           {match.odds && (
-            <div className="px-5 pb-5">
-              <div className="rounded-xl bg-white/5 border border-white/10 p-4">
-                <div className="grid grid-cols-3 gap-3 mb-3">
+            <div className="px-3 pb-3">
+              <div className="rounded-lg bg-white/5 border border-white/10 p-2.5">
+                <div className="grid grid-cols-3 gap-2 mb-2">
                   <OddsButton label="1" sublabel={match.homeTeam.name.split(' ')[0]} value={match.odds.home} />
                   {match.odds.draw !== undefined ? (
                     <OddsButton label="X" sublabel="Draw" value={match.odds.draw} />
@@ -1156,11 +1156,11 @@ export default function MatchDetailPage({ params }: PageProps) {
                   <OddsButton label="2" sublabel={match.awayTeam.name.split(' ')[0]} value={match.odds.away} />
                 </div>
                 <OddsProbBar home={match.odds.home} draw={match.odds.draw} away={match.odds.away} />
-                <div className="flex items-center justify-between mt-2">
-                  <p className="text-[10px] text-white/30">
+                <div className="flex items-center justify-between mt-1.5">
+                  <p className="text-[9px] text-white/30">
                     {match.oddsIsComputed ? '📊 Estimated odds' : `Odds • ${match.odds.bookmaker || 'Market'}`}
                   </p>
-                  {!hasRealOdds && <Badge variant="outline" className="text-[9px] border-white/20 text-white/30 py-0">Estimated</Badge>}
+                  {!hasRealOdds && <Badge variant="outline" className="text-[8px] border-white/20 text-white/30 py-0 h-3">Estimated</Badge>}
                 </div>
               </div>
             </div>
@@ -1168,16 +1168,16 @@ export default function MatchDetailPage({ params }: PageProps) {
 
           {/* Venue strip */}
           {(match.venue || match.broadcasts?.length || match.attendance) && (
-            <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 px-5 pb-4 text-xs text-white/40">
+            <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 px-3 pb-3 text-[10px] text-white/40">
               {match.venue && (
                 <span className="flex items-center gap-1">
-                  <MapPin className="h-3 w-3" />{match.venue}{match.venueCity ? `, ${match.venueCity}` : ''}
+                  <MapPin className="h-2.5 w-2.5" />{match.venue}{match.venueCity ? `, ${match.venueCity}` : ''}
                 </span>
               )}
               {match.attendance ? <span>👥 {match.attendance.toLocaleString()}</span> : null}
               {match.broadcasts && match.broadcasts.length > 0 && (
                 <span className="flex items-center gap-1">
-                  <Tv className="h-3 w-3" />{match.broadcasts.slice(0, 3).join(', ')}
+                  <Tv className="h-2.5 w-2.5" />{match.broadcasts.slice(0, 3).join(', ')}
                 </span>
               )}
             </div>
@@ -1203,66 +1203,53 @@ export default function MatchDetailPage({ params }: PageProps) {
 
         {/* ─── PROMINENT "ADD TIP" CTA — sits right under the hero so the
             primary action is impossible to miss. ─── */}
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-500/30 bg-gradient-to-r from-amber-500/15 via-amber-500/5 to-transparent px-3 py-2">
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-1.5 rounded-lg border border-amber-500/30 bg-gradient-to-r from-amber-500/15 via-amber-500/5 to-transparent px-2.5 py-1.5">
           <div className="flex items-center gap-2 min-w-0">
-            <Star className="h-4 w-4 shrink-0 fill-amber-400 text-amber-400" />
+            <Star className="h-3.5 w-3.5 shrink-0 fill-amber-400 text-amber-400" />
             <div className="min-w-0">
-              <p className="text-xs font-bold leading-tight">
+              <p className="text-[11px] font-bold leading-tight">
                 {tips.length > 0
                   ? `${tips.length} tipster${tips.length === 1 ? '' : 's'} have already posted`
                   : 'Be the first to post a tip on this match'}
               </p>
-              <p className="text-[10px] text-muted-foreground leading-tight">
+              <p className="text-[9px] text-muted-foreground leading-tight">
                 Pick from 25+ markets — 1X2, Asian Handicap, BTTS, Over/Under, HT/FT…
               </p>
             </div>
           </div>
           <Button
             size="sm"
-            className="h-8 gap-1.5 bg-amber-500 text-amber-950 hover:bg-amber-400 font-bold shadow-sm"
+            className="h-7 gap-1 px-2 text-[11px] bg-amber-500 text-amber-950 hover:bg-amber-400 font-bold shadow-sm"
             onClick={() => setTipModalOpen(true)}
           >
-            <Star className="h-3.5 w-3.5" />
-            Add a Tip
+            <Star className="h-3 w-3" />
+            Add Tip
           </Button>
         </div>
 
         {/* ─── TABS — compact, scrollable on mobile, Tips first ─── */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="w-full h-auto flex flex-wrap gap-0.5 bg-muted/60 p-0.5 rounded-lg mb-3">
-            <TabsTrigger value="tips" className="flex-1 min-w-[64px] px-1.5 py-1 text-[11px] md:text-xs font-semibold rounded-md relative data-[state=active]:bg-amber-500 data-[state=active]:text-amber-950">
-              <Star className="mr-0.5 h-3 w-3 hidden sm:inline text-amber-400 data-[state=active]:text-amber-950" />
+          <TabsList className="w-full h-7 flex flex-wrap gap-0.5 bg-muted/60 p-0.5 rounded-md mb-2">
+            <TabsTrigger value="tips" className="flex-1 min-w-[50px] px-1 py-0 h-full text-[10px] md:text-[11px] font-semibold rounded relative data-[state=active]:bg-amber-500 data-[state=active]:text-amber-950">
               Tips
               {tips.length > 0 && (
-                <span className="ml-1 rounded-full bg-amber-500 px-1 py-0 text-[9px] font-bold text-white leading-4">{tips.length}</span>
+                <span className="ml-0.5 rounded-full bg-amber-500 px-1 py-0 text-[8px] font-bold text-white leading-3">{tips.length}</span>
               )}
             </TabsTrigger>
-            <TabsTrigger value="overview" className="flex-1 min-w-[64px] px-1.5 py-1 text-[11px] md:text-xs font-semibold rounded-md">
-              <BarChart3 className="mr-0.5 h-3 w-3 hidden sm:inline" />Overview
+            <TabsTrigger value="overview" className="flex-1 min-w-[50px] px-1 py-0 h-full text-[10px] md:text-[11px] font-semibold rounded">Overview</TabsTrigger>
+            <TabsTrigger value="events" className="flex-1 min-w-[50px] px-1 py-0 h-full text-[10px] md:text-[11px] font-semibold rounded relative">
+              Events
+              {isLive && <span className="absolute -top-0.5 -right-0.5 h-1.5 w-1.5 rounded-full bg-rose-500 animate-pulse" />}
             </TabsTrigger>
-            <TabsTrigger value="events" className="flex-1 min-w-[58px] px-1.5 py-1 text-[11px] md:text-xs font-semibold rounded-md relative">
-              <Zap className="mr-0.5 h-3 w-3 hidden sm:inline" />Events
-              {isLive && <span className="absolute -top-1 -right-1 h-2 w-2 rounded-full bg-rose-500 animate-pulse" />}
+            <TabsTrigger value="stats" className="flex-1 min-w-[40px] px-1 py-0 h-full text-[10px] md:text-[11px] font-semibold rounded relative">
+              Stats
+              {hasTeamStats && isLive && <span className="absolute -top-0.5 -right-0.5 h-1.5 w-1.5 rounded-full bg-rose-500 animate-pulse" />}
             </TabsTrigger>
-            <TabsTrigger value="stats" className="flex-1 min-w-[52px] px-1.5 py-1 text-[11px] md:text-xs font-semibold rounded-md relative">
-              <BarChart3 className="mr-0.5 h-3 w-3 hidden sm:inline" />Stats
-              {hasTeamStats && isLive && <span className="absolute -top-1 -right-1 h-2 w-2 rounded-full bg-rose-500 animate-pulse" />}
-            </TabsTrigger>
-            <TabsTrigger value="odds" className="flex-1 min-w-[52px] px-1.5 py-1 text-[11px] md:text-xs font-semibold rounded-md">
-              <TrendingUp className="mr-0.5 h-3 w-3 hidden sm:inline" />Odds
-            </TabsTrigger>
-            <TabsTrigger value="lineups" className="flex-1 min-w-[60px] px-1.5 py-1 text-[11px] md:text-xs font-semibold rounded-md">
-              <Shirt className="mr-0.5 h-3 w-3 hidden sm:inline" />Lineups
-            </TabsTrigger>
-            <TabsTrigger value="h2h" className="flex-1 min-w-[44px] px-1.5 py-1 text-[11px] md:text-xs font-semibold rounded-md">
-              <Award className="mr-0.5 h-3 w-3 hidden sm:inline" />H2H
-            </TabsTrigger>
-            <TabsTrigger value="standings" className="flex-1 min-w-[52px] px-1.5 py-1 text-[11px] md:text-xs font-semibold rounded-md">
-              <Trophy className="mr-0.5 h-3 w-3 hidden sm:inline" />Table
-            </TabsTrigger>
-            <TabsTrigger value="news" className="flex-1 min-w-[52px] px-1.5 py-1 text-[11px] md:text-xs font-semibold rounded-md">
-              <Newspaper className="mr-0.5 h-3 w-3 hidden sm:inline" />News
-            </TabsTrigger>
+            <TabsTrigger value="odds" className="flex-1 min-w-[40px] px-1 py-0 h-full text-[10px] md:text-[11px] font-semibold rounded">Odds</TabsTrigger>
+            <TabsTrigger value="lineups" className="flex-1 min-w-[50px] px-1 py-0 h-full text-[10px] md:text-[11px] font-semibold rounded">Lineups</TabsTrigger>
+            <TabsTrigger value="h2h" className="flex-1 min-w-[35px] px-1 py-0 h-full text-[10px] md:text-[11px] font-semibold rounded">H2H</TabsTrigger>
+            <TabsTrigger value="standings" className="flex-1 min-w-[40px] px-1 py-0 h-full text-[10px] md:text-[11px] font-semibold rounded">Table</TabsTrigger>
+            <TabsTrigger value="news" className="flex-1 min-w-[40px] px-1 py-0 h-full text-[10px] md:text-[11px] font-semibold rounded">News</TabsTrigger>
           </TabsList>
 
           {/* ══ OVERVIEW ══ */}

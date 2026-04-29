@@ -104,77 +104,77 @@ export default function TipstersPage() {
     <div className="flex">
       <SidebarNew />
       <div className="flex-1 overflow-hidden">
-        <div className="mx-auto max-w-6xl px-4 py-3 pb-32">
+        <div className="mx-auto max-w-6xl px-3 py-2.5 pb-24">
           {/* Header */}
-          <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
+          <div className="mb-4 flex flex-wrap items-end justify-between gap-2">
             <div>
-              <h1 className="text-xl font-bold text-foreground">Tipsters</h1>
-              <p className="text-sm text-muted-foreground">
+              <h1 className="text-lg font-bold text-foreground">Tipsters</h1>
+              <p className="text-xs text-muted-foreground">
                 Browse and follow expert tipsters from across Africa
               </p>
             </div>
-            <Button variant="outline" size="sm" asChild>
+            <Button variant="outline" size="sm" h-7 className="text-xs" asChild>
               <Link href="/tipsters/compare">
-                <GitCompare className="mr-2 h-4 w-4" />
+                <GitCompare className="mr-1.5 h-3.5 w-3.5" />
                 Compare tipsters
               </Link>
             </Button>
           </div>
 
           {/* Stats */}
-          <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <div className="rounded-xl border border-border bg-card p-3 text-center">
-              <Users className="mx-auto h-4 w-4 text-primary" />
-              <div className="mt-1 text-xl font-bold">{stats.totalTipsters}</div>
-              <div className="text-[11px] text-muted-foreground">Active tipsters</div>
+          <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+            <div className="rounded-lg border border-border bg-card p-2 text-center">
+              <Users className="mx-auto h-3.5 w-3.5 text-primary" />
+              <div className="mt-0.5 text-xl font-bold">{stats.totalTipsters}</div>
+              <div className="text-[11px] uppercase text-muted-foreground">Active tipsters</div>
             </div>
-            <div className="rounded-xl border border-border bg-card p-3 text-center">
-              <Trophy className="mx-auto h-4 w-4 text-warning" />
-              <div className="mt-1 text-xl font-bold">{stats.proTipsters}</div>
-              <div className="text-[11px] text-muted-foreground">Pro tipsters</div>
+            <div className="rounded-lg border border-border bg-card p-2 text-center">
+              <Trophy className="mx-auto h-3.5 w-3.5 text-warning" />
+              <div className="mt-0.5 text-xl font-bold">{stats.proTipsters}</div>
+              <div className="text-[11px] uppercase text-muted-foreground">Pro tipsters</div>
             </div>
-            <div className="rounded-xl border border-border bg-card p-3 text-center">
-              <TrendingUp className="mx-auto h-4 w-4 text-success" />
-              <div className="mt-1 text-xl font-bold">{stats.avgWinRate}%</div>
-              <div className="text-[11px] text-muted-foreground">Avg win rate</div>
+            <div className="rounded-lg border border-border bg-card p-2 text-center">
+              <TrendingUp className="mx-auto h-3.5 w-3.5 text-success" />
+              <div className="mt-0.5 text-xl font-bold">{stats.avgWinRate}%</div>
+              <div className="text-[11px] uppercase text-muted-foreground">Avg win rate</div>
             </div>
-            <div className="rounded-xl border border-border bg-card p-3 text-center">
-              <Flame className="mx-auto h-4 w-4 text-live" />
-              <div className="mt-1 text-xl font-bold">{stats.totalTips.toLocaleString()}</div>
-              <div className="text-[11px] text-muted-foreground">Total tips</div>
+            <div className="rounded-lg border border-border bg-card p-2 text-center">
+              <Flame className="mx-auto h-3.5 w-3.5 text-live" />
+              <div className="mt-0.5 text-xl font-bold">{stats.totalTips.toLocaleString()}</div>
+              <div className="text-[11px] uppercase text-muted-foreground">Total tips</div>
             </div>
           </div>
 
           {/* Filters */}
-          <div className="mb-4 flex flex-wrap items-center gap-2">
+          <div className="mb-3 flex flex-wrap items-center gap-2">
             <div className="relative min-w-[180px] flex-1">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
               <Input
                 placeholder="Search by name or @handle..."
                 value={search}
                 onChange={(e) => { setSearch(e.target.value); setPage(0); }}
-                className="pl-9"
+                className="h-8 pl-8 text-xs"
               />
             </div>
             <Select value={filterBy} onValueChange={(v) => { setFilterBy(v); setPage(0); }}>
-              <SelectTrigger className="w-36">
-                <Filter className="mr-2 h-4 w-4" />
+              <SelectTrigger className="h-8 w-32 text-xs">
+                <Filter className="mr-1.5 h-3.5 w-3.5" />
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {filterOptions.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+                {filterOptions.map(o => <SelectItem key={o.value} value={o.value} className="text-xs">{o.label}</SelectItem>)}
               </SelectContent>
             </Select>
             <Select value={sortBy} onValueChange={setSortBy}>
-              <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="h-8 w-32 text-xs"><SelectValue /></SelectTrigger>
               <SelectContent>
-                {sortOptions.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+                {sortOptions.map(o => <SelectItem key={o.value} value={o.value} className="text-xs">{o.label}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
 
           {/* Result count + pager */}
-          <div className="mb-3 flex items-center justify-between text-xs text-muted-foreground">
+          <div className="mb-2 flex items-center justify-between text-[11px] text-muted-foreground uppercase tracking-wider">
             <span>{allTipsters.length} tipster{allTipsters.length !== 1 ? 's' : ''} found</span>
             <span>Page {page + 1} of {totalPages}</span>
           </div>
@@ -182,14 +182,14 @@ export default function TipstersPage() {
           {/* List / loader */}
           {isLoading ? (
             <div className="flex h-64 items-center justify-center">
-              <Spinner className="h-8 w-8" />
+              <Spinner className="h-6 w-6" />
             </div>
           ) : visible.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-border bg-card p-10 text-center text-sm text-muted-foreground">
+            <div className="rounded-lg border border-dashed border-border bg-card p-8 text-center text-xs text-muted-foreground">
               No tipsters match those filters yet.
             </div>
           ) : (
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
               {visible.map((tipster, idx) => {
                 const checked = compareIds.includes(tipster.id);
                 const globalRank = page * PAGE_SIZE + idx + 1;
@@ -197,8 +197,8 @@ export default function TipstersPage() {
                   <div
                     key={tipster.id}
                     className={cn(
-                      'group relative rounded-xl border bg-card p-4 transition-all hover:shadow-lg',
-                      checked ? 'border-primary ring-2 ring-primary/30' : 'border-border hover:border-primary/40',
+                      'group relative rounded-lg border bg-card p-3 transition-all hover:shadow-md',
+                      checked ? 'border-primary ring-1 ring-primary/30' : 'border-border hover:border-primary/40',
                     )}
                   >
                     {/* Compare checkbox */}
@@ -206,7 +206,7 @@ export default function TipstersPage() {
                       type="button"
                       onClick={(e) => { e.preventDefault(); toggleCompare(tipster.id); }}
                       className={cn(
-                        'absolute right-3 top-3 flex h-6 w-6 items-center justify-center rounded-md border text-xs',
+                        'absolute right-2 top-2 flex h-5 w-5 items-center justify-center rounded-md border text-[10px]',
                         checked
                           ? 'border-primary bg-primary text-primary-foreground'
                           : 'border-border bg-background text-muted-foreground hover:border-primary',
@@ -217,19 +217,19 @@ export default function TipstersPage() {
                     </button>
 
                     <Link href={`/tipsters/${tipster.id}`} className="block">
-                      <div className="flex items-start gap-3 pr-7">
+                      <div className="flex items-start gap-2.5 pr-6">
                         <div className="relative shrink-0">
                           {tipster.avatar ? (
                             // eslint-disable-next-line @next/next/no-img-element
-                            <img src={tipster.avatar} alt="" className="h-12 w-12 rounded-full bg-muted object-cover" />
+                            <img src={tipster.avatar} alt="" className="h-10 w-10 rounded-full bg-muted object-cover" />
                           ) : (
-                            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary text-base font-bold text-primary-foreground">
+                            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary text-sm font-bold text-primary-foreground">
                               {tipster.displayName.charAt(0)}
                             </div>
                           )}
                           {globalRank <= 3 && (
                             <div className={cn(
-                              'absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold',
+                              'absolute -bottom-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full text-[9px] font-bold',
                               globalRank === 1 && 'bg-yellow-500 text-yellow-950',
                               globalRank === 2 && 'bg-gray-300 text-gray-700',
                               globalRank === 3 && 'bg-amber-700 text-amber-100',
@@ -237,55 +237,55 @@ export default function TipstersPage() {
                           )}
                         </div>
                         <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-1.5">
-                            <span className="truncate text-sm font-semibold group-hover:text-primary">
+                          <div className="flex items-center gap-1">
+                            <span className="truncate text-xs font-semibold group-hover:text-primary">
                               {tipster.displayName}
                             </span>
                             {tipster.verified && (
-                              <Check className="h-3.5 w-3.5 shrink-0 rounded-full bg-primary p-0.5 text-primary-foreground" />
+                              <Check className="h-3 w-3 shrink-0 rounded-full bg-primary p-0.5 text-primary-foreground" />
                             )}
                             {tipster.isPro && (
-                              <Badge className="ml-auto h-4 bg-gradient-to-r from-primary to-primary/80 px-1.5 text-[9px]">
-                                <Star className="mr-0.5 h-2.5 w-2.5" />PRO
+                              <Badge className="ml-auto h-3.5 bg-gradient-to-r from-primary to-primary/80 px-1 text-[8px]">
+                                <Star className="mr-0.5 h-2 w-2" />PRO
                               </Badge>
                             )}
                           </div>
-                          <div className="text-xs text-muted-foreground">
+                          <div className="text-[10px] text-muted-foreground">
                             <span className="mr-1">{flagFor(tipster.countryCode)}</span>
                             @{tipster.username}
                           </div>
-                          <p className="mt-1 line-clamp-2 text-xs text-muted-foreground/80">
+                          <p className="mt-1 line-clamp-2 text-[10px] text-muted-foreground/80">
                             {tipster.bio}
                           </p>
                         </div>
                       </div>
 
                       {/* Stats row */}
-                      <div className="mt-3 grid grid-cols-4 gap-1.5 text-center">
-                        <div className="rounded-md bg-success/10 px-1 py-1.5">
-                          <div className="text-sm font-bold text-success">{tipster.winRate}%</div>
-                          <div className="text-[9px] text-muted-foreground">Win</div>
+                      <div className="mt-2.5 grid grid-cols-4 gap-1 text-center">
+                        <div className="rounded-md bg-success/10 px-0.5 py-1">
+                          <div className="text-xs font-bold text-success">{tipster.winRate}%</div>
+                          <div className="text-[9px] uppercase text-muted-foreground">Win</div>
                         </div>
-                        <div className="rounded-md bg-primary/10 px-1 py-1.5">
-                          <div className="text-sm font-bold text-primary">+{tipster.roi}%</div>
-                          <div className="text-[9px] text-muted-foreground">ROI</div>
+                        <div className="rounded-md bg-primary/10 px-0.5 py-1">
+                          <div className="text-xs font-bold text-primary">+{tipster.roi}%</div>
+                          <div className="text-[9px] uppercase text-muted-foreground">ROI</div>
                         </div>
-                        <div className="rounded-md bg-warning/10 px-1 py-1.5">
-                          <div className="flex items-center justify-center gap-0.5 text-sm font-bold text-warning">
-                            {tipster.streak > 2 && <Flame className="h-3 w-3" />}
+                        <div className="rounded-md bg-warning/10 px-0.5 py-1">
+                          <div className="flex items-center justify-center gap-0.5 text-xs font-bold text-warning">
+                            {tipster.streak > 2 && <Flame className="h-2.5 w-2.5" />}
                             {tipster.streak}
                           </div>
-                          <div className="text-[9px] text-muted-foreground">Streak</div>
+                          <div className="text-[9px] uppercase text-muted-foreground">Streak</div>
                         </div>
-                        <div className="rounded-md bg-muted px-1 py-1.5">
-                          <div className="text-sm font-bold">{tipster.totalTips}</div>
-                          <div className="text-[9px] text-muted-foreground">Tips</div>
+                        <div className="rounded-md bg-muted px-0.5 py-1">
+                          <div className="text-xs font-bold">{tipster.totalTips}</div>
+                          <div className="text-[9px] uppercase text-muted-foreground">Tips</div>
                         </div>
                       </div>
                     </Link>
 
-                    <div className="mt-3 flex items-center justify-between gap-2 border-t border-border pt-2">
-                      <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
+                    <div className="mt-2.5 flex items-center justify-between gap-2 border-t border-border pt-2">
+                      <span className="flex items-center gap-1 text-[10px] text-muted-foreground uppercase tracking-wider">
                         <Users className="h-3 w-3" />
                         {tipster.followers.toLocaleString()}
                       </span>
@@ -293,7 +293,7 @@ export default function TipstersPage() {
                         tipsterId={tipster.id}
                         tipsterName={tipster.displayName}
                         size="sm"
-                        className="h-7 px-2 text-xs"
+                        className="h-6 px-2 text-[10px]"
                       />
                     </div>
                   </div>
@@ -304,23 +304,25 @@ export default function TipstersPage() {
 
           {/* Pagination */}
           {totalPages > 1 && (
-            <div className="mt-6 flex items-center justify-center gap-2">
+            <div className="mt-4 flex items-center justify-center gap-2">
               <Button
                 variant="outline" size="sm"
+                className="h-7 text-xs"
                 disabled={page === 0}
                 onClick={() => setPage(p => Math.max(0, p - 1))}
               >
-                <ChevronLeft className="h-4 w-4" /> Prev
+                <ChevronLeft className="h-3.5 w-3.5" /> Prev
               </Button>
-              <span className="text-sm text-muted-foreground">
+              <span className="text-[11px] text-muted-foreground">
                 {page + 1} / {totalPages}
               </span>
               <Button
                 variant="outline" size="sm"
+                className="h-7 text-xs"
                 disabled={page >= totalPages - 1}
                 onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
               >
-                Next <ChevronRight className="h-4 w-4" />
+                Next <ChevronRight className="h-3.5 w-3.5" />
               </Button>
             </div>
           )}
@@ -328,12 +330,12 @@ export default function TipstersPage() {
 
         {/* Compare floating bar */}
         {compareIds.length > 0 && (
-          <div className="fixed bottom-20 left-1/2 z-30 flex -translate-x-1/2 items-center gap-3 rounded-full border border-border bg-card px-4 py-2 shadow-lg md:bottom-6">
-            <span className="text-sm font-medium">{compareIds.length} selected</span>
-            <Button size="sm" variant="ghost" onClick={() => setCompareIds([])} className="h-7 px-2 text-xs">
+          <div className="fixed bottom-20 left-1/2 z-30 flex -translate-x-1/2 items-center gap-2 rounded-full border border-border bg-card px-3 py-1.5 shadow-lg md:bottom-6">
+            <span className="text-xs font-medium">{compareIds.length} selected</span>
+            <Button size="sm" variant="ghost" onClick={() => setCompareIds([])} className="h-6 px-2 text-[10px]">
               Clear
             </Button>
-            <Button size="sm" disabled={!compareHref} asChild={!!compareHref}>
+            <Button size="sm" className="h-7 text-xs" disabled={!compareHref} asChild={!!compareHref}>
               {compareHref ? <Link href={compareHref}><GitCompare className="mr-1 h-3 w-3" />Compare</Link>
                            : <span><GitCompare className="mr-1 h-3 w-3" />Pick 2+</span>}
             </Button>

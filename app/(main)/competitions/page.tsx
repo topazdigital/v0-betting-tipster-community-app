@@ -123,76 +123,76 @@ export default function CompetitionsPage() {
     <div className="flex">
       <SidebarNew />
       <div className="flex-1 overflow-hidden">
-        <div className="mx-auto max-w-5xl px-4 py-3">
+        <div className="mx-auto max-w-5xl px-4 py-2.5">
           {/* Header */}
-          <div className="mb-3 flex items-center justify-between">
+          <div className="mb-2.5 flex items-center justify-between">
             <div>
-              <h1 className="flex items-center gap-2 text-lg font-bold text-foreground">
-                <Trophy className="h-7 w-7 text-warning" />
+              <h1 className="flex items-center gap-1.5 text-lg font-bold text-foreground">
+                <Trophy className="h-5 w-5 text-warning" />
                 Competitions
               </h1>
-              <p className="text-sm text-muted-foreground">
+              <p className="text-xs text-muted-foreground">
                 Outright winners, tipster challenges, and more
               </p>
             </div>
-            <Button asChild>
+            <Button size="sm" className="h-8 text-xs" asChild>
               <Link href="/leaderboard">
-                <Star className="mr-2 h-4 w-4" />
+                <Star className="mr-1.5 h-3.5 w-3.5" />
                 Leaderboard
               </Link>
             </Button>
           </div>
 
           {/* Stats */}
-          <div className="mb-4 grid grid-cols-2 gap-4 sm:grid-cols-4">
-            <div className="rounded-xl border border-border bg-gradient-to-br from-warning/10 to-transparent p-4 text-center">
-              <Target className="mx-auto h-6 w-6 text-warning" />
-              <div className="mt-2 text-2xl font-bold text-warning">
+          <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+            <div className="rounded-xl border border-border bg-gradient-to-br from-warning/10 to-transparent p-2.5 text-center">
+              <Target className="mx-auto h-4 w-4 text-warning" />
+              <div className="mt-1 text-xl font-bold text-warning">
                 {outrightLeagues.length}
               </div>
-              <div className="text-xs text-muted-foreground">Outright Markets</div>
+              <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Markets</div>
             </div>
-            <div className="rounded-xl border border-border bg-card p-4 text-center">
-              <Zap className="mx-auto h-6 w-6 text-primary" />
-              <div className="mt-2 text-2xl font-bold">{activeComps.length}</div>
-              <div className="text-xs text-muted-foreground">Active Contests</div>
+            <div className="rounded-xl border border-border bg-card p-2.5 text-center">
+              <Zap className="mx-auto h-4 w-4 text-primary" />
+              <div className="mt-1 text-xl font-bold">{activeComps.length}</div>
+              <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Contests</div>
             </div>
-            <div className="rounded-xl border border-border bg-card p-4 text-center">
-              <Users className="mx-auto h-6 w-6 text-success" />
-              <div className="mt-2 text-2xl font-bold">
+            <div className="rounded-xl border border-border bg-card p-2.5 text-center">
+              <Users className="mx-auto h-4 w-4 text-success" />
+              <div className="mt-1 text-xl font-bold">
                 {tipsterCompetitions.reduce((sum, c) => sum + c.currentParticipants, 0)}
               </div>
-              <div className="text-xs text-muted-foreground">Participants</div>
+              <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Users</div>
             </div>
-            <div className="rounded-xl border border-border bg-card p-4 text-center">
-              <Gift className="mx-auto h-6 w-6 text-live" />
-              <div className="mt-2 text-2xl font-bold">
-                KES {tipsterCompetitions.reduce((sum, c) => sum + c.prizePool, 0).toLocaleString()}
+            <div className="rounded-xl border border-border bg-card p-2.5 text-center">
+              <Gift className="mx-auto h-4 w-4 text-live" />
+              <div className="mt-1 text-xl font-bold">
+                KES {Math.round(tipsterCompetitions.reduce((sum, c) => sum + c.prizePool, 0) / 1000)}K
               </div>
-              <div className="text-xs text-muted-foreground">Prize Pool</div>
+              <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Prizes</div>
             </div>
           </div>
 
           {/* Tabs */}
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-6">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="outrights" className="gap-2">
-                <Target className="h-4 w-4" />
-                Outright Winners
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-4">
+            <TabsList className="grid h-8 w-full grid-cols-2 p-0.5">
+              <TabsTrigger value="outrights" className="h-7 gap-1.5 text-xs">
+                <Target className="h-3 w-3" />
+                Outrights
               </TabsTrigger>
-              <TabsTrigger value="contests" className="gap-2">
-                <Trophy className="h-4 w-4" />
-                Tipster Contests ({activeComps.length})
+              <TabsTrigger value="contests" className="h-7 gap-1.5 text-xs">
+                <Trophy className="h-3 w-3" />
+                Contests ({activeComps.length})
               </TabsTrigger>
             </TabsList>
 
             {/* Outright Winners Tab */}
-            <TabsContent value="outrights" className="mt-6">
-              <div className="mb-4 text-sm text-muted-foreground">
-                Real bookmaker odds aggregated from UK / EU / US sportsbooks. Football leagues shown first.
+            <TabsContent value="outrights" className="mt-3">
+              <div className="mb-3 text-[11px] text-muted-foreground">
+                Real bookmaker odds aggregated from UK / EU / US sportsbooks.
               </div>
 
-              <div className="grid gap-4 md:grid-cols-2">
+              <div className="grid gap-3 md:grid-cols-2">
                 {outrightLeagues.map(league => (
                   <OutrightCard key={league.id} league={league} />
                 ))}
@@ -200,8 +200,8 @@ export default function CompetitionsPage() {
             </TabsContent>
 
             {/* Tipster Contests Tab */}
-            <TabsContent value="contests" className="mt-6">
-              <div className="grid gap-3">
+            <TabsContent value="contests" className="mt-3">
+              <div className="grid gap-2.5">
                 {activeComps.map(comp => (
                   <CompetitionCard 
                     key={comp.id} 

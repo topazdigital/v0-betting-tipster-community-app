@@ -79,32 +79,32 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
         />
       )}
 
-      {/* Sidebar */}
+      {/* Sidebar — narrower & denser */}
       <aside className={cn(
-        "fixed inset-y-0 left-0 z-50 w-64 transform border-r border-border bg-card transition-transform lg:translate-x-0",
+        "fixed inset-y-0 left-0 z-50 flex w-56 transform flex-col border-r border-border bg-card transition-transform lg:translate-x-0",
         sidebarOpen ? "translate-x-0" : "-translate-x-full"
       )}>
         {/* Logo */}
-        <div className="flex h-16 items-center justify-between border-b border-border px-4">
+        <div className="flex h-12 items-center justify-between border-b border-border px-3">
           <Link href="/" className="flex items-center gap-2">
             {branding.logoUrl ? (
               <>
                 <img
                   src={branding.logoUrl}
                   alt={branding.siteName}
-                  className={`h-9 w-auto object-contain ${branding.logoDarkUrl ? 'block dark:hidden' : ''}`}
+                  className={`h-7 w-auto object-contain ${branding.logoDarkUrl ? 'block dark:hidden' : ''}`}
                 />
                 {branding.logoDarkUrl && (
                   <img
                     src={branding.logoDarkUrl}
                     alt={branding.siteName}
-                    className="hidden h-9 w-auto object-contain dark:block"
+                    className="hidden h-7 w-auto object-contain dark:block"
                   />
                 )}
               </>
             ) : (
               <>
-                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white font-bold">
+                <div className="flex h-7 w-7 items-center justify-center rounded-md bg-gradient-to-br from-emerald-500 to-teal-600 text-white text-xs font-bold">
                   {branding.siteName
                     .split(" ")
                     .filter(Boolean)
@@ -113,17 +113,17 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
                     .join("")
                     .slice(0, 2) || "BT"}
                 </div>
-                <span className="text-lg font-bold">{branding.siteName}</span>
+                <span className="text-sm font-bold">{branding.siteName}</span>
               </>
             )}
           </Link>
-          <Button variant="ghost" size="icon" className="lg:hidden" onClick={() => setSidebarOpen(false)}>
-            <X className="h-5 w-5" />
+          <Button variant="ghost" size="icon" className="h-7 w-7 lg:hidden" onClick={() => setSidebarOpen(false)}>
+            <X className="h-4 w-4" />
           </Button>
         </div>
 
         {/* Navigation */}
-        <nav className="space-y-1 p-3">
+        <nav className="space-y-0.5 p-2">
           {mainNavItems.map((item) => {
             const isActive = pathname === item.href
             return (
@@ -132,14 +132,14 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
                 href={item.href}
                 onClick={() => setSidebarOpen(false)}
                 className={cn(
-                  "flex items-center justify-between rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
+                  "flex items-center justify-between rounded-md px-2 py-1.5 text-xs font-medium transition-colors",
                   isActive 
                     ? "bg-primary text-primary-foreground" 
                     : "text-muted-foreground hover:bg-muted hover:text-foreground"
                 )}
               >
-                <div className="flex items-center gap-3">
-                  <item.icon className="h-5 w-5" />
+                <div className="flex items-center gap-2">
+                  <item.icon className="h-3.5 w-3.5" />
                   {item.label}
                 </div>
                 {item.badgeKey && (() => {
@@ -147,7 +147,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
                   if (!count) return null
                   return (
                     <span className={cn(
-                      "flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-xs font-bold",
+                      "flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-bold",
                       isActive ? "bg-white/20 text-white" : (item.badgeKey === 'live' ? "bg-red-500 text-white" : "bg-primary text-primary-foreground")
                     )}>
                       {count}
@@ -160,25 +160,25 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
         </nav>
 
         {/* Sports */}
-        <div className="border-t border-border p-3">
+        <div className="border-t border-border p-2">
           <button 
             onClick={() => setShowSports(!showSports)}
-            className="flex w-full items-center justify-between px-3 py-2 text-sm font-semibold text-muted-foreground"
+            className="flex w-full items-center justify-between px-2 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground"
           >
             Sports
-            <ChevronDown className={cn("h-4 w-4 transition-transform", showSports && "rotate-180")} />
+            <ChevronDown className={cn("h-3.5 w-3.5 transition-transform", showSports && "rotate-180")} />
           </button>
 
           {showSports && (
-            <div className="mt-1 max-h-64 space-y-0.5 overflow-y-auto">
+            <div className="mt-0.5 max-h-56 space-y-0.5 overflow-y-auto">
               {SPORTS_LIST?.slice(0, 15).map((sport) => (
                 <Link
                   key={sport.id}
                   href={`/matches?sport=${sport.slug}`}
                   onClick={() => setSidebarOpen(false)}
-                  className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted-foreground hover:bg-muted hover:text-foreground"
+                  className="flex items-center gap-2 rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-muted hover:text-foreground"
                 >
-                  <span>{getSportIcon(sport.slug)}</span>
+                  <span className="text-sm">{getSportIcon(sport.slug)}</span>
                   {sport.name}
                 </Link>
               ))}
@@ -188,9 +188,9 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
 
         {/* Admin - only visible for admin users */}
         {isAuthenticated && user?.role === 'admin' && (
-          <div className="absolute bottom-0 left-0 right-0 border-t border-border p-3">
-            <Link href="/admin" className="flex items-center gap-3 px-3 py-2.5 text-sm hover:bg-muted rounded-lg text-primary">
-              <Settings className="h-5 w-5" />
+          <div className="mt-auto border-t border-border p-2">
+            <Link href="/admin" className="flex items-center gap-2 px-2 py-1.5 text-xs hover:bg-muted rounded-md text-primary">
+              <Settings className="h-3.5 w-3.5" />
               Admin Panel
             </Link>
           </div>
@@ -198,11 +198,11 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
       </aside>
 
       {/* Main */}
-      <div className="lg:pl-64">
+      <div className="lg:pl-56">
         {/* Header */}
-        <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b border-border bg-card px-4">
-          <Button variant="ghost" size="icon" className="lg:hidden" onClick={() => setSidebarOpen(true)}>
-            <Menu className="h-5 w-5" />
+        <header className="sticky top-0 z-30 flex h-12 items-center gap-2 border-b border-border bg-card px-3">
+          <Button variant="ghost" size="icon" className="h-8 w-8 lg:hidden" onClick={() => setSidebarOpen(true)}>
+            <Menu className="h-4 w-4" />
           </Button>
 
           <div className="hidden flex-1 max-w-md md:block">
@@ -213,20 +213,20 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
             <HeaderSearch />
           </div>
 
-          <div className="ml-auto flex items-center gap-2">
+          <div className="ml-auto flex items-center gap-1">
             <ThemeToggle />
             <NotificationBell />
-            <Button variant="ghost" size="icon">
-              <Bookmark className="h-5 w-5" />
+            <Button variant="ghost" size="icon" className="h-8 w-8">
+              <Bookmark className="h-4 w-4" />
             </Button>
             
             {isLoading ? (
-              <div className="h-8 w-8 animate-pulse rounded-full bg-muted" />
+              <div className="h-7 w-7 animate-pulse rounded-full bg-muted" />
             ) : isAuthenticated && user ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="sm" className="gap-2">
-                    <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">
+                  <Button variant="ghost" size="sm" className="h-8 gap-1.5 px-2 text-xs">
+                    <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-[10px] font-semibold text-primary-foreground">
                       {user.displayName?.charAt(0).toUpperCase() || user.username?.charAt(0).toUpperCase() || 'U'}
                     </div>
                     <span className="hidden sm:inline">{user.displayName || user.username}</span>
@@ -296,7 +296,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
           </div>
         </header>
 
-        <main className="p-4 pb-20 md:pb-4">{children}</main>
+        <main className="p-3 pb-20 md:p-4 md:pb-4">{children}</main>
 
         {/* Site footer (admin-managed branding + social links) */}
         <Footer />

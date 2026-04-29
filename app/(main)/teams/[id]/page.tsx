@@ -179,7 +179,7 @@ export default function TeamPage({ params }: PageProps) {
   if (isLoading) {
     return (
       <div className="flex h-64 items-center justify-center">
-        <Spinner size="lg" />
+        <Spinner className="size-8" />
         <span className="ml-3 text-muted-foreground">Loading team...</span>
       </div>
     );
@@ -232,10 +232,10 @@ export default function TeamPage({ params }: PageProps) {
         <div className="min-w-0 space-y-3">
 
       {/* Team Hero — oddspedia-inspired banner */}
-      <div className="relative overflow-hidden rounded-2xl border border-border shadow-sm">
+      <div className="relative overflow-hidden rounded-xl border border-border shadow-sm">
         {/* Tinted banner background */}
         <div
-          className="relative px-5 pt-6 pb-5 sm:px-8 sm:pt-8 sm:pb-7"
+          className="relative px-4 pt-4 pb-4 sm:px-6 sm:pt-6 sm:pb-5"
           style={{
             background: `linear-gradient(135deg, ${accentColor}f0 0%, ${accentColor}b3 55%, ${accentColor}66 100%)`,
           }}
@@ -246,50 +246,50 @@ export default function TeamPage({ params }: PageProps) {
             style={{ background: `radial-gradient(circle, #ffffff 0%, transparent 70%)` }}
             aria-hidden
           />
-          <div className="relative flex flex-col gap-5 sm:flex-row sm:items-center">
-            <div className="flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-white/30 bg-white shadow-xl ring-1 ring-black/5 sm:h-28 sm:w-28">
-              <TeamLogo teamName={team.name} logoUrl={team.logo} sportSlug={sportSlug} size="xl" className="h-full w-full p-2" />
+          <div className="relative flex flex-col gap-4 sm:flex-row sm:items-center">
+            <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-white/30 bg-white shadow-xl ring-1 ring-black/5 sm:h-24 sm:w-24">
+              <TeamLogo teamName={team.name} logoUrl={team.logo} sportSlug={sportSlug} size="lg" className="h-full w-full p-1.5" />
             </div>
 
             <div className="min-w-0 flex-1">
-              <div className="flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-start">
+              <div className="flex flex-col items-start justify-between gap-2 sm:flex-row sm:items-start">
                 <div className="min-w-0">
-                  <h1 className="text-2xl font-extrabold tracking-tight text-white drop-shadow-sm sm:text-3xl">
+                  <h1 className="text-lg font-extrabold tracking-tight text-white drop-shadow-sm sm:text-xl">
                     {team.name}
                   </h1>
                   {team.nickname && team.nickname !== team.name && (
-                    <p className="mt-0.5 text-sm text-white/85">{team.nickname}</p>
+                    <p className="mt-0.5 text-xs text-white/85">{team.nickname}</p>
                   )}
-                  <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-white/90">
+                  <div className="mt-2 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[11px] text-white/90">
                     {countryCode && (
-                      <span className="inline-flex items-center gap-1.5">
-                        <FlagIcon countryCode={countryCode} size="sm" />
+                      <span className="inline-flex items-center gap-1">
+                        <FlagIcon countryCode={countryCode} size="xs" />
                         {country || countryCode}
                       </span>
                     )}
                     {team.venue && (
                       <span className="inline-flex items-center gap-1">
-                        <MapPin className="h-3 w-3" />
+                        <MapPin className="h-2.5 w-2.5" />
                         {team.venue}
                       </span>
                     )}
                     {team.founded && (
                       <span className="inline-flex items-center gap-1">
-                        <Calendar className="h-3 w-3" />
+                        <Calendar className="h-2.5 w-2.5" />
                         Est. {team.founded}
                       </span>
                     )}
                     {team.record && (
-                      <span className="inline-flex items-center rounded-full bg-white/20 px-2 py-0.5 font-semibold tabular-nums">
+                      <span className="inline-flex items-center rounded-full bg-white/20 px-1.5 py-0.5 font-semibold tabular-nums">
                         {team.record}
                       </span>
                     )}
                     {team.standing?.position && (
                       <span
-                        className="inline-flex items-center gap-1 rounded-full bg-white/20 px-2 py-0.5 font-semibold"
+                        className="inline-flex items-center gap-1 rounded-full bg-white/20 px-1.5 py-0.5 font-semibold"
                         title={team.standing.raw || `${team.standing.position}${team.standing.competition ? ` in ${team.standing.competition}` : ''}`}
                       >
-                        <Trophy className="h-3 w-3" />
+                        <Trophy className="h-2.5 w-2.5" />
                         {team.standing.position}
                         {team.standing.competition && (
                           <span className="ml-1 hidden font-normal text-white/85 sm:inline">
@@ -300,7 +300,7 @@ export default function TeamPage({ params }: PageProps) {
                     )}
                   </div>
                 </div>
-                <div className="flex flex-col items-start gap-1.5 sm:items-end">
+                <div className="flex flex-col items-start gap-1 sm:items-end">
                   <FollowTeamButton
                     teamId={id}
                     teamName={team.name}
@@ -310,7 +310,7 @@ export default function TeamPage({ params }: PageProps) {
                     leagueName={(team as any).league ?? null}
                     sportSlug={sportSlug ?? null}
                     countryCode={countryCode ?? null}
-                    size="md"
+                    size="sm"
                     onChange={(now) => {
                       // Optimistically bump the visible counter so the UI
                       // reflects the action instantly, then re-fetch the
@@ -323,15 +323,15 @@ export default function TeamPage({ params }: PageProps) {
                       );
                     }}
                   />
-                  <span className="inline-flex items-center gap-1 text-[11px] font-medium text-white/80">
-                    <Users className="h-3 w-3" />
+                  <span className="inline-flex items-center gap-1 text-[10px] font-medium text-white/80">
+                    <Users className="h-2.5 w-2.5" />
                     {(followersCount ?? 0).toLocaleString()} {followersCount === 1 ? 'follower' : 'followers'}
                   </span>
                 </div>
               </div>
               {past?.length > 0 && (
-                <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1 backdrop-blur-sm">
-                  <span className="text-[11px] font-semibold uppercase tracking-wide text-white/85">Form</span>
+                <div className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-white/15 px-2 py-0.5 backdrop-blur-sm">
+                  <span className="text-[10px] font-semibold uppercase tracking-wide text-white/85">Form</span>
                   <FormBar past={past} />
                 </div>
               )}
@@ -353,9 +353,9 @@ export default function TeamPage({ params }: PageProps) {
                 color: goalsFor - goalsAgainst >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400',
               },
             ].map((s) => (
-              <div key={s.label} className="px-2 py-3 text-center">
-                <div className={cn('text-xl font-bold tabular-nums', s.color)}>{s.value}</div>
-                <div className="mt-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+              <div key={s.label} className="px-1.5 py-2 text-center">
+                <div className={cn('text-lg font-bold tabular-nums', s.color)}>{s.value}</div>
+                <div className="mt-0.5 text-[9px] font-medium uppercase tracking-wide text-muted-foreground">
                   {s.label}
                 </div>
               </div>

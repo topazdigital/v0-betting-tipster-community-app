@@ -114,29 +114,29 @@ export default function AdminTipstersPage() {
   return (
     <div className="space-y-3">
       {/* Header */}
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+      <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
         <div>
           <h1 className="text-lg font-bold">Tipsters Management</h1>
-          <p className="text-muted-foreground">Real users + seeded tipsters that power the public feed.</p>
+          <p className="text-xs text-muted-foreground">Real users + seeded tipsters that power the public feed.</p>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Button variant="outline" size="sm" onClick={postSampleTips} disabled={posting}>
-            {posting ? <Spinner className="mr-2 h-4 w-4" /> : <Sparkles className="mr-2 h-4 w-4" />}
+        <div className="flex flex-wrap gap-1.5">
+          <Button variant="outline" size="sm" className="h-8 text-xs px-2.5" onClick={postSampleTips} disabled={posting}>
+            {posting ? <Spinner className="mr-1.5 h-3.5 w-3.5" /> : <Sparkles className="mr-1.5 h-3.5 w-3.5" />}
             Plan auto-tips (dry)
           </Button>
-          <Button size="sm" onClick={() => setGenOpen(true)}>
-            <RefreshCw className="mr-2 h-4 w-4" />
+          <Button size="sm" className="h-8 text-xs px-2.5" onClick={() => setGenOpen(true)}>
+            <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
             Generate fake tipsters
           </Button>
         </div>
       </div>
 
       {postResult && (
-        <div className="rounded-lg border border-border bg-muted/50 px-3 py-2 text-xs">{postResult}</div>
+        <div className="rounded-lg border border-border bg-muted/50 px-2.5 py-1.5 text-[10px] text-muted-foreground leading-tight">{postResult}</div>
       )}
 
       {/* Stats */}
-      <div className="grid gap-3 md:grid-cols-4">
+      <div className="grid gap-2 md:grid-cols-4">
         <StatCard icon={Trophy} label="Total tipsters" value={counts.total} colour="amber" />
         <StatCard icon={Bot} label="Seeded (fake)" value={counts.fake} colour="purple" />
         <StatCard icon={CheckCircle2} label="Verified" value={stats.verified} colour="emerald" />
@@ -145,16 +145,16 @@ export default function AdminTipstersPage() {
 
       {/* Filters */}
       <Card>
-        <CardContent className="p-3">
-          <div className="flex flex-col gap-3 md:flex-row md:items-center">
+        <CardContent className="p-2">
+          <div className="flex flex-col gap-2 md:flex-row md:items-center">
             <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
               <Input placeholder="Search tipsters..." value={search}
-                     onChange={(e) => setSearch(e.target.value)} className="pl-9" />
+                     onChange={(e) => setSearch(e.target.value)} className="h-8 pl-8 text-xs" />
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-1.5">
               {(['all', 'real', 'fake'] as const).map(opt => (
-                <Button key={opt} size="sm"
+                <Button key={opt} size="sm" className="h-7 text-xs px-2"
                         variant={filter === opt ? 'default' : 'outline'}
                         onClick={() => setFilter(opt)}>
                   {opt === 'all' ? 'All' : opt === 'real' ? `Real (${counts.real})` : `Fake (${counts.fake})`}
@@ -167,9 +167,9 @@ export default function AdminTipstersPage() {
 
       {/* List */}
       {isLoading ? (
-        <div className="flex h-64 items-center justify-center"><Spinner className="h-8 w-8" /></div>
+        <div className="flex h-64 items-center justify-center"><Spinner className="h-6 w-6" /></div>
       ) : tipsters.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-border p-10 text-center text-sm text-muted-foreground">
+        <div className="rounded-xl border border-dashed border-border p-10 text-center text-xs text-muted-foreground">
           No tipsters match those filters.
         </div>
       ) : (
@@ -178,72 +178,72 @@ export default function AdminTipstersPage() {
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
-                  <tr className="border-b bg-muted/50 text-left text-xs uppercase text-muted-foreground">
-                    <th className="p-3 font-medium">Tipster</th>
-                    <th className="p-3 font-medium">Source</th>
-                    <th className="p-3 font-medium text-right">Tips</th>
-                    <th className="p-3 font-medium text-right">Win&nbsp;%</th>
-                    <th className="p-3 font-medium text-right">ROI</th>
-                    <th className="p-3 font-medium text-right">Followers</th>
-                    <th className="p-3 font-medium text-right">Plan</th>
-                    <th className="p-3 font-medium"></th>
+                  <tr className="border-b bg-muted/30 text-left text-[11px] uppercase text-muted-foreground">
+                    <th className="p-2 px-3 font-medium">Tipster</th>
+                    <th className="p-2 px-3 font-medium">Source</th>
+                    <th className="p-2 px-3 font-medium text-right">Tips</th>
+                    <th className="p-2 px-3 font-medium text-right">Win&nbsp;%</th>
+                    <th className="p-2 px-3 font-medium text-right">ROI</th>
+                    <th className="p-2 px-3 font-medium text-right">Followers</th>
+                    <th className="p-2 px-3 font-medium text-right">Plan</th>
+                    <th className="p-2 px-3 font-medium"></th>
                   </tr>
                 </thead>
-                <tbody>
+                <tbody className="text-xs">
                   {tipsters.map(t => (
-                    <tr key={t.id} className="border-b last:border-0 hover:bg-muted/30">
-                      <td className="p-3">
-                        <div className="flex items-center gap-3">
-                          <div className="relative">
+                    <tr key={t.id} className="border-b last:border-0 hover:bg-muted/30 transition-colors">
+                      <td className="p-1.5 px-3">
+                        <div className="flex items-center gap-2.5">
+                          <div className="relative shrink-0">
                             {t.avatar
                               // eslint-disable-next-line @next/next/no-img-element
-                              ? <img src={t.avatar} alt="" className="h-9 w-9 rounded-full bg-muted" />
-                              : <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary text-sm font-bold text-primary-foreground">{t.displayName.charAt(0)}</div>}
+                              ? <img src={t.avatar} alt="" className="h-8 w-8 rounded-full bg-muted" />
+                              : <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground">{t.displayName.charAt(0)}</div>}
                             {t.isVerified && (
-                              <div className="absolute -bottom-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-blue-500">
-                                <CheckCircle2 className="h-2.5 w-2.5 text-white" />
+                              <div className="absolute -bottom-0.5 -right-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-blue-500 border border-white">
+                                <CheckCircle2 className="h-2 w-2 text-white" />
                               </div>
                             )}
                           </div>
                           <div className="min-w-0">
-                            <p className="truncate text-sm font-medium">{t.displayName}</p>
-                            <p className="truncate text-xs text-muted-foreground">@{t.username}</p>
+                            <p className="truncate font-medium leading-tight">{t.displayName}</p>
+                            <p className="truncate text-[10px] text-muted-foreground">@{t.username}</p>
                           </div>
                         </div>
                       </td>
-                      <td className="p-3">
+                      <td className="p-1.5 px-3">
                         <Badge variant="outline" className={cn(
-                          'text-[10px]',
+                          'text-[9px] h-4 px-1',
                           t.isFake ? 'border-purple-500/30 text-purple-500' : 'border-emerald-500/30 text-emerald-500',
                         )}>
-                          {t.isFake ? <><Bot className="mr-1 h-2.5 w-2.5" />Seeded</> : 'Real'}
+                          {t.isFake ? <><Bot className="mr-0.5 h-2.5 w-2.5" />Seeded</> : 'Real'}
                         </Badge>
                       </td>
-                      <td className="p-3 text-right text-sm">{t.totalTips}</td>
-                      <td className="p-3 text-right text-sm">
-                        <span className={t.winRate >= 60 ? 'font-semibold text-emerald-500' : ''}>{t.winRate}%</span>
+                      <td className="p-1.5 px-3 text-right tabular-nums">{t.totalTips}</td>
+                      <td className="p-1.5 px-3 text-right">
+                        <span className={cn("tabular-nums", t.winRate >= 60 ? 'font-semibold text-emerald-500' : '')}>{t.winRate}%</span>
                       </td>
-                      <td className="p-3 text-right text-sm">
-                        <span className={t.roi > 0 ? 'text-emerald-500' : 'text-red-500'}>+{t.roi}%</span>
+                      <td className="p-1.5 px-3 text-right">
+                        <span className={cn("tabular-nums", t.roi > 0 ? 'text-emerald-500 font-medium' : 'text-red-500')}>+{t.roi}%</span>
                       </td>
-                      <td className="p-3 text-right text-sm">{t.followers.toLocaleString()}</td>
-                      <td className="p-3 text-right">
+                      <td className="p-1.5 px-3 text-right tabular-nums">{t.followers.toLocaleString()}</td>
+                      <td className="p-1.5 px-3 text-right">
                         {t.isPro
-                          ? <Badge className="bg-primary text-[10px]"><Star className="mr-0.5 h-2.5 w-2.5" />PRO</Badge>
-                          : <span className="text-xs text-muted-foreground">Free</span>}
+                          ? <Badge className="bg-primary text-[9px] h-4 px-1"><Star className="mr-0.5 h-2 w-2" />PRO</Badge>
+                          : <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Free</span>}
                       </td>
-                      <td className="p-3 text-right">
+                      <td className="p-1.5 px-3 text-right">
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
+                            <Button variant="ghost" size="icon" className="h-7 w-7"><MoreHorizontal className="h-3.5 w-3.5" /></Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem asChild>
-                              <Link href={`/tipsters/${t.id}`} target="_blank"><Eye className="mr-2 h-4 w-4" />View profile</Link>
+                            <DropdownMenuItem asChild className="text-xs">
+                              <Link href={`/tipsters/${t.id}`} target="_blank"><Eye className="mr-2 h-3.5 w-3.5" />View profile</Link>
                             </DropdownMenuItem>
-                            <DropdownMenuItem><CheckCircle2 className="mr-2 h-4 w-4" />{t.isVerified ? 'Remove verification' : 'Verify'}</DropdownMenuItem>
+                            <DropdownMenuItem className="text-xs"><CheckCircle2 className="mr-2 h-3.5 w-3.5" />{t.isVerified ? 'Remove verification' : 'Verify'}</DropdownMenuItem>
                             <DropdownMenuSeparator />
-                            <DropdownMenuItem className="text-red-500"><XCircle className="mr-2 h-4 w-4" />Suspend</DropdownMenuItem>
+                            <DropdownMenuItem className="text-red-500 text-xs"><XCircle className="mr-2 h-3.5 w-3.5" />Suspend</DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </td>

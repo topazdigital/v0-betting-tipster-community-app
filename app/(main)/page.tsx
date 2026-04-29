@@ -209,7 +209,7 @@ export default function HomePage() {
           </div>
         </section>
 
-        <div className="mx-auto max-w-6xl px-4 py-4">
+        <div className="mx-auto max-w-6xl px-4 py-3">
           {isLoading ? (
             <div className="flex h-64 items-center justify-center">
               <Spinner className="h-8 w-8" />
@@ -219,49 +219,49 @@ export default function HomePage() {
               {/* Live Matches Section — ALWAYS visible. When no matches are
                   live, show a friendly "no live games" panel + the next few
                   scheduled kickoffs so the row never silently disappears. */}
-              <section className="mb-5">
+              <section className="mb-4">
                 <div className="mb-2 flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <span className="relative flex h-3 w-3">
+                  <div className="flex items-center gap-2">
+                    <span className="relative flex h-2.5 w-2.5">
                       <span className={cn(
                         'absolute inline-flex h-full w-full rounded-full opacity-75',
                         liveMatches.length > 0 ? 'animate-ping bg-live' : 'bg-muted-foreground/40',
                       )}></span>
                       <span className={cn(
-                        'relative inline-flex h-3 w-3 rounded-full',
+                        'relative inline-flex h-2.5 w-2.5 rounded-full',
                         liveMatches.length > 0 ? 'bg-live' : 'bg-muted-foreground/60',
                       )}></span>
                     </span>
-                    <h2 className="text-xl font-bold text-foreground">Live Now</h2>
-                    <Badge variant={liveMatches.length > 0 ? 'destructive' : 'secondary'}>
+                    <h2 className="text-lg font-bold text-foreground">Live Now</h2>
+                    <Badge variant={liveMatches.length > 0 ? 'destructive' : 'secondary'} className="h-5 px-1.5 text-[10px]">
                       {liveMatches.length}
                     </Badge>
                   </div>
-                  <Button variant="ghost" size="sm" asChild>
+                  <Button variant="ghost" size="sm" className="h-7 text-xs" asChild>
                     <Link href="/matches?status=live">
                       View all
-                      <ChevronRight className="ml-1 h-4 w-4" />
+                      <ChevronRight className="ml-1 h-3.5 w-3.5" />
                     </Link>
                   </Button>
                 </div>
                 {liveMatches.length > 0 ? (
                   <LiveMarquee matches={liveMatches} tips={liveRowTips} />
                 ) : (
-                  <div className="rounded-xl border border-dashed border-border bg-card/40 px-4 py-3">
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                      <p className="text-sm text-muted-foreground">
+                  <div className="rounded-xl border border-dashed border-border bg-card/40 px-3 py-2.5">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <p className="text-xs text-muted-foreground">
                         <span className="font-semibold text-foreground">No live games right now.</span>{' '}
-                        We refresh this every 10 seconds — meanwhile, here are the next kickoffs.
+                        Refreshing every 10s — meanwhile, here are the next kickoffs.
                       </p>
-                      <Button size="sm" variant="outline" asChild>
+                      <Button size="sm" variant="outline" className="h-7 text-xs" asChild>
                         <Link href="/matches?status=scheduled">
                           See schedule
-                          <ChevronRight className="ml-1 h-4 w-4" />
+                          <ChevronRight className="ml-1 h-3.5 w-3.5" />
                         </Link>
                       </Button>
                     </div>
                     {upcomingMatches.length > 0 && (
-                      <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                      <div className="mt-2.5 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
                         {upcomingMatches.slice(0, 6).map((m) => {
                           const t = new Date(m.kickoffTime);
                           const time = t.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -272,19 +272,19 @@ export default function HomePage() {
                             <Link
                               key={m.id}
                               href={`/matches/${matchIdToSlug(m.id)}`}
-                              className="group flex items-center justify-between gap-2 rounded-lg border border-border bg-card px-3 py-2 transition-colors hover:border-primary/50"
+                              className="group flex items-center justify-between gap-2 rounded-lg border border-border bg-card px-2.5 py-1.5 transition-colors hover:border-primary/50"
                             >
                               <div className="min-w-0">
-                                <p className="truncate text-sm font-medium text-foreground group-hover:text-primary">
+                                <p className="truncate text-xs font-medium text-foreground group-hover:text-primary">
                                   {m.homeTeam.name} vs {m.awayTeam.name}
                                 </p>
-                                <p className="truncate text-[11px] text-muted-foreground">
+                                <p className="truncate text-[10px] text-muted-foreground">
                                   {m.league?.name || m.sport?.name}
                                 </p>
                               </div>
                               <div className="shrink-0 text-right">
-                                <p className="text-xs font-semibold text-foreground">{time}</p>
-                                <p className="text-[10px] text-muted-foreground">{day}</p>
+                                <p className="text-[11px] font-semibold text-foreground">{time}</p>
+                                <p className="text-[9px] text-muted-foreground">{day}</p>
                               </div>
                             </Link>
                           );
@@ -301,37 +301,37 @@ export default function HomePage() {
               {liveMatches.length === 0 && <FavoritedTipsPanel />}
 
               {/* Top Tipsters */}
-              <section className="mb-5">
+              <section className="mb-4">
                 <div className="mb-2 flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <Trophy className="h-5 w-5 text-warning" />
-                    <h2 className="text-xl font-bold text-foreground">Top Tipsters</h2>
+                  <div className="flex items-center gap-2">
+                    <Trophy className="h-4 w-4 text-warning" />
+                    <h2 className="text-lg font-bold text-foreground">Top Tipsters</h2>
                   </div>
-                  <Button variant="ghost" size="sm" asChild>
+                  <Button variant="ghost" size="sm" className="h-7 text-xs" asChild>
                     <Link href="/leaderboard">
                       Leaderboard
-                      <ChevronRight className="ml-1 h-4 w-4" />
+                      <ChevronRight className="ml-1 h-3.5 w-3.5" />
                     </Link>
                   </Button>
                 </div>
                 {topTipsters.length > 0 ? (
-                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                     {topTipsters.map((tipster, index) => {
                       const initial = (tipster.displayName || tipster.username || '?').charAt(0).toUpperCase();
                       return (
                         <Link
                           key={tipster.id}
                           href={`/tipsters/${tipster.id}`}
-                          className="group rounded-xl border border-border bg-card p-4 transition-all hover:border-primary/50 hover:shadow-lg"
+                          className="group rounded-xl border border-border bg-card p-3 transition-all hover:border-primary/50 hover:shadow-lg"
                         >
-                          <div className="mb-3 flex items-center gap-3">
+                          <div className="mb-2.5 flex items-center gap-2.5">
                             <div className="relative">
-                              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary text-lg font-bold text-primary-foreground">
+                              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary text-base font-bold text-primary-foreground">
                                 {initial}
                               </div>
                               {index < 3 && (
                                 <div className={cn(
-                                  'absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold',
+                                  'absolute -bottom-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full text-[9px] font-bold',
                                   index === 0 && 'bg-yellow-500 text-yellow-950',
                                   index === 1 && 'bg-gray-300 text-gray-700',
                                   index === 2 && 'bg-amber-700 text-amber-100',
@@ -340,15 +340,15 @@ export default function HomePage() {
                                 </div>
                               )}
                             </div>
-                            <div>
-                              <div className="font-semibold text-foreground group-hover:text-primary">
+                            <div className="min-w-0">
+                              <div className="truncate text-sm font-semibold text-foreground group-hover:text-primary">
                                 {tipster.displayName || tipster.username}
                               </div>
-                              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                              <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
                                 <span>{tipster.totalTips} tips</span>
                                 {tipster.streak > 0 && (
                                   <span className="flex items-center gap-0.5 text-success">
-                                    <Flame className="h-3 w-3" />
+                                    <Flame className="h-2.5 w-2.5" />
                                     {tipster.streak}
                                   </span>
                                 )}
@@ -356,13 +356,13 @@ export default function HomePage() {
                             </div>
                           </div>
                           <div className="grid grid-cols-2 gap-2 text-center">
-                            <div className="rounded-lg bg-success/10 px-2 py-1.5">
-                              <div className="text-lg font-bold text-success">{tipster.winRate}%</div>
-                              <div className="text-[10px] text-muted-foreground">Win Rate</div>
+                            <div className="rounded-lg bg-success/10 py-1">
+                              <div className="text-base font-bold text-success">{tipster.winRate}%</div>
+                              <div className="text-[9px] uppercase tracking-wide text-muted-foreground">Win Rate</div>
                             </div>
-                            <div className="rounded-lg bg-primary/10 px-2 py-1.5">
-                              <div className="text-lg font-bold text-primary">+{tipster.roi}%</div>
-                              <div className="text-[10px] text-muted-foreground">ROI</div>
+                            <div className="rounded-lg bg-primary/10 py-1">
+                              <div className="text-base font-bold text-primary">+{tipster.roi}%</div>
+                              <div className="text-[9px] uppercase tracking-wide text-muted-foreground">ROI</div>
                             </div>
                           </div>
                         </Link>
@@ -370,17 +370,17 @@ export default function HomePage() {
                     })}
                   </div>
                 ) : (
-                  <div className="rounded-xl border border-dashed border-border bg-card/40 p-6 text-center">
-                    <Users className="mx-auto h-10 w-10 text-muted-foreground" />
-                    <p className="mt-3 font-semibold text-foreground">No verified tipsters yet</p>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      The leaderboard fills up as tipsters post and grade their picks. Check back soon.
+                  <div className="rounded-xl border border-dashed border-border bg-card/40 p-5 text-center">
+                    <Users className="mx-auto h-8 w-8 text-muted-foreground" />
+                    <p className="mt-2 text-sm font-semibold text-foreground">No verified tipsters yet</p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      The leaderboard fills up as tipsters post and grade picks. Check back soon.
                     </p>
                     <div className="mt-3 flex justify-center gap-2">
-                      <Button size="sm" variant="outline" asChild>
+                      <Button size="sm" variant="outline" className="h-8 text-xs px-3" asChild>
                         <Link href="/leaderboard">Open leaderboard</Link>
                       </Button>
-                      <Button size="sm" onClick={() => openAuthModal('register')}>
+                      <Button size="sm" className="h-8 text-xs px-3" onClick={() => openAuthModal('register')}>
                         Become a tipster
                       </Button>
                     </div>
@@ -389,37 +389,37 @@ export default function HomePage() {
               </section>
 
               {/* Today's Matches by League — with Best Bets right rail */}
-              <section className="mb-5">
+              <section className="mb-4">
                 <div className="mb-2 flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <Clock className="h-5 w-5 text-primary" />
-                    <h2 className="text-xl font-bold text-foreground">Today&apos;s Matches</h2>
-                    <Badge variant="secondary">{todayMatches.length}</Badge>
+                  <div className="flex items-center gap-2">
+                    <Clock className="h-4 w-4 text-primary" />
+                    <h2 className="text-lg font-bold text-foreground">Today&apos;s Matches</h2>
+                    <Badge variant="secondary" className="h-5 px-1.5 text-[10px]">{todayMatches.length}</Badge>
                   </div>
-                  <Button variant="ghost" size="sm" asChild>
+                  <Button variant="ghost" size="sm" className="h-7 text-xs" asChild>
                     <Link href="/matches">
                       All matches
-                      <ChevronRight className="ml-1 h-4 w-4" />
+                      <ChevronRight className="ml-1 h-3.5 w-3.5" />
                     </Link>
                   </Button>
                 </div>
 
-                <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
+                <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_300px]">
                   <div className="min-w-0">
                 {todayMatches.length > 0 ? (
-                  <div className="space-y-3">
+                  <div className="space-y-2">
                     {todayMatches.slice(0, 10).map(match => (
                       <MatchCardNew key={match.id} match={match} variant="compact" showSport />
                     ))}
                   </div>
                 ) : (
-                  <div className="rounded-xl border border-border bg-card p-6 text-center">
-                    <Clock className="mx-auto h-12 w-12 text-muted-foreground" />
-                    <h3 className="mt-4 text-lg font-semibold">No matches today</h3>
-                    <p className="mt-2 text-sm text-muted-foreground">
+                  <div className="rounded-xl border border-border bg-card p-5 text-center">
+                    <Clock className="mx-auto h-10 w-10 text-muted-foreground" />
+                    <h3 className="mt-3 text-base font-semibold">No matches today</h3>
+                    <p className="mt-1 text-xs text-muted-foreground">
                       Check back later or browse upcoming matches
                     </p>
-                    <Button className="mt-4" asChild>
+                    <Button className="mt-4 h-8 text-xs" asChild>
                       <Link href="/matches">Browse Matches</Link>
                     </Button>
                   </div>
@@ -437,39 +437,39 @@ export default function HomePage() {
 
               {/* Multi-Sport Section */}
               {Object.keys(upcomingBySport).length > 1 && (
-                <section className="mb-5">
-                  <div className="mb-2 flex items-center gap-3">
-                    <Target className="h-5 w-5 text-primary" />
-                    <h2 className="text-xl font-bold text-foreground">Across All Sports</h2>
+                <section className="mb-4">
+                  <div className="mb-2 flex items-center gap-2">
+                    <Target className="h-4 w-4 text-primary" />
+                    <h2 className="text-lg font-bold text-foreground">Across All Sports</h2>
                   </div>
-                  <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                  <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
                     {Object.entries(upcomingBySport).slice(0, 6).map(([sportName, sportMatches]) => (
-                      <div key={sportName} className="rounded-xl border border-border bg-card p-4">
-                        <div className="mb-3 flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <span className="text-xl">{sportMatches[0]?.sport.icon}</span>
-                            <h3 className="font-semibold">{sportName}</h3>
+                      <div key={sportName} className="rounded-xl border border-border bg-card p-3">
+                        <div className="mb-2.5 flex items-center justify-between">
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-lg">{sportMatches[0]?.sport.icon}</span>
+                            <h3 className="text-sm font-semibold">{sportName}</h3>
                           </div>
-                          <Button variant="ghost" size="sm" asChild>
+                          <Button variant="ghost" size="sm" className="h-6 w-6 p-0" asChild>
                             <Link href={`/matches?sport=${sportMatches[0]?.sport.slug}`}>
-                              <ChevronRight className="h-4 w-4" />
+                              <ChevronRight className="h-3.5 w-3.5" />
                             </Link>
                           </Button>
                         </div>
-                        <div className="space-y-2">
+                        <div className="space-y-1.5">
                           {sportMatches.slice(0, 3).map(match => (
                             <Link 
                               key={match.id}
                               href={`/matches/${matchIdToSlug(match.id)}`}
                               className="block rounded-lg bg-muted/50 p-2 transition-colors hover:bg-muted"
                             >
-                              <div className="flex items-center justify-between text-xs">
+                              <div className="flex items-center justify-between text-[11px]">
                                 <span className="truncate font-medium">{match.homeTeam.name}</span>
-                                <span className="ml-2 shrink-0 font-mono">{match.odds?.home.toFixed(2)}</span>
+                                <span className="ml-2 shrink-0 font-mono text-primary">{match.odds?.home.toFixed(2)}</span>
                               </div>
-                              <div className="flex items-center justify-between text-xs">
+                              <div className="flex items-center justify-between text-[11px]">
                                 <span className="truncate font-medium">{match.awayTeam.name}</span>
-                                <span className="ml-2 shrink-0 font-mono">{match.odds?.away.toFixed(2)}</span>
+                                <span className="ml-2 shrink-0 font-mono text-primary">{match.odds?.away.toFixed(2)}</span>
                               </div>
                             </Link>
                           ))}

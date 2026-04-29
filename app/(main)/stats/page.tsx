@@ -134,48 +134,48 @@ export default function StatsPage() {
     <div className="flex">
       <SidebarNew />
       <div className="flex-1 overflow-x-hidden">
-        <div className="mx-auto max-w-6xl space-y-6 p-4 lg:p-8">
-          <header className="flex items-center gap-3">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10">
-              <BarChart3 className="h-6 w-6 text-primary" />
+        <div className="mx-auto max-w-6xl space-y-4 p-3 lg:p-4">
+          <header className="flex items-center gap-2">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+              <BarChart3 className="h-5 w-5 text-primary" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold">Statistics</h1>
-              <p className="text-sm text-muted-foreground">Standings and top scorers across the world's biggest leagues.</p>
+              <h1 className="text-lg font-bold">Statistics</h1>
+              <p className="text-xs text-muted-foreground">Standings and top scorers across major leagues.</p>
             </div>
           </header>
 
           <Tabs defaultValue={String(FEATURED_LEAGUES[0].id)} className="w-full">
-            <TabsList className="flex w-full flex-wrap gap-1 bg-transparent p-0">
+            <TabsList className="flex w-full flex-wrap gap-1 bg-transparent p-0 h-8">
               {FEATURED_LEAGUES.map(l => (
-                <TabsTrigger key={l.id} value={String(l.id)} className="rounded-full data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                <TabsTrigger key={l.id} value={String(l.id)} className="rounded-full h-7 px-3 text-xs data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
                   {l.name}
                 </TabsTrigger>
               ))}
             </TabsList>
             {FEATURED_LEAGUES.map(l => (
-              <TabsContent key={l.id} value={String(l.id)} className="mt-4">
-                <div className="grid gap-4 lg:grid-cols-3">
+              <TabsContent key={l.id} value={String(l.id)} className="mt-3">
+                <div className="grid gap-3 lg:grid-cols-3">
                   <Card className="lg:col-span-2">
-                    <CardHeader className="flex-row items-center justify-between">
-                      <CardTitle className="flex items-center gap-2 text-base">
-                        <Trophy className="h-4 w-4 text-amber-500" />
+                    <CardHeader className="flex-row items-center justify-between pb-2">
+                      <CardTitle className="flex items-center gap-1.5 text-sm font-semibold">
+                        <Trophy className="h-3.5 w-3.5 text-amber-500" />
                         {l.name} Standings
                       </CardTitle>
-                      <Link href={`/leagues/${l.slug}`} className="text-xs text-primary hover:underline">View league →</Link>
+                      <Link href={`/leagues/${l.slug}`} className="text-[10px] text-primary hover:underline">View league →</Link>
                     </CardHeader>
-                    <CardContent>
+                    <CardContent className="pt-0">
                       <StandingsTable leagueId={l.id} leagueSlug={l.slug} />
                     </CardContent>
                   </Card>
                   <Card>
-                    <CardHeader>
-                      <CardTitle className="flex items-center gap-2 text-base">
-                        <Goal className="h-4 w-4 text-emerald-500" />
+                    <CardHeader className="pb-2">
+                      <CardTitle className="flex items-center gap-1.5 text-sm font-semibold">
+                        <Goal className="h-3.5 w-3.5 text-emerald-500" />
                         Top Scorers
                       </CardTitle>
                     </CardHeader>
-                    <CardContent>
+                    <CardContent className="pt-0">
                       <ScorersTable leagueId={l.id} />
                     </CardContent>
                   </Card>

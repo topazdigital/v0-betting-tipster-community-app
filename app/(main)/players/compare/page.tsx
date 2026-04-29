@@ -113,18 +113,18 @@ export default function PlayerComparePage() {
   }
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-6">
+    <div className="mx-auto max-w-5xl px-3 py-4">
       <Link
         href="/matches"
-        className="mb-4 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+        className="mb-3 inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
       >
-        <ChevronLeft className="h-4 w-4" />
+        <ChevronLeft className="h-3.5 w-3.5" />
         Back
       </Link>
 
-      <h1 className="mb-6 text-2xl font-bold tracking-tight sm:text-3xl">Compare players</h1>
+      <h1 className="mb-4 text-lg font-bold tracking-tight">Compare players</h1>
 
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid gap-3 sm:grid-cols-2">
         <PlayerSlot
           slot="A"
           player={pa}
@@ -144,10 +144,10 @@ export default function PlayerComparePage() {
       </div>
 
       {pa && pb && (
-        <div className="mt-8 space-y-6">
+        <div className="mt-6 space-y-4">
           {/* Vital stats */}
-          <section className="rounded-2xl border border-border bg-card p-4">
-            <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-muted-foreground">Profile</h2>
+          <section className="rounded-xl border border-border bg-card p-3">
+            <h2 className="mb-2 text-[11px] font-bold uppercase tracking-wide text-muted-foreground">Profile</h2>
             <CompareTable
               rows={[
                 { label: 'Position', a: pa.position, b: pb.position },
@@ -163,8 +163,8 @@ export default function PlayerComparePage() {
 
           {/* Stats by category */}
           {grouped.map(([cat, labels]) => (
-            <section key={cat} className="rounded-2xl border border-border bg-card p-4">
-              <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-muted-foreground">{cat}</h2>
+            <section key={cat} className="rounded-xl border border-border bg-card p-3">
+              <h2 className="mb-2 text-[11px] font-bold uppercase tracking-wide text-muted-foreground">{cat}</h2>
               <CompareTable
                 rows={labels.map((label) => {
                   const ra = aMap.get(label);
@@ -184,15 +184,15 @@ export default function PlayerComparePage() {
           ))}
 
           {grouped.length === 0 && (
-            <div className="rounded-2xl border border-dashed border-border bg-card p-6 text-center text-sm text-muted-foreground">
-              No detailed stats available to compare for these players.
+            <div className="rounded-xl border border-dashed border-border bg-card p-4 text-center text-xs text-muted-foreground">
+              No detailed stats available to compare.
             </div>
           )}
         </div>
       )}
 
       {(!a || !b) && (
-        <p className="mt-8 rounded-xl border border-dashed border-border bg-card p-6 text-center text-sm text-muted-foreground">
+        <p className="mt-6 rounded-lg border border-dashed border-border bg-card p-4 text-center text-xs text-muted-foreground">
           Pick two players above to see a side-by-side comparison.
         </p>
       )}

@@ -172,9 +172,9 @@ function MatchesContent() {
           </div>
         </div>
 
-        <div className="mx-auto max-w-5xl px-4 py-3">
+        <div className="mx-auto max-w-5xl px-4 py-2.5">
           {/* Header */}
-          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2">
             <div>
               <h1 className="text-lg font-bold text-foreground">
                 {selectedSportId 
@@ -185,19 +185,19 @@ function MatchesContent() {
             </div>
 
             {/* Quick Stats */}
-            <div className="flex gap-3">
+            <div className="flex gap-2">
               <Badge 
                 variant={statusFilter === 'live' ? 'destructive' : 'outline'}
-                className="cursor-pointer gap-1"
+                className="cursor-pointer gap-1 h-6 text-[10px]"
                 onClick={() => setStatusFilter(statusFilter === 'live' ? 'all' : 'live')}
               >
-                <span className="relative flex h-2 w-2">
+                <span className="relative flex h-1.5 w-1.5">
                   <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-live opacity-75"></span>
-                  <span className="relative inline-flex h-2 w-2 rounded-full bg-live"></span>
+                  <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-live"></span>
                 </span>
                 {stats.live} Live
               </Badge>
-              <Badge variant="outline" className="gap-1">
+              <Badge variant="outline" className="gap-1 h-6 text-[10px]">
                 <Clock className="h-3 w-3" />
                 {stats.today} Today
               </Badge>
@@ -205,8 +205,8 @@ function MatchesContent() {
           </div>
 
           {/* Today / Upcoming / Calendar tabs */}
-          <div className="mb-3 flex flex-wrap items-center gap-2">
-            <div className="inline-flex rounded-lg border border-border bg-card p-1">
+          <div className="mb-2.5 flex flex-wrap items-center gap-2">
+            <div className="inline-flex rounded-lg border border-border bg-card p-0.5">
               {([
                 { v: 'today' as DateTab,    label: 'Today',    Icon: Clock },
                 { v: 'upcoming' as DateTab, label: 'Upcoming', Icon: CalendarClock },
@@ -216,13 +216,13 @@ function MatchesContent() {
                   key={v}
                   onClick={() => setDateTab(v)}
                   className={cn(
-                    'flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors',
+                    'flex items-center gap-1 rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors',
                     dateTab === v
                       ? 'bg-primary text-primary-foreground shadow-sm'
                       : 'text-muted-foreground hover:text-foreground'
                   )}
                 >
-                  <Icon className="h-3.5 w-3.5" />
+                  <Icon className="h-3 w-3" />
                   {label}
                 </button>
               ))}
@@ -232,30 +232,30 @@ function MatchesContent() {
                 type="date"
                 value={calendarDate}
                 onChange={(e) => setCalendarDate(e.target.value)}
-                className="w-44"
+                className="h-7 w-36 text-xs"
               />
             )}
           </div>
 
           {/* Filters */}
-          <div className="mb-3 flex flex-wrap items-center gap-2">
+          <div className="mb-2.5 flex flex-wrap items-center gap-2">
             <div className="relative flex-1 sm:max-w-xs">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
               <Input
                 placeholder="Search teams, leagues..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="pl-9"
+                className="h-8 pl-8 text-xs"
               />
             </div>
 
             <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-36">
+              <SelectTrigger className="h-8 w-32 text-xs">
                 <SelectValue placeholder="Status" />
               </SelectTrigger>
               <SelectContent>
                 {statusOptions.map(option => (
-                  <SelectItem key={option.value} value={option.value}>
+                  <SelectItem key={option.value} value={option.value} className="text-xs">
                     {option.label}
                   </SelectItem>
                 ))}
@@ -263,13 +263,13 @@ function MatchesContent() {
             </Select>
 
             <Select value={leagueFilter} onValueChange={setLeagueFilter}>
-              <SelectTrigger className="w-44">
+              <SelectTrigger className="h-8 w-40 text-xs">
                 <SelectValue placeholder="All Leagues" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Leagues</SelectItem>
+                <SelectItem value="all" className="text-xs">All Leagues</SelectItem>
                 {relevantLeagues.map(league => (
-                  <SelectItem key={league.id} value={league.slug}>
+                  <SelectItem key={league.id} value={league.slug} className="text-xs">
                     {league.name}
                   </SelectItem>
                 ))}
@@ -279,6 +279,7 @@ function MatchesContent() {
             <Button
               variant="outline"
               size="sm"
+              className="h-8 text-xs"
               onClick={() => {
                 setSearch('');
                 setStatusFilter('all');
@@ -291,10 +292,10 @@ function MatchesContent() {
           </div>
 
           {/* Results Count */}
-          <div className="mb-2 text-xs text-muted-foreground">
+          <div className="mb-2 text-[10px] uppercase tracking-wide text-muted-foreground">
             {filteredMatches.length} match{filteredMatches.length !== 1 ? 'es' : ''} found
             {statusFilter === 'live' && (
-              <span className="ml-2 text-live">• Updating every 10 seconds</span>
+              <span className="ml-2 text-live">• Updating every 10s</span>
             )}
           </div>
 
@@ -310,20 +311,20 @@ function MatchesContent() {
                 const leagueSlug = league.slug || league.name.toLowerCase().replace(/\s+/g, '-');
                 return (
                 <div key={key}>
-                  <div className="mb-2 flex items-center justify-between border-b border-border/60 pb-2">
+                  <div className="mb-1.5 flex items-center justify-between border-b border-border/60 pb-1">
                     <Link
                       href={`/leagues/${leagueSlug}`}
-                      className="group flex items-center gap-2 text-sm font-semibold text-foreground hover:text-primary transition-colors"
+                      className="group flex items-center gap-1.5 text-xs font-semibold text-foreground hover:text-primary transition-colors"
                     >
                       <SportIcon sportSlug={sport.slug} size="sm" />
                       <LeagueFlag countryCode={league.countryCode} size="xs" />
-                      <span className="text-muted-foreground text-xs uppercase tracking-wide group-hover:text-primary/70">{league.country}</span>
+                      <span className="text-muted-foreground text-[10px] uppercase tracking-wider group-hover:text-primary/70">{league.country}</span>
                       <span className="group-hover:underline underline-offset-4">{league.name}</span>
-                      <Badge variant="secondary" className="ml-1 text-xs">{leagueMatches.length}</Badge>
-                      <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/60 group-hover:text-primary opacity-0 group-hover:opacity-100 transition-opacity" />
+                      <Badge variant="secondary" className="ml-1 h-4 px-1 text-[9px] font-bold">{leagueMatches.length}</Badge>
+                      <ChevronRight className="h-3 w-3 text-muted-foreground/60 group-hover:text-primary opacity-0 group-hover:opacity-100 transition-opacity" />
                     </Link>
                   </div>
-                  <div className="space-y-1.5">
+                  <div className="space-y-1">
                     {leagueMatches.map(match => (
                       <MatchCardNew key={match.id} match={match} variant="compact" showLeague={false} />
                     ))}
@@ -334,14 +335,14 @@ function MatchesContent() {
             </div>
           ) : (
             /* Empty State */
-            <div className="rounded-xl border border-border bg-card p-12 text-center">
-              <Calendar className="mx-auto h-12 w-12 text-muted-foreground" />
-              <h3 className="mt-4 text-lg font-semibold text-foreground">No matches found</h3>
-              <p className="mt-2 text-sm text-muted-foreground">
+            <div className="rounded-xl border border-border bg-card p-10 text-center">
+              <Calendar className="mx-auto h-10 w-10 text-muted-foreground" />
+              <h3 className="mt-3 text-base font-semibold text-foreground">No matches found</h3>
+              <p className="mt-1 text-xs text-muted-foreground">
                 Try adjusting your filters or check back later
               </p>
               <Button 
-                className="mt-4"
+                className="mt-4 h-8 text-xs"
                 onClick={() => {
                   setSearch('');
                   setStatusFilter('all');

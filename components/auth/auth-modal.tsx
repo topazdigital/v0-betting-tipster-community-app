@@ -53,20 +53,20 @@ export function AuthModal() {
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) close(); }}>
-      <DialogContent className="max-w-md p-0 overflow-hidden">
-        <div className="bg-gradient-to-br from-primary/10 via-background to-background px-6 pt-6 pb-2">
+      <DialogContent className="max-w-sm p-0 overflow-hidden">
+        <div className="bg-gradient-to-br from-primary/10 via-background to-background px-4 pt-4 pb-1.5">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-xl">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
-                <span className="font-mono text-sm font-bold text-primary-foreground">B</span>
+            <DialogTitle className="flex items-center gap-2 text-lg">
+              <div className="flex h-7 w-7 items-center justify-center rounded bg-primary">
+                <span className="font-mono text-xs font-bold text-primary-foreground">B</span>
               </div>
               {meta.title}
             </DialogTitle>
-            <DialogDescription>{meta.desc}</DialogDescription>
+            <DialogDescription className="text-xs">{meta.desc}</DialogDescription>
           </DialogHeader>
         </div>
 
-        <div className="px-6 pb-6 pt-3">
+        <div className="px-4 pb-4 pt-2">
           {view === 'login' && <LoginPanel />}
           {view === 'register' && <RegisterPanel />}
           {view === 'forgot' && <ForgotPanel />}
@@ -126,20 +126,20 @@ function startOAuth(provider: Provider) {
 function SocialButtons({ mode }: { mode: 'login' | 'register' }) {
   const verb = mode === 'login' ? 'Continue' : 'Sign up';
   return (
-    <div className="space-y-2">
+    <div className="space-y-1.5">
       <button
         type="button"
         onClick={() => startOAuth('google')}
-        className="flex w-full items-center justify-center gap-2 rounded-md border border-border bg-background px-3 py-2 text-sm font-medium hover:bg-muted"
+        className="flex h-8 w-full items-center justify-center gap-2 rounded-md border border-border bg-background px-3 py-1 text-xs font-medium hover:bg-muted"
       >
         <GoogleIcon />
         {verb} with Google
       </button>
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-3 gap-1.5">
         <button
           type="button"
           onClick={() => startOAuth('facebook')}
-          className="flex items-center justify-center gap-1 rounded-md border border-border bg-background px-2 py-2 text-xs font-medium hover:bg-muted"
+          className="flex h-8 items-center justify-center gap-1 rounded-md border border-border bg-background px-2 py-1 text-xs font-medium hover:bg-muted"
           title="Facebook"
         >
           <FacebookIcon />
@@ -148,7 +148,7 @@ function SocialButtons({ mode }: { mode: 'login' | 'register' }) {
         <button
           type="button"
           onClick={() => startOAuth('apple')}
-          className="flex items-center justify-center gap-1 rounded-md border border-border bg-background px-2 py-2 text-xs font-medium hover:bg-muted"
+          className="flex h-8 items-center justify-center gap-1 rounded-md border border-border bg-background px-2 py-1 text-xs font-medium hover:bg-muted"
           title="Apple"
         >
           <AppleIcon />
@@ -157,18 +157,18 @@ function SocialButtons({ mode }: { mode: 'login' | 'register' }) {
         <button
           type="button"
           onClick={() => startOAuth('github')}
-          className="flex items-center justify-center gap-1 rounded-md border border-border bg-background px-2 py-2 text-xs font-medium hover:bg-muted"
+          className="flex h-8 items-center justify-center gap-1 rounded-md border border-border bg-background px-2 py-1 text-xs font-medium hover:bg-muted"
           title="GitHub"
         >
           <GithubIcon />
           <span className="hidden sm:inline">GitHub</span>
         </button>
       </div>
-      <div className="relative my-3">
+      <div className="relative my-2">
         <div className="absolute inset-0 flex items-center">
           <span className="w-full border-t border-border" />
         </div>
-        <div className="relative flex justify-center text-xs uppercase">
+        <div className="relative flex justify-center text-[10px] uppercase">
           <span className="bg-background px-2 text-muted-foreground">or use email</span>
         </div>
       </div>
@@ -281,24 +281,24 @@ function LoginPanel() {
 
   if (twoFactor) {
     return (
-      <form onSubmit={handleVerify} className="space-y-3">
-        <div className="rounded-lg border border-primary/30 bg-primary/5 p-3 text-sm">
+      <form onSubmit={handleVerify} className="space-y-2">
+        <div className="rounded border border-primary/30 bg-primary/5 p-2 text-[11px]">
           We sent a 6-digit code to <strong>{twoFactor.deliveredTo}</strong>
           {twoFactor.channel === 'sms' ? ' via SMS.' : ' by email.'} Enter it below to finish signing in.
         </div>
         {twoFactor.warning && (
-          <div className="rounded-lg border border-yellow-500/30 bg-yellow-500/10 p-2.5 text-xs text-yellow-700 dark:text-yellow-300">
+          <div className="rounded border border-yellow-500/30 bg-yellow-500/10 p-2 text-[10px] text-yellow-700 dark:text-yellow-300">
             {twoFactor.warning}
           </div>
         )}
         {error && (
-          <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-2.5 text-sm text-destructive">{error}</div>
+          <div className="rounded border border-destructive/30 bg-destructive/10 p-2 text-xs text-destructive">{error}</div>
         )}
         {resendNote && (
-          <div className="rounded-lg border border-success/30 bg-success/10 p-2.5 text-sm text-success">{resendNote}</div>
+          <div className="rounded border border-success/30 bg-success/10 p-2 text-xs text-success">{resendNote}</div>
         )}
-        <div className="space-y-1.5">
-          <Label htmlFor="modal-otp">Verification code</Label>
+        <div className="space-y-1">
+          <Label htmlFor="modal-otp" className="text-xs">Verification code</Label>
           <Input
             id="modal-otp"
             inputMode="numeric"
@@ -306,15 +306,15 @@ function LoginPanel() {
             placeholder="123456"
             value={otpCode}
             onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-            className="text-center text-2xl tracking-[0.5em] font-mono"
+            className="h-9 text-center text-xl tracking-[0.4em] font-mono"
             required
             disabled={isLoading}
           />
         </div>
-        <Button type="submit" className="w-full" disabled={isLoading || otpCode.length !== 6}>
-          {isLoading ? (<><Loader2 className="mr-2 h-4 w-4 animate-spin" />Verifying…</>) : 'Verify and sign in'}
+        <Button type="submit" size="sm" className="w-full h-8 text-xs" disabled={isLoading || otpCode.length !== 6}>
+          {isLoading ? (<><Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />Verifying…</>) : 'Verify and sign in'}
         </Button>
-        <div className="flex items-center justify-between text-xs">
+        <div className="flex items-center justify-between text-[10px]">
           <button type="button" onClick={() => { setTwoFactor(null); setOtpCode(''); setError(''); }} className="text-muted-foreground hover:text-foreground hover:underline">Use a different account</button>
           <button type="button" onClick={handleResend} className="font-medium text-primary hover:underline">Resend code</button>
         </div>
@@ -325,15 +325,15 @@ function LoginPanel() {
   return (
     <>
       <SocialButtons mode="login" />
-      <form onSubmit={handleSubmit} className="space-y-3">
+      <form onSubmit={handleSubmit} className="space-y-2.5">
         {error && (
-          <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-2.5 text-sm text-destructive">
+          <div className="rounded border border-destructive/30 bg-destructive/10 p-2 text-xs text-destructive">
             {error}
           </div>
         )}
 
-        <div className="space-y-1.5">
-          <Label htmlFor="modal-email">Email</Label>
+        <div className="space-y-1">
+          <Label htmlFor="modal-email" className="text-xs">Email</Label>
           <Input
             id="modal-email"
             type="email"
@@ -342,16 +342,17 @@ function LoginPanel() {
             onChange={(e) => setEmail(e.target.value)}
             required
             disabled={isLoading}
+            className="h-8 text-xs"
           />
         </div>
 
-        <div className="space-y-1.5">
+        <div className="space-y-1">
           <div className="flex items-center justify-between">
-            <Label htmlFor="modal-password">Password</Label>
+            <Label htmlFor="modal-password" className="text-xs">Password</Label>
             <button
               type="button"
               onClick={() => setView('forgot')}
-              className="text-xs font-medium text-primary hover:underline"
+              className="text-[10px] font-medium text-primary hover:underline"
             >
               Forgot password?
             </button>
@@ -365,24 +366,24 @@ function LoginPanel() {
               onChange={(e) => setPassword(e.target.value)}
               required
               disabled={isLoading}
-              className="pr-10"
+              className="h-8 pr-10 text-xs"
             />
             <button
               type="button"
               onClick={() => setShowPassword(!showPassword)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
             >
-              {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              {showPassword ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
             </button>
           </div>
         </div>
 
         <CaptchaChallenge ref={captchaRef} visible={captchaRequired} />
 
-        <Button type="submit" className="w-full" disabled={isLoading}>
+        <Button type="submit" size="sm" className="w-full h-8 text-xs" disabled={isLoading}>
           {isLoading ? (
             <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
               Signing in...
             </>
           ) : (
@@ -390,7 +391,7 @@ function LoginPanel() {
           )}
         </Button>
 
-        <p className="text-center text-[11px] text-muted-foreground">
+        <p className="text-center text-[10px] text-muted-foreground">
           Demo: <code className="rounded bg-muted px-1">admin@betcheza.co.ke</code> / <code className="rounded bg-muted px-1">admin123</code>
         </p>
       </form>
@@ -467,15 +468,15 @@ function RegisterPanel() {
   return (
     <>
       <SocialButtons mode="register" />
-      <form onSubmit={handleSubmit} className="space-y-3">
+      <form onSubmit={handleSubmit} className="space-y-2.5">
         {error && (
-          <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-2.5 text-sm text-destructive">
+          <div className="rounded border border-destructive/30 bg-destructive/10 p-2 text-xs text-destructive">
             {error}
           </div>
         )}
 
-        <div className="space-y-1.5">
-          <Label htmlFor="modal-reg-email">Email</Label>
+        <div className="space-y-1">
+          <Label htmlFor="modal-reg-email" className="text-xs">Email</Label>
           <Input
             id="modal-reg-email"
             type="email"
@@ -484,12 +485,13 @@ function RegisterPanel() {
             onChange={(e) => setFormData({ ...formData, email: e.target.value })}
             required
             disabled={isLoading}
+            className="h-8 text-xs"
           />
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-2">
-          <div className="space-y-1.5">
-            <Label htmlFor="modal-reg-username">
+        <div className="grid gap-2 sm:grid-cols-2">
+          <div className="space-y-1">
+            <Label htmlFor="modal-reg-username" className="text-xs">
               Username <span className="text-destructive">*</span>
             </Label>
             <Input
@@ -500,13 +502,14 @@ function RegisterPanel() {
               required
               disabled={isLoading}
               maxLength={20}
+              className="h-8 text-xs"
             />
             <p className="text-[10px] text-muted-foreground leading-tight">
-              Your @handle — lowercase, letters, numbers, underscore. Used in your profile URL.
+              Lowercase, letters, numbers, underscore.
             </p>
           </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="modal-reg-display">
+          <div className="space-y-1">
+            <Label htmlFor="modal-reg-display" className="text-xs">
               Display name <span className="text-destructive">*</span>
             </Label>
             <Input
@@ -517,31 +520,32 @@ function RegisterPanel() {
               required
               disabled={isLoading}
               maxLength={40}
+              className="h-8 text-xs"
             />
             <p className="text-[10px] text-muted-foreground leading-tight">
-              The name shown on your tips and posts. Spaces and capitals are allowed.
+              The name shown on your tips.
             </p>
           </div>
         </div>
 
-        <div className="space-y-1.5">
-          <Label htmlFor="modal-reg-phone">Phone (optional)</Label>
-          <div className="flex gap-2">
+        <div className="space-y-1">
+          <Label htmlFor="modal-reg-phone" className="text-xs">Phone (optional)</Label>
+          <div className="flex gap-1.5">
             <Select
               value={formData.countryCode}
               onValueChange={(value) => setFormData({ ...formData, countryCode: value })}
             >
-              <SelectTrigger className="w-28">
+              <SelectTrigger className="h-8 w-24 text-[11px] px-2">
                 <SelectValue>
                   <span className="flex items-center gap-1">
                     <span>{selectedCountry?.code}</span>
-                    <span className="text-muted-foreground text-xs">{selectedCountry?.dialCode}</span>
+                    <span className="text-muted-foreground text-[10px]">{selectedCountry?.dialCode}</span>
                   </span>
                 </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 {countries.map((country) => (
-                  <SelectItem key={country.code} value={country.code}>
+                  <SelectItem key={country.code} value={country.code} className="text-xs">
                     <span className="flex items-center gap-2">
                       <span>{country.code}</span>
                       <span className="text-muted-foreground">{country.dialCode}</span>
@@ -558,13 +562,13 @@ function RegisterPanel() {
               value={formData.phone}
               onChange={(e) => setFormData({ ...formData, phone: e.target.value.replace(/\D/g, '') })}
               disabled={isLoading}
-              className="flex-1"
+              className="h-8 flex-1 text-xs"
             />
           </div>
         </div>
 
-        <div className="space-y-1.5">
-          <Label htmlFor="modal-reg-password">Password</Label>
+        <div className="space-y-1">
+          <Label htmlFor="modal-reg-password" className="text-xs">Password</Label>
           <div className="relative">
             <Input
               id="modal-reg-password"
@@ -574,47 +578,30 @@ function RegisterPanel() {
               onChange={(e) => setFormData({ ...formData, password: e.target.value })}
               required
               disabled={isLoading}
-              className="pr-10"
+              className="h-8 pr-10 text-xs"
             />
             <button
               type="button"
               onClick={() => setShowPassword(!showPassword)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
             >
-              {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              {showPassword ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
             </button>
           </div>
         </div>
 
-        <div className="space-y-1.5">
-          <Label htmlFor="modal-reg-confirm">Confirm password</Label>
-          <Input
-            id="modal-reg-confirm"
-            type="password"
-            placeholder="Confirm your password"
-            value={formData.confirmPassword}
-            onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
-            required
-            disabled={isLoading}
-          />
-        </div>
-
         <CaptchaChallenge ref={captchaRef} visible />
 
-        <Button type="submit" className="w-full" disabled={isLoading}>
+        <Button type="submit" size="sm" className="w-full h-8 text-xs" disabled={isLoading}>
           {isLoading ? (
             <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
               Creating account...
             </>
           ) : (
             'Create account'
           )}
         </Button>
-
-        <p className="text-center text-[10px] text-muted-foreground">
-          By creating an account you agree to our Terms and Privacy Policy. You must be 18+.
-        </p>
       </form>
     </>
   );
@@ -651,9 +638,9 @@ function ForgotPanel() {
 
   if (sent) {
     return (
-      <div className="space-y-3 text-center">
-        <CheckCircle2 className="mx-auto h-10 w-10 text-success" />
-        <p className="text-sm text-muted-foreground">
+      <div className="space-y-2 text-center">
+        <CheckCircle2 className="mx-auto h-8 w-8 text-success" />
+        <p className="text-xs text-muted-foreground">
           If an account exists for <strong className="text-foreground">{email}</strong>, a password
           reset link is on its way. Check your inbox (and spam folder).
         </p>
@@ -662,14 +649,14 @@ function ForgotPanel() {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-3">
+    <form onSubmit={handleSubmit} className="space-y-2.5">
       {error && (
-        <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-2.5 text-sm text-destructive">
+        <div className="rounded border border-destructive/30 bg-destructive/10 p-2 text-xs text-destructive">
           {error}
         </div>
       )}
-      <div className="space-y-1.5">
-        <Label htmlFor="modal-forgot-email">Email</Label>
+      <div className="space-y-1">
+        <Label htmlFor="modal-forgot-email" className="text-xs">Email</Label>
         <Input
           id="modal-forgot-email"
           type="email"
@@ -678,12 +665,13 @@ function ForgotPanel() {
           onChange={(e) => setEmail(e.target.value)}
           required
           disabled={isLoading}
+          className="h-8 text-xs"
         />
       </div>
-      <Button type="submit" className="w-full" disabled={isLoading}>
+      <Button type="submit" size="sm" className="w-full h-8 text-xs" disabled={isLoading}>
         {isLoading ? (
           <>
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
             Sending link...
           </>
         ) : (
@@ -730,55 +718,58 @@ function ResetPanel() {
 
   if (done) {
     return (
-      <div className="space-y-3 text-center">
-        <CheckCircle2 className="mx-auto h-10 w-10 text-success" />
-        <p className="text-sm text-muted-foreground">Your password has been updated. You can now sign in.</p>
-        <Button onClick={close} className="w-full">Close</Button>
+      <div className="space-y-2 text-center">
+        <CheckCircle2 className="mx-auto h-8 w-8 text-success" />
+        <p className="text-xs text-muted-foreground">Your password has been updated. You can now sign in.</p>
+        <Button onClick={close} size="sm" className="w-full h-8 text-xs">Close</Button>
       </div>
     );
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-3">
+    <form onSubmit={handleSubmit} className="space-y-2.5">
       {error && (
-        <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-2.5 text-sm text-destructive">
+        <div className="rounded border border-destructive/30 bg-destructive/10 p-2 text-xs text-destructive">
           {error}
         </div>
       )}
       {!token && (
-        <div className="space-y-1.5">
-          <Label htmlFor="modal-reset-token">Reset token</Label>
+        <div className="space-y-1">
+          <Label htmlFor="modal-reset-token" className="text-xs">Reset token</Label>
           <Input
             id="modal-reset-token"
             value={token}
             onChange={(e) => setToken(e.target.value)}
             placeholder="Paste the token from your email"
             required
+            className="h-8 text-xs"
           />
         </div>
       )}
-      <div className="space-y-1.5">
-        <Label htmlFor="modal-reset-pw">New password</Label>
+      <div className="space-y-1">
+        <Label htmlFor="modal-reset-pw" className="text-xs">New password</Label>
         <Input
           id="modal-reset-pw"
           type="password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           required
+          className="h-8 text-xs"
         />
       </div>
-      <div className="space-y-1.5">
-        <Label htmlFor="modal-reset-confirm">Confirm password</Label>
+      <div className="space-y-1">
+        <Label htmlFor="modal-reset-confirm" className="text-xs">Confirm password</Label>
         <Input
           id="modal-reset-confirm"
           type="password"
           value={confirm}
           onChange={(e) => setConfirm(e.target.value)}
           required
+          className="h-8 text-xs"
         />
       </div>
-      <Button type="submit" className="w-full" disabled={isLoading}>
-        {isLoading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Updating...</> : 'Update password'}
+      <Button type="submit" size="sm" className="w-full h-8 text-xs" disabled={isLoading}>
+        {isLoading ? <><Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> Updating...</> : 'Update password'}
       </Button>
     </form>
   );

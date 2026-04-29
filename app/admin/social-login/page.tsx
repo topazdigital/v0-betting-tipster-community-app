@@ -166,112 +166,112 @@ export default function AdminSocialLoginPage() {
   }
 
   return (
-    <div className="space-y-4 p-4 md:p-6">
-      <div className="flex items-start justify-between gap-4">
+    <div className="space-y-3 p-3 md:p-4">
+      <div className="flex items-start justify-between gap-3">
         <div>
-          <h1 className="flex items-center gap-2 text-2xl font-bold">
-            <KeyRound className="h-6 w-6 text-primary" />
+          <h1 className="flex items-center gap-2 text-lg font-bold">
+            <KeyRound className="h-5 w-5 text-primary" />
             Social Login
           </h1>
-          <p className="mt-1 text-sm text-muted-foreground">
+          <p className="mt-0.5 text-xs text-muted-foreground">
             Add your own OAuth credentials so users can sign in with their existing accounts.
-            Nothing is shared with anyone — keys are stored on this server only.
+            Nothing is shared — keys are stored on this server only.
           </p>
         </div>
-        <Button onClick={save} disabled={saving}>
-          <Save className="mr-2 h-4 w-4" />
+        <Button onClick={save} disabled={saving} size="sm" className="h-8 text-xs px-3">
+          <Save className="mr-1.5 h-3.5 w-3.5" />
           {saving ? 'Saving…' : 'Save changes'}
         </Button>
       </div>
 
       {status && (
         <div
-          className={`flex items-center gap-2 rounded-md border px-3 py-2 text-sm ${
+          className={`flex items-center gap-2 rounded-md border px-2.5 py-1.5 text-xs ${
             status.kind === 'ok'
               ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
               : 'border-rose-500/40 bg-rose-500/10 text-rose-700 dark:text-rose-300'
           }`}
         >
-          {status.kind === 'ok' ? <CheckCircle2 className="h-4 w-4" /> : <AlertTriangle className="h-4 w-4" />}
+          {status.kind === 'ok' ? <CheckCircle2 className="h-3.5 w-3.5" /> : <AlertTriangle className="h-3.5 w-3.5" />}
           {status.msg}
         </div>
       )}
 
       {/* Site URL — drives every callback URL shown below */}
       <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base">Site URL (used for all callback URLs)</CardTitle>
-          <p className="mt-1 text-xs text-muted-foreground">
-            Set this to your live install domain (e.g. <code className="rounded bg-muted px-1">https://betcheza.com</code>)
-            so the callback URLs below stay constant — even if you open this admin
-            panel from a staging or dev URL. Leave blank to use the current browser origin.
+        <CardHeader className="py-2 pb-1.5 px-3">
+          <CardTitle className="text-sm font-semibold">Site URL (used for all callback URLs)</CardTitle>
+          <p className="mt-0.5 text-[10px] text-muted-foreground">
+            Set to your domain (e.g. <code className="rounded bg-muted px-1">https://betcheza.com</code>)
+            so redirects stay constant. Leave blank for browser origin.
           </p>
         </CardHeader>
-        <CardContent className="space-y-2">
-          <Label className="text-xs">Public site URL</Label>
+        <CardContent className="space-y-2 p-3 pt-0">
           <div className="flex items-center gap-2">
             <Input
+              className="h-8 text-[11px] font-mono"
               value={siteUrl}
               onChange={(e) => setSiteUrl(e.target.value)}
               placeholder="https://your-domain.com"
-              className="font-mono text-xs"
             />
             {siteUrl && (
-              <Button type="button" variant="outline" size="sm" onClick={() => setSiteUrl('')}>
+              <Button type="button" variant="outline" size="sm" className="h-8 text-xs px-2" onClick={() => setSiteUrl('')}>
                 Clear
               </Button>
             )}
           </div>
-          <p className="text-[11px] text-muted-foreground">
+          <p className="text-[10px] text-muted-foreground px-1">
             Currently using:{' '}
             <code className="rounded bg-muted px-1 font-mono">{baseUrl || '(none)'}</code>
           </p>
         </CardContent>
       </Card>
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid gap-3 lg:grid-cols-2">
         {ORDER.map((p) => {
           const meta = PROVIDER_META[p];
           const s = state[p];
           const cb = callbackUrl(p);
           return (
             <Card key={p}>
-              <CardHeader className="pb-3">
-                <div className="flex items-start justify-between gap-3">
+              <CardHeader className="py-2 pb-1.5 px-3">
+                <div className="flex items-start justify-between gap-2">
                   <div>
-                    <CardTitle className="flex items-center gap-2 text-base">
-                      <span className="text-lg">{meta.emoji}</span>
+                    <CardTitle className="flex items-center gap-1.5 text-sm font-semibold">
+                      <span className="text-base">{meta.emoji}</span>
                       {meta.label}
                     </CardTitle>
-                    <p className="mt-1 text-xs text-muted-foreground">{meta.helper}</p>
+                    <p className="mt-0.5 text-[10px] text-muted-foreground leading-tight">{meta.helper}</p>
                   </div>
-                  <Switch checked={s.enabled} onCheckedChange={(v) => update(p, { enabled: v })} />
+                  <Switch checked={s.enabled} onCheckedChange={(v) => update(p, { enabled: v })} className="scale-75" />
                 </div>
               </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="space-y-1">
-                  <Label className="text-xs">Callback URL</Label>
+              <CardContent className="space-y-2 p-3 pt-0">
+                <div className="space-y-0.5">
+                  <Label className="text-[10px] font-medium uppercase text-muted-foreground px-0.5">Callback URL</Label>
                   <div className="flex items-center gap-1">
-                    <Input value={cb} readOnly className="text-xs font-mono" />
-                    <Button type="button" variant="outline" size="icon" onClick={() => copy(cb)} title="Copy">
-                      <Copy className="h-3.5 w-3.5" />
+                    <Input value={cb} readOnly className="h-7 text-[10px] font-mono" />
+                    <Button type="button" variant="outline" size="icon" className="h-7 w-7" onClick={() => copy(cb)} title="Copy">
+                      <Copy className="h-3 w-3" />
                     </Button>
                   </div>
                 </div>
-                <div className="space-y-1">
-                  <Label className="text-xs">Client ID</Label>
+                <div className="space-y-0.5">
+                  <Label className="text-[10px] font-medium uppercase text-muted-foreground px-0.5">Client ID</Label>
                   <Input
+                    className="h-8 text-xs"
                     value={s.clientId}
                     onChange={(e) => update(p, { clientId: e.target.value })}
-                    placeholder="from your provider's developer console"
+                    placeholder="id from dev console"
                   />
                 </div>
-                <div className="space-y-1">
-                  <Label className="text-xs">
+                <div className="space-y-0.5">
+                  <Label className="text-[10px] font-medium uppercase text-muted-foreground px-0.5">
                     Client Secret {s.secretSet && <span className="text-emerald-500">· stored</span>}
                   </Label>
                   <div className="flex items-center gap-1">
                     <Input
+                      className="h-8 text-xs"
                       type={revealed[p] ? 'text' : 'password'}
                       value={s.clientSecret}
                       onChange={(e) => update(p, { clientSecret: e.target.value })}
@@ -281,6 +281,7 @@ export default function AdminSocialLoginPage() {
                       type="button"
                       variant="outline"
                       size="icon"
+                      className="h-8 w-8"
                       onClick={() => setRevealed((r) => ({ ...r, [p]: !r[p] }))}
                       title={revealed[p] ? 'Hide' : 'Show'}
                     >
@@ -290,46 +291,48 @@ export default function AdminSocialLoginPage() {
                 </div>
 
                 {p === 'apple' && (
-                  <div className="grid gap-2 sm:grid-cols-2">
-                    <div className="space-y-1">
-                      <Label className="text-xs">Team ID</Label>
+                  <div className="grid gap-2 sm:grid-cols-2 pt-0.5">
+                    <div className="space-y-0.5">
+                      <Label className="text-[10px] font-medium uppercase text-muted-foreground px-0.5">Team ID</Label>
                       <Input
+                        className="h-8 text-xs"
                         value={s.extra?.teamId || ''}
                         onChange={(e) => update(p, { extra: { ...(s.extra || {}), teamId: e.target.value } })}
                       />
                     </div>
-                    <div className="space-y-1">
-                      <Label className="text-xs">Key ID</Label>
+                    <div className="space-y-0.5">
+                      <Label className="text-[10px] font-medium uppercase text-muted-foreground px-0.5">Key ID</Label>
                       <Input
+                        className="h-8 text-xs"
                         value={s.extra?.keyId || ''}
                         onChange={(e) => update(p, { extra: { ...(s.extra || {}), keyId: e.target.value } })}
                       />
                     </div>
-                    <div className="space-y-1 sm:col-span-2">
-                      <Label className="text-xs">Private Key (.p8 contents)</Label>
+                    <div className="space-y-0.5 sm:col-span-2">
+                      <Label className="text-[10px] font-medium uppercase text-muted-foreground px-0.5">Private Key (.p8)</Label>
                       <textarea
                         value={s.extra?.privateKey || ''}
                         onChange={(e) => update(p, { extra: { ...(s.extra || {}), privateKey: e.target.value } })}
-                        rows={4}
-                        className="w-full rounded-md border border-border bg-background p-2 font-mono text-[11px]"
+                        rows={3}
+                        className="w-full rounded-md border border-border bg-background p-1.5 font-mono text-[10px]"
                         placeholder="-----BEGIN PRIVATE KEY-----"
                       />
                     </div>
                   </div>
                 )}
 
-                <div className="flex items-center justify-between pt-1">
+                <div className="flex items-center justify-between pt-0.5">
                   <a
                     href={meta.docs}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                    className="inline-flex items-center gap-1 text-[10px] text-primary hover:underline"
                   >
-                    Open developer console
-                    <ExternalLink className="h-3 w-3" />
+                    Dev console
+                    <ExternalLink className="h-2.5 w-2.5" />
                   </a>
                   {s.enabled && !s.clientId && (
-                    <span className="text-xs text-amber-500">Needs a Client ID</span>
+                    <span className="text-[10px] text-amber-500">Needs ID</span>
                   )}
                 </div>
               </CardContent>
@@ -339,23 +342,13 @@ export default function AdminSocialLoginPage() {
       </div>
 
       <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base">How it works</CardTitle>
+        <CardHeader className="py-2 px-3">
+          <CardTitle className="text-xs font-semibold uppercase text-muted-foreground tracking-wider">How it works</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-2 text-sm text-muted-foreground">
-          <p>
-            1. In each provider's developer console, create an OAuth application and copy the
-            Client ID and Client Secret here. Use the callback URL shown for each provider as
-            the redirect URI.
-          </p>
-          <p>
-            2. Toggle the provider on and Save. The button on the login modal becomes active
-            instantly — no deploy needed.
-          </p>
-          <p>
-            3. When a user signs in, their email is linked to an existing Betcheza account if
-            one exists; otherwise a new account is created automatically.
-          </p>
+        <CardContent className="space-y-1.5 text-[11px] text-muted-foreground p-3 pt-0">
+          <p>1. Create an OAuth app in the provider's console using the callback URL shown above.</p>
+          <p>2. Toggle enabled and Save. The button on login modal becomes active instantly.</p>
+          <p>3. Emails link to existing accounts; otherwise a new user is created automatically.</p>
         </CardContent>
       </Card>
     </div>

@@ -42,41 +42,42 @@ export default function AdminNotificationsPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <div>
-        <h1 className="text-2xl font-bold">Broadcast Notifications</h1>
-        <p className="text-sm text-muted-foreground">
+        <h1 className="text-lg font-bold">Broadcast Notifications</h1>
+        <p className="text-xs text-muted-foreground">
           Send a push or email notification to your audience.
         </p>
       </div>
 
       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Bell className="h-5 w-5" /> New Broadcast
+        <CardHeader className="py-2 pb-1.5 px-3">
+          <CardTitle className="flex items-center gap-2 text-sm font-semibold">
+            <Bell className="h-4 w-4" /> New Broadcast
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div>
-            <label className="text-sm font-medium">Title</label>
-            <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Match starting in 30 minutes" />
+        <CardContent className="space-y-3 p-3">
+          <div className="space-y-1">
+            <label className="text-xs font-medium">Title</label>
+            <Input className="h-8 text-xs" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Match starting in 30 minutes" />
           </div>
-          <div>
-            <label className="text-sm font-medium">Message</label>
-            <Textarea value={body} onChange={(e) => setBody(e.target.value)} rows={4} placeholder="Don't miss out on tonight's top picks…" />
+          <div className="space-y-1">
+            <label className="text-xs font-medium">Message</label>
+            <Textarea className="text-xs" value={body} onChange={(e) => setBody(e.target.value)} rows={3} placeholder="Don't miss out on tonight's top picks…" />
           </div>
-          <div>
-            <label className="text-sm font-medium">Link (optional)</label>
-            <Input value={link} onChange={(e) => setLink(e.target.value)} placeholder="/matches/123" />
+          <div className="space-y-1">
+            <label className="text-xs font-medium">Link (optional)</label>
+            <Input className="h-8 text-xs" value={link} onChange={(e) => setLink(e.target.value)} placeholder="/matches/123" />
           </div>
-          <div>
-            <label className="text-sm font-medium">Audience</label>
-            <div className="mt-1 flex gap-2">
+          <div className="space-y-1">
+            <label className="text-xs font-medium">Audience</label>
+            <div className="mt-0.5 flex gap-1.5">
               {(['all', 'push', 'email'] as const).map((a) => (
                 <Button
                   key={a}
                   variant={audience === a ? 'default' : 'outline'}
                   size="sm"
+                  className="h-7 text-xs px-2"
                   onClick={() => setAudience(a)}
                 >
                   {a === 'all' ? 'All channels' : a === 'push' ? 'Push only' : 'Email only'}
@@ -84,10 +85,10 @@ export default function AdminNotificationsPage() {
               ))}
             </div>
           </div>
-          <div className="flex items-center justify-between">
-            {status && <p className="text-sm text-muted-foreground">{status}</p>}
-            <Button onClick={broadcast} disabled={sending || !title.trim() || !body.trim()}>
-              <Send className="mr-2 h-4 w-4" />
+          <div className="flex items-center justify-between pt-1">
+            {status && <p className="text-xs text-muted-foreground">{status}</p>}
+            <Button size="sm" className="h-8 text-xs" onClick={broadcast} disabled={sending || !title.trim() || !body.trim()}>
+              <Send className="mr-1.5 h-3.5 w-3.5" />
               {sending ? 'Sending…' : 'Send broadcast'}
             </Button>
           </div>

@@ -222,122 +222,127 @@ export default function AdminSettingsPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-lg font-bold">Settings</h1>
-          <p className="text-muted-foreground">Manage your application settings</p>
+          <p className="text-xs text-muted-foreground">Manage your application settings</p>
         </div>
         <Button 
-          className="gap-2" 
+          size="sm"
+          className="h-8 text-xs gap-1.5 px-3" 
           onClick={handleSave}
           disabled={isSaving}
         >
           {isSaving ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
           ) : saveStatus === 'success' ? (
-            <CheckCircle2 className="h-4 w-4 text-success" />
+            <CheckCircle2 className="h-3.5 w-3.5 text-success" />
           ) : saveStatus === 'error' ? (
-            <AlertCircle className="h-4 w-4 text-destructive" />
+            <AlertCircle className="h-3.5 w-3.5 text-destructive" />
           ) : (
-            <Save className="h-4 w-4" />
+            <Save className="h-3.5 w-3.5" />
           )}
           {isSaving ? 'Saving...' : saveStatus === 'success' ? 'Saved!' : saveStatus === 'error' ? 'Error' : 'Save Changes'}
         </Button>
       </div>
 
       {errorMessage && (
-        <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4 text-destructive">
+        <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-2.5 text-xs text-destructive">
           {errorMessage}
         </div>
       )}
 
       <Tabs defaultValue="general" className="space-y-3">
-        <TabsList className="grid w-full grid-cols-2 md:w-auto md:grid-cols-11">
-          <TabsTrigger value="general" className="gap-2">
-            <Globe className="h-4 w-4" /> General
+        <TabsList className="h-auto flex flex-wrap gap-1 p-1 bg-muted/50">
+          <TabsTrigger value="general" className="h-7 text-xs px-2.5 gap-1.5">
+            <Globe className="h-3.5 w-3.5" /> General
           </TabsTrigger>
-          <TabsTrigger value="security" className="gap-2">
-            <Shield className="h-4 w-4" /> Security
+          <TabsTrigger value="security" className="h-7 text-xs px-2.5 gap-1.5">
+            <Shield className="h-3.5 w-3.5" /> Security
           </TabsTrigger>
-          <TabsTrigger value="notifications" className="gap-2">
-            <Bell className="h-4 w-4" /> Notifications
+          <TabsTrigger value="notifications" className="h-7 text-xs px-2.5 gap-1.5">
+            <Bell className="h-3.5 w-3.5" /> Notifications
           </TabsTrigger>
-          <TabsTrigger value="predictions" className="gap-2">
-            <Database className="h-4 w-4" /> Predictions
+          <TabsTrigger value="predictions" className="h-7 text-xs px-2.5 gap-1.5">
+            <Database className="h-3.5 w-3.5" /> Predictions
           </TabsTrigger>
-          <TabsTrigger value="appearance" className="gap-2">
-            <Palette className="h-4 w-4" /> Appearance
+          <TabsTrigger value="appearance" className="h-7 text-xs px-2.5 gap-1.5">
+            <Palette className="h-3.5 w-3.5" /> Appearance
           </TabsTrigger>
-          <TabsTrigger value="branding" className="gap-2">
-            <ImageIcon className="h-4 w-4" /> Branding
+          <TabsTrigger value="branding" className="h-7 text-xs px-2.5 gap-1.5">
+            <ImageIcon className="h-3.5 w-3.5" /> Branding
           </TabsTrigger>
-          <TabsTrigger value="rewrites" className="gap-2">
-            <Link2 className="h-4 w-4" /> URL Rewrites
+          <TabsTrigger value="rewrites" className="h-7 text-xs px-2.5 gap-1.5">
+            <Link2 className="h-3.5 w-3.5" /> Rewrites
           </TabsTrigger>
-          <TabsTrigger value="twofa" className="gap-2">
-            <KeyRound className="h-4 w-4" /> 2FA
+          <TabsTrigger value="twofa" className="h-7 text-xs px-2.5 gap-1.5">
+            <KeyRound className="h-3.5 w-3.5" /> 2FA
           </TabsTrigger>
-          <TabsTrigger value="seo" className="gap-2">
-            <Search className="h-4 w-4" /> SEO
+          <TabsTrigger value="seo" className="h-7 text-xs px-2.5 gap-1.5">
+            <Search className="h-3.5 w-3.5" /> SEO
           </TabsTrigger>
-          <TabsTrigger value="social" className="gap-2">
-            <Share2 className="h-4 w-4" /> Social
+          <TabsTrigger value="social" className="h-7 text-xs px-2.5 gap-1.5">
+            <Share2 className="h-3.5 w-3.5" /> Social
           </TabsTrigger>
-          <TabsTrigger value="apikeys" className="gap-2">
-            <KeyRound className="h-4 w-4" /> API Keys
+          <TabsTrigger value="apikeys" className="h-7 text-xs px-2.5 gap-1.5">
+            <KeyRound className="h-3.5 w-3.5" /> Keys
           </TabsTrigger>
         </TabsList>
 
         {/* General Settings */}
-        <TabsContent value="general">
+        <TabsContent value="general" className="mt-0">
           <Card>
-            <CardHeader>
-              <CardTitle>General Settings</CardTitle>
-              <CardDescription>Configure basic site information</CardDescription>
+            <CardHeader className="py-2 pb-1.5 px-3">
+              <CardTitle className="text-sm font-semibold">General Settings</CardTitle>
+              <CardDescription className="text-xs">Configure basic site information</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="siteName">Site Name</Label>
+            <CardContent className="space-y-3 p-3 pt-0">
+              <div className="grid gap-3 md:grid-cols-2">
+                <div className="space-y-1">
+                  <Label htmlFor="siteName" className="text-xs">Site Name</Label>
                   <Input 
                     id="siteName" 
+                    className="h-8 text-xs"
                     value={settings.site_name}
                     onChange={(e) => updateSetting('site_name', e.target.value)}
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="siteDescription">Site Description</Label>
+                <div className="space-y-1">
+                  <Label htmlFor="siteDescription" className="text-xs">Site Description</Label>
                   <Input 
                     id="siteDescription" 
+                    className="h-8 text-xs"
                     value={settings.site_description}
                     onChange={(e) => updateSetting('site_description', e.target.value)}
                   />
                 </div>
               </div>
-              <div className="flex items-center justify-between rounded-lg border border-border p-4">
+              <div className="flex items-center justify-between rounded-lg border border-border p-3">
                 <div>
-                  <p className="font-medium">Maintenance Mode</p>
-                  <p className="text-sm text-muted-foreground">Put the site in maintenance mode</p>
+                  <p className="font-medium text-xs">Maintenance Mode</p>
+                  <p className="text-[10px] text-muted-foreground leading-tight">Put the site in maintenance mode</p>
                 </div>
                 <Switch 
                   checked={settings.maintenance_mode === 'true'}
                   onCheckedChange={() => toggleSetting('maintenance_mode')}
+                  className="scale-75"
                 />
               </div>
-              <div className="rounded-lg border border-border p-4 space-y-3">
-                <div className="flex items-center justify-between gap-4">
+              <div className="rounded-lg border border-border p-3 space-y-2">
+                <div className="flex items-center justify-between gap-3">
                   <div>
-                    <p className="font-medium">Cookie Consent Banner</p>
-                    <p className="text-sm text-muted-foreground">Show a GDPR-style cookie banner to first-time visitors.</p>
+                    <p className="font-medium text-xs">Cookie Consent Banner</p>
+                    <p className="text-[10px] text-muted-foreground leading-tight">Show a GDPR-style banner.</p>
                   </div>
                   <Switch
                     checked={settings.cookie_banner_enabled === 'true'}
                     onCheckedChange={() => toggleSetting('cookie_banner_enabled')}
+                    className="scale-75"
                   />
                 </div>
                 {settings.cookie_banner_enabled === 'true' && (
-                  <div>
-                    <label className="mb-1 block text-xs font-medium text-muted-foreground">Banner message</label>
+                  <div className="pt-1">
+                    <label className="mb-1 block text-[10px] font-medium text-muted-foreground uppercase px-0.5">Banner message</label>
                     <textarea
-                      className="w-full rounded-md border border-border bg-background p-2 text-sm"
-                      rows={3}
+                      className="w-full rounded-md border border-border bg-background p-2 text-xs leading-normal"
+                      rows={2}
                       value={settings.cookie_banner_message}
                       onChange={(e) => updateSetting('cookie_banner_message', e.target.value)}
                     />
@@ -347,6 +352,7 @@ export default function AdminSettingsPage() {
             </CardContent>
           </Card>
         </TabsContent>
+
 
         {/* Security Settings */}
         <TabsContent value="security">

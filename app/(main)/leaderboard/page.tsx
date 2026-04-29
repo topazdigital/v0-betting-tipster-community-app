@@ -49,112 +49,112 @@ export default function LeaderboardPage() {
     <div className="flex">
       <SidebarNew />
       <div className="flex-1 overflow-hidden">
-        <div className="mx-auto max-w-5xl px-4 py-3">
+        <div className="mx-auto max-w-5xl px-3 py-2.5">
           {/* Header */}
-          <div className="mb-3 flex items-center justify-between">
+          <div className="mb-4 flex items-center justify-between">
             <div>
-              <h1 className="flex items-center gap-2 text-lg font-bold text-foreground">
-                <Trophy className="h-7 w-7 text-warning" />
+              <h1 className="flex items-center gap-1.5 text-lg font-bold text-foreground">
+                <Trophy className="h-5 w-5 text-warning" />
                 Leaderboard
               </h1>
-              <p className="text-sm text-muted-foreground">
+              <p className="text-xs text-muted-foreground">
                 Top performing tipsters ranked by performance
               </p>
             </div>
-            <Button variant="outline" asChild>
+            <Button variant="outline" size="sm" className="h-7 text-xs" asChild>
               <Link href="/competitions">
-                <Star className="mr-2 h-4 w-4" />
+                <Star className="mr-1.5 h-3.5 w-3.5" />
                 View Competitions
               </Link>
             </Button>
           </div>
 
           {/* Top 3 Podium */}
-          <div className="mb-4 grid grid-cols-3 gap-4">
+          <div className="mb-4 grid grid-cols-3 gap-2">
             {/* Second Place */}
-            <div className="mt-8 flex flex-col items-center">
-              <div className="relative mb-3">
-                <div className="flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-gray-200 to-gray-400 text-2xl font-bold text-gray-700 ring-4 ring-gray-300">
+            <div className="mt-6 flex flex-col items-center">
+              <div className="relative mb-2">
+                <div className="flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-gray-200 to-gray-400 text-xl font-bold text-gray-700 ring-2 ring-gray-300">
                   {data[1]?.avatar}
                 </div>
-                <div className="absolute -bottom-2 left-1/2 flex h-7 w-7 -translate-x-1/2 items-center justify-center rounded-full bg-gray-300 text-sm font-bold text-gray-700">
+                <div className="absolute -bottom-1.5 left-1/2 flex h-5 w-5 -translate-x-1/2 items-center justify-center rounded-full bg-gray-300 text-[10px] font-bold text-gray-700">
                   2
                 </div>
               </div>
               <Link href={`/tipsters/${data[1]?.username}`} className="text-center hover:text-primary">
-                <div className="font-semibold">{data[1]?.displayName}</div>
-                <div className="text-sm text-success">{data[1]?.winRate}%</div>
+                <div className="text-xs font-semibold">{data[1]?.displayName}</div>
+                <div className="text-[10px] text-success font-bold">{data[1]?.winRate}%</div>
               </Link>
             </div>
             
             {/* First Place */}
             <div className="flex flex-col items-center">
-              <Crown className="mb-2 h-8 w-8 text-yellow-500" />
-              <div className="relative mb-3">
-                <div className="flex h-24 w-24 items-center justify-center rounded-full bg-gradient-to-br from-yellow-400 to-yellow-600 text-3xl font-bold text-yellow-900 ring-4 ring-yellow-300 shadow-lg shadow-yellow-500/30">
+              <Crown className="mb-1 h-5 w-5 text-yellow-500" />
+              <div className="relative mb-2">
+                <div className="flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-yellow-400 to-yellow-600 text-2xl font-bold text-yellow-900 ring-2 ring-yellow-300 shadow-lg shadow-yellow-500/20">
                   {data[0]?.avatar}
                 </div>
-                <div className="absolute -bottom-2 left-1/2 flex h-8 w-8 -translate-x-1/2 items-center justify-center rounded-full bg-yellow-400 text-base font-bold text-yellow-900">
+                <div className="absolute -bottom-1.5 left-1/2 flex h-6 w-6 -translate-x-1/2 items-center justify-center rounded-full bg-yellow-400 text-xs font-bold text-yellow-900">
                   1
                 </div>
               </div>
               <Link href={`/tipsters/${data[0]?.username}`} className="text-center hover:text-primary">
-                <div className="text-lg font-bold">{data[0]?.displayName}</div>
-                <div className="text-success">{data[0]?.winRate}%</div>
+                <div className="text-sm font-bold">{data[0]?.displayName}</div>
+                <div className="text-[11px] text-success font-bold">{data[0]?.winRate}%</div>
               </Link>
             </div>
             
             {/* Third Place */}
-            <div className="mt-12 flex flex-col items-center">
-              <div className="relative mb-3">
-                <div className="flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-amber-600 to-amber-800 text-xl font-bold text-amber-100 ring-4 ring-amber-600">
+            <div className="mt-10 flex flex-col items-center">
+              <div className="relative mb-2">
+                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-amber-600 to-amber-800 text-lg font-bold text-amber-100 ring-2 ring-amber-600">
                   {data[2]?.avatar}
                 </div>
-                <div className="absolute -bottom-2 left-1/2 flex h-6 w-6 -translate-x-1/2 items-center justify-center rounded-full bg-amber-700 text-xs font-bold text-amber-100">
+                <div className="absolute -bottom-1.5 left-1/2 flex h-4 w-4 -translate-x-1/2 items-center justify-center rounded-full bg-amber-700 text-[9px] font-bold text-amber-100">
                   3
                 </div>
               </div>
               <Link href={`/tipsters/${data[2]?.username}`} className="text-center hover:text-primary">
-                <div className="font-semibold">{data[2]?.displayName}</div>
-                <div className="text-sm text-success">{data[2]?.winRate}%</div>
+                <div className="text-xs font-semibold">{data[2]?.displayName}</div>
+                <div className="text-[10px] text-success font-bold">{data[2]?.winRate}%</div>
               </Link>
             </div>
           </div>
 
           {/* Period Tabs */}
-          <Tabs value={period} onValueChange={(v) => setPeriod(v as typeof period)} className="mb-6">
-            <TabsList className="grid w-full grid-cols-4">
-              <TabsTrigger value="daily">
-                <Calendar className="mr-2 h-4 w-4" />
+          <Tabs value={period} onValueChange={(v) => setPeriod(v as typeof period)} className="mb-4">
+            <TabsList className="grid w-full grid-cols-4 h-8">
+              <TabsTrigger value="daily" className="text-xs px-2">
+                <Calendar className="mr-1 h-3 w-3" />
                 Daily
               </TabsTrigger>
-              <TabsTrigger value="weekly">
-                <Calendar className="mr-2 h-4 w-4" />
+              <TabsTrigger value="weekly" className="text-xs px-2">
+                <Calendar className="mr-1 h-3 w-3" />
                 Weekly
               </TabsTrigger>
-              <TabsTrigger value="monthly">
-                <Calendar className="mr-2 h-4 w-4" />
+              <TabsTrigger value="monthly" className="text-xs px-2">
+                <Calendar className="mr-1 h-3 w-3" />
                 Monthly
               </TabsTrigger>
-              <TabsTrigger value="alltime">
-                <Trophy className="mr-2 h-4 w-4" />
+              <TabsTrigger value="alltime" className="text-xs px-2">
+                <Trophy className="mr-1 h-3 w-3" />
                 All Time
               </TabsTrigger>
             </TabsList>
           </Tabs>
 
           {/* Full Leaderboard Table */}
-          <div className="rounded-xl border border-border bg-card overflow-hidden">
+          <div className="rounded-lg border border-border bg-card overflow-hidden">
             <table className="w-full">
               <thead>
-                <tr className="border-b border-border bg-muted/50">
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase text-muted-foreground">Rank</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium uppercase text-muted-foreground">Tipster</th>
-                  <th className="px-4 py-3 text-center text-xs font-medium uppercase text-muted-foreground">Win Rate</th>
-                  <th className="px-4 py-3 text-center text-xs font-medium uppercase text-muted-foreground">Tips</th>
-                  <th className="px-4 py-3 text-center text-xs font-medium uppercase text-muted-foreground">ROI</th>
-                  <th className="px-4 py-3 text-center text-xs font-medium uppercase text-muted-foreground">Streak</th>
-                  <th className="px-4 py-3 text-center text-xs font-medium uppercase text-muted-foreground">Change</th>
+                <tr className="border-b border-border bg-muted/30">
+                  <th className="px-3 py-2 text-left text-[11px] font-medium uppercase text-muted-foreground tracking-wider">Rank</th>
+                  <th className="px-3 py-2 text-left text-[11px] font-medium uppercase text-muted-foreground tracking-wider">Tipster</th>
+                  <th className="px-3 py-2 text-center text-[11px] font-medium uppercase text-muted-foreground tracking-wider">Win Rate</th>
+                  <th className="px-3 py-2 text-center text-[11px] font-medium uppercase text-muted-foreground tracking-wider">Tips</th>
+                  <th className="px-3 py-2 text-center text-[11px] font-medium uppercase text-muted-foreground tracking-wider">ROI</th>
+                  <th className="px-3 py-2 text-center text-[11px] font-medium uppercase text-muted-foreground tracking-wider">Streak</th>
+                  <th className="px-3 py-2 text-center text-[11px] font-medium uppercase text-muted-foreground tracking-wider">Change</th>
                 </tr>
               </thead>
               <tbody>
@@ -162,13 +162,13 @@ export default function LeaderboardPage() {
                   <tr 
                     key={entry.username} 
                     className={cn(
-                      'border-b border-border transition-colors hover:bg-muted/50',
-                      index < 3 && 'bg-muted/20'
+                      'border-b border-border transition-colors hover:bg-muted/30',
+                      index < 3 && 'bg-muted/10'
                     )}
                   >
-                    <td className="px-4 py-2">
+                    <td className="px-3 py-1.5">
                       <div className={cn(
-                        'flex h-8 w-8 items-center justify-center rounded-full font-bold',
+                        'flex h-6 w-6 items-center justify-center rounded-full text-[10px] font-bold',
                         entry.rank === 1 && 'bg-yellow-500 text-yellow-950',
                         entry.rank === 2 && 'bg-gray-300 text-gray-700',
                         entry.rank === 3 && 'bg-amber-700 text-amber-100',
@@ -177,34 +177,34 @@ export default function LeaderboardPage() {
                         {entry.rank}
                       </div>
                     </td>
-                    <td className="px-4 py-2">
-                      <Link href={`/tipsters/${entry.username}`} className="flex items-center gap-3 hover:text-primary">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary text-sm font-bold text-primary-foreground">
+                    <td className="px-3 py-1.5">
+                      <Link href={`/tipsters/${entry.username}`} className="flex items-center gap-2.5 hover:text-primary">
+                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground shrink-0">
                           {entry.avatar}
                         </div>
-                        <div>
-                          <div className="font-medium">{entry.displayName}</div>
-                          <div className="text-xs text-muted-foreground">@{entry.username}</div>
+                        <div className="min-w-0">
+                          <div className="font-medium text-xs truncate">{entry.displayName}</div>
+                          <div className="text-[10px] text-muted-foreground truncate">@{entry.username}</div>
                         </div>
                       </Link>
                     </td>
-                    <td className="px-4 py-2 text-center">
-                      <div className="font-semibold text-success">{entry.winRate}%</div>
-                      <div className="text-xs text-muted-foreground">{entry.won}/{entry.tips}</div>
+                    <td className="px-3 py-1.5 text-center">
+                      <div className="font-semibold text-xs text-success">{entry.winRate}%</div>
+                      <div className="text-[10px] text-muted-foreground">{entry.won}/{entry.tips}</div>
                     </td>
-                    <td className="px-4 py-2 text-center font-medium">{entry.tips}</td>
-                    <td className="px-4 py-2 text-center">
-                      <span className="font-semibold text-primary">+{entry.roi}%</span>
+                    <td className="px-3 py-1.5 text-center font-medium text-xs">{entry.tips}</td>
+                    <td className="px-3 py-1.5 text-center">
+                      <span className="font-semibold text-xs text-primary">+{entry.roi}%</span>
                     </td>
-                    <td className="px-4 py-2 text-center">
+                    <td className="px-3 py-1.5 text-center">
                       {entry.streak > 0 && (
-                        <div className="inline-flex items-center gap-1 rounded-full bg-warning/10 px-2 py-1 text-sm font-medium text-warning">
-                          <Flame className="h-3 w-3" />
+                        <div className="inline-flex items-center gap-0.5 rounded-full bg-warning/10 px-1.5 py-0.5 text-[10px] font-medium text-warning">
+                          <Flame className="h-2.5 w-2.5" />
                           {entry.streak}
                         </div>
                       )}
                     </td>
-                    <td className="px-4 py-2 text-center">
+                    <td className="px-3 py-1.5 text-center text-[10px]">
                       {entry.change > 0 && (
                         <span className="text-success">+{entry.change}</span>
                       )}
@@ -222,10 +222,10 @@ export default function LeaderboardPage() {
           </div>
 
           {/* Load More */}
-          <div className="mt-6 text-center">
-            <Button variant="outline">
+          <div className="mt-4 text-center">
+            <Button variant="outline" size="sm" className="h-8 text-xs px-4">
               Load More
-              <ChevronRight className="ml-2 h-4 w-4" />
+              <ChevronRight className="ml-1.5 h-3.5 w-3.5" />
             </Button>
           </div>
         </div>

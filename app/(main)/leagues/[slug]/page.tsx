@@ -232,78 +232,78 @@ export default function LeaguePage({ params }: PageProps) {
       <SidebarNew />
 
       <div className="flex-1 overflow-hidden">
-        <div className="mx-auto max-w-7xl px-4 py-4">
+        <div className="mx-auto max-w-7xl px-3 py-3 md:px-4 md:py-4">
           {/* Back Button */}
-          <Button variant="ghost" size="sm" className="mb-3" asChild>
+          <Button variant="ghost" size="sm" className="mb-2 h-7 text-xs px-2" asChild>
             <Link href="/matches">
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              Back to Matches
+              <ArrowLeft className="mr-1.5 h-3.5 w-3.5" />
+              Back
             </Link>
           </Button>
 
           {/* League Header */}
-          <Card className="mb-4 overflow-hidden">
-            <div className="bg-gradient-to-r from-primary/10 to-transparent p-5">
-              <div className="flex flex-wrap items-center gap-4">
-                <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-card text-3xl">
+          <Card className="mb-3 overflow-hidden">
+            <div className="bg-gradient-to-r from-primary/10 to-transparent p-4">
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-card text-2xl">
                   {sportIcon}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <FlagIcon countryCode={league.countryCode} size="md" />
-                    <h1 className="truncate text-xl font-bold sm:text-2xl">{league.name}</h1>
+                  <div className="flex items-center gap-1.5">
+                    <FlagIcon countryCode={league.countryCode} size="sm" />
+                    <h1 className="truncate text-lg font-bold sm:text-xl">{league.name}</h1>
                   </div>
-                  <p className="text-sm text-muted-foreground">{league.country}</p>
+                  <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{league.country}</p>
                 </div>
-                <div className="flex flex-wrap items-center gap-2">
+                <div className="flex flex-wrap items-center gap-1.5">
                   {/* Season Selector */}
                   <Select
                     value={selectedSeason === null ? 'current' : String(selectedSeason)}
                     onValueChange={(v) => setSelectedSeason(v === 'current' ? null : Number(v))}
                   >
-                    <SelectTrigger className="h-8 gap-1 border-border bg-card/80 text-xs w-auto min-w-[140px]">
+                    <SelectTrigger className="h-7 gap-1 border-border bg-card/80 text-[10px] w-auto min-w-[120px]">
                       <Calendar className="h-3 w-3 text-muted-foreground" />
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
                       {SEASONS.map(s => (
-                        <SelectItem key={s.year ?? 'current'} value={s.year === null ? 'current' : String(s.year)}>
+                        <SelectItem key={s.year ?? 'current'} value={s.year === null ? 'current' : String(s.year)} className="text-[10px]">
                           {s.label}
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
-                  <Badge variant="secondary" className="gap-1">
-                    {matches.length} matches
+                  <Badge variant="secondary" className="h-5 gap-1 px-1.5 text-[10px]">
+                    {matches.length}
                   </Badge>
                   {standings.length > 0 && (
-                    <Badge variant="outline" className="gap-1">
-                      <Trophy className="h-3 w-3" />
-                      {standings.length} teams
+                    <Badge variant="outline" className="h-5 gap-1 px-1.5 text-[10px]">
+                      <Trophy className="h-2.5 w-2.5 text-warning" />
+                      {standings.length}
                     </Badge>
                   )}
                 </div>
               </div>
 
               {/* Quick Stats */}
-              <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-                <div className="rounded-lg bg-card p-3 text-center">
-                  <div className="text-2xl font-bold text-live">{liveMatches.length}</div>
-                  <div className="text-xs text-muted-foreground">Live Now</div>
+              <div className="mt-3.5 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                <div className="rounded-lg bg-card py-2 text-center border border-border/50">
+                  <div className="text-xl font-bold text-live">{liveMatches.length}</div>
+                  <div className="text-[9px] uppercase tracking-wide text-muted-foreground">Live</div>
                 </div>
-                <div className="rounded-lg bg-card p-3 text-center">
-                  <div className="text-2xl font-bold text-primary">{upcomingMatches.length}</div>
-                  <div className="text-xs text-muted-foreground">Upcoming</div>
+                <div className="rounded-lg bg-card py-2 text-center border border-border/50">
+                  <div className="text-xl font-bold text-primary">{upcomingMatches.length}</div>
+                  <div className="text-[9px] uppercase tracking-wide text-muted-foreground">Upcoming</div>
                 </div>
-                <div className="rounded-lg bg-card p-3 text-center">
-                  <div className="text-2xl font-bold">{finishedMatches.length}</div>
-                  <div className="text-xs text-muted-foreground">Played</div>
+                <div className="rounded-lg bg-card py-2 text-center border border-border/50">
+                  <div className="text-xl font-bold">{finishedMatches.length}</div>
+                  <div className="text-[9px] uppercase tracking-wide text-muted-foreground">Played</div>
                 </div>
-                <div className="rounded-lg bg-card p-3 text-center">
-                  <div className="text-2xl font-bold text-warning">
+                <div className="rounded-lg bg-card py-2 text-center border border-border/50">
+                  <div className="text-xl font-bold text-warning">
                     {outrightMarket?.outcomes.length ?? 0}
                   </div>
-                  <div className="text-xs text-muted-foreground">Outright runners</div>
+                  <div className="text-[9px] uppercase tracking-wide text-muted-foreground">Runners</div>
                 </div>
               </div>
             </div>
@@ -311,32 +311,32 @@ export default function LeaguePage({ params }: PageProps) {
 
           {/* Knockout bracket — silently renders nothing for league-format
               competitions, so we can include it unconditionally. */}
-          <div className="mb-4">
+          <div className="mb-3">
             <KnockoutBracket leagueId={league.id} />
           </div>
 
           {/* Two-column layout: matches main, sidebar with standings/outrights/scorers */}
-          <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
+          <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_340px]">
             {/* ── Main column: matches + standings table ─────────── */}
-            <div className="min-w-0 space-y-4">
+            <div className="min-w-0 space-y-3">
               {matchesLoading ? (
-                <div className="flex h-40 items-center justify-center">
-                  <Spinner className="h-8 w-8" />
+                <div className="flex h-32 items-center justify-center">
+                  <Spinner className="h-6 w-6" />
                 </div>
               ) : (
                 <>
                   {/* Live */}
                   {liveMatches.length > 0 && (
                     <section>
-                      <div className="mb-2 flex items-center gap-2">
-                        <span className="relative flex h-3 w-3">
+                      <div className="mb-1.5 flex items-center gap-1.5">
+                        <span className="relative flex h-2 w-2">
                           <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-live opacity-75"></span>
-                          <span className="relative inline-flex h-3 w-3 rounded-full bg-live"></span>
+                          <span className="relative inline-flex h-2 w-2 rounded-full bg-live"></span>
                         </span>
-                        <h2 className="text-base font-semibold">Live Now</h2>
-                        <Badge variant="destructive">{liveMatches.length}</Badge>
+                        <h2 className="text-sm font-bold">Live Now</h2>
+                        <Badge variant="destructive" className="h-4 px-1 text-[9px]">{liveMatches.length}</Badge>
                       </div>
-                      <div className="space-y-1.5">
+                      <div className="space-y-1">
                         {liveMatches.map(match => (
                           <MatchCardNew key={match.id} match={match} variant="compact" showLeague={false} />
                         ))}
@@ -347,21 +347,21 @@ export default function LeaguePage({ params }: PageProps) {
                   {/* Upcoming */}
                   {upcomingMatches.length > 0 && (
                     <section>
-                      <div className="mb-2 flex items-center gap-2">
-                        <Clock className="h-4 w-4 text-primary" />
-                        <h2 className="text-base font-semibold">Upcoming</h2>
-                        <Badge variant="secondary">{upcomingMatches.length}</Badge>
+                      <div className="mb-1.5 flex items-center gap-1.5">
+                        <Clock className="h-3.5 w-3.5 text-primary" />
+                        <h2 className="text-sm font-bold">Upcoming</h2>
+                        <Badge variant="secondary" className="h-4 px-1 text-[9px]">{upcomingMatches.length}</Badge>
                       </div>
-                      <div className="space-y-1.5">
+                      <div className="space-y-1">
                         {upcomingMatches.slice(0, 12).map(match => (
                           <MatchCardNew key={match.id} match={match} variant="compact" showLeague={false} />
                         ))}
                       </div>
                       {upcomingMatches.length > 12 && (
-                        <Button variant="ghost" className="mt-2 w-full" asChild>
+                        <Button variant="ghost" size="sm" className="mt-2 h-7 w-full text-xs" asChild>
                           <Link href={`/matches?league=${league.slug}`}>
                             View all {upcomingMatches.length} matches
-                            <ChevronRight className="ml-1 h-4 w-4" />
+                            <ChevronRight className="ml-1 h-3.5 w-3.5" />
                           </Link>
                         </Button>
                       )}
@@ -371,11 +371,11 @@ export default function LeaguePage({ params }: PageProps) {
                   {/* Recent Results */}
                   {finishedMatches.length > 0 && (
                     <section>
-                      <div className="mb-2 flex items-center gap-2">
-                        <Trophy className="h-4 w-4 text-success" />
-                        <h2 className="text-base font-semibold">Recent Results</h2>
+                      <div className="mb-1.5 flex items-center gap-1.5">
+                        <Trophy className="h-3.5 w-3.5 text-success" />
+                        <h2 className="text-sm font-bold">Recent Results</h2>
                       </div>
-                      <div className="space-y-1.5">
+                      <div className="space-y-1">
                         {finishedMatches.slice(0, 8).map(match => (
                           <MatchCardNew key={match.id} match={match} variant="compact" showLeague={false} />
                         ))}
@@ -386,14 +386,14 @@ export default function LeaguePage({ params }: PageProps) {
                   {liveMatches.length + upcomingMatches.length + finishedMatches.length === 0 && (
                     isPastSeason ? (
                       <Card className="border-dashed">
-                        <CardContent className="flex flex-col items-center gap-2 p-8 text-center">
-                          <Calendar className="h-8 w-8 text-muted-foreground/60" />
-                          <p className="font-semibold">Viewing the {SEASONS.find(s => s.year === selectedSeason)?.label} archive</p>
-                          <p className="max-w-md text-sm text-muted-foreground">
-                            Live and upcoming match data is only available for the current season. The standings, top scorers and outright markets below reflect your selected season.
+                        <CardContent className="flex flex-col items-center gap-1.5 p-6 text-center">
+                          <Calendar className="h-6 w-6 text-muted-foreground/60" />
+                          <p className="text-sm font-semibold">{SEASONS.find(s => s.year === selectedSeason)?.label} archive</p>
+                          <p className="max-w-md text-[11px] text-muted-foreground">
+                            Live/upcoming data is current-season only. Standings and scorers below reflect your selection.
                           </p>
-                          <Button size="sm" variant="outline" className="mt-2" onClick={() => setSelectedSeason(null)}>
-                            Back to current season
+                          <Button size="sm" variant="outline" className="mt-2 h-7 text-xs px-3" onClick={() => setSelectedSeason(null)}>
+                            Back to current
                           </Button>
                         </CardContent>
                       </Card>
@@ -406,36 +406,36 @@ export default function LeaguePage({ params }: PageProps) {
 
               {/* Full standings table */}
               <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="flex items-center gap-2 text-base">
-                    <Trophy className="h-4 w-4 text-warning" />
+                <CardHeader className="pb-2">
+                  <CardTitle className="flex items-center gap-1.5 text-sm">
+                    <Trophy className="h-3.5 w-3.5 text-warning" />
                     League Table
                   </CardTitle>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="pt-0">
                   {standingsLoading ? (
                     <LoadingBox />
                   ) : standings.length === 0 ? (
                     <EmptyState
                       icon={AlertCircle}
                       title="No standings available"
-                      hint="ESPN doesn't publish a table for this competition (cup format or off-season)."
+                      hint="ESPN doesn't publish a table for this competition."
                     />
                   ) : (
                     <div className="overflow-x-auto">
-                      <table className="w-full text-sm">
+                      <table className="w-full text-xs">
                         <thead>
-                          <tr className="border-b text-muted-foreground">
-                            <th className="pb-2 pr-2 text-left font-medium">#</th>
-                            <th className="pb-2 text-left font-medium">Team</th>
-                            <th className="pb-2 text-center font-medium">P</th>
-                            <th className="pb-2 text-center font-medium">W</th>
-                            <th className="pb-2 text-center font-medium">D</th>
-                            <th className="pb-2 text-center font-medium">L</th>
-                            <th className="pb-2 text-center font-medium">GF</th>
-                            <th className="pb-2 text-center font-medium">GA</th>
-                            <th className="pb-2 text-center font-medium">GD</th>
-                            <th className="pb-2 pl-2 text-center font-medium">Pts</th>
+                          <tr className="border-b text-[10px] uppercase tracking-wide text-muted-foreground">
+                            <th className="pb-1.5 pr-2 text-left font-bold">#</th>
+                            <th className="pb-1.5 text-left font-bold">Team</th>
+                            <th className="pb-1.5 text-center font-bold">P</th>
+                            <th className="pb-1.5 text-center font-bold">W</th>
+                            <th className="pb-1.5 text-center font-bold">D</th>
+                            <th className="pb-1.5 text-center font-bold">L</th>
+                            <th className="pb-1.5 text-center font-bold hidden sm:table-cell">GF</th>
+                            <th className="pb-1.5 text-center font-bold hidden sm:table-cell">GA</th>
+                            <th className="pb-1.5 text-center font-bold">GD</th>
+                            <th className="pb-1.5 pl-2 text-center font-bold">Pts</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -448,43 +448,43 @@ export default function LeaguePage({ params }: PageProps) {
                                 row.position >= standings.length - 2 && "bg-destructive/5"
                               )}
                             >
-                              <td className="py-2 pr-2">
+                              <td className="py-1.5 pr-2">
                                 <span className={cn(
-                                  "inline-flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold",
+                                  "inline-flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-black",
                                   row.position <= 4 && "bg-success text-success-foreground",
                                   row.position >= standings.length - 2 && "bg-destructive text-destructive-foreground"
                                 )}>
                                   {row.position}
                                 </span>
                               </td>
-                              <td className="py-2">
+                              <td className="py-1.5">
                                 {row.team.href ? (
                                   <Link
                                     href={row.team.href}
-                                    className="group flex items-center gap-2 hover:text-primary"
+                                    className="group flex items-center gap-1.5 hover:text-primary"
                                   >
                                     <TeamLogo teamName={row.team.name} logoUrl={row.team.logo} size="xs" />
-                                    <span className="truncate font-medium group-hover:underline">{row.team.name}</span>
+                                    <span className="truncate font-semibold group-hover:underline">{row.team.name}</span>
                                   </Link>
                                 ) : (
-                                  <div className="flex items-center gap-2">
+                                  <div className="flex items-center gap-1.5">
                                     <TeamLogo teamName={row.team.name} logoUrl={row.team.logo} size="xs" />
-                                    <span className="truncate font-medium">{row.team.name}</span>
+                                    <span className="truncate font-semibold">{row.team.name}</span>
                                   </div>
                                 )}
                               </td>
-                              <td className="py-2 text-center">{row.played}</td>
-                              <td className="py-2 text-center text-success">{row.won}</td>
-                              <td className="py-2 text-center">{row.drawn}</td>
-                              <td className="py-2 text-center text-destructive">{row.lost}</td>
-                              <td className="py-2 text-center">{row.goalsFor}</td>
-                              <td className="py-2 text-center">{row.goalsAgainst}</td>
-                              <td className="py-2 text-center font-medium">
-                                <span className={row.goalDifference > 0 ? "text-success" : row.goalDifference < 0 ? "text-destructive" : ""}>
+                              <td className="py-1.5 text-center font-medium">{row.played}</td>
+                              <td className="py-1.5 text-center text-success font-medium">{row.won}</td>
+                              <td className="py-1.5 text-center font-medium">{row.drawn}</td>
+                              <td className="py-1.5 text-center text-destructive font-medium">{row.lost}</td>
+                              <td className="py-1.5 text-center hidden sm:table-cell text-muted-foreground">{row.goalsFor}</td>
+                              <td className="py-1.5 text-center hidden sm:table-cell text-muted-foreground">{row.goalsAgainst}</td>
+                              <td className="py-1.5 text-center font-bold">
+                                <span className={row.goalDifference > 0 ? "text-success" : row.goalDifference < 0 ? "text-destructive" : "text-muted-foreground"}>
                                   {row.goalDifference > 0 ? `+${row.goalDifference}` : row.goalDifference}
                                 </span>
                               </td>
-                              <td className="py-2 pl-2 text-center font-bold">{row.points}</td>
+                              <td className="py-1.5 pl-2 text-center font-black">{row.points}</td>
                             </tr>
                           ))}
                         </tbody>
@@ -496,19 +496,16 @@ export default function LeaguePage({ params }: PageProps) {
             </div>
 
             {/* ── Right sidebar: outrights + scorers ─────────────── */}
-            <aside className="space-y-4">
+            <aside className="space-y-3">
               {/* Outrights */}
               <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="flex items-center gap-2 text-sm">
-                    <Target className="h-4 w-4 text-warning" />
+                <CardHeader className="pb-2">
+                  <CardTitle className="flex items-center gap-1.5 text-xs">
+                    <Target className="h-3.5 w-3.5 text-warning" />
                     Outright Winner
                   </CardTitle>
-                  <p className="text-xs text-muted-foreground">
-                    Best price across UK / EU / US sportsbooks
-                  </p>
                 </CardHeader>
-                <CardContent className="space-y-2">
+                <CardContent className="space-y-1.5 pt-0">
                   {outrightsLoading ? (
                     <LoadingBox />
                   ) : !outrightMarket || outrightMarket.outcomes.length === 0 ? (

@@ -96,94 +96,96 @@ export default function MatchPredictorPage() {
     <div className="flex">
       <SidebarNew />
       <div className="flex-1">
-        <div className="mx-auto max-w-4xl px-4 py-6 md:px-6 md:py-8">
+        <div className="mx-auto max-w-4xl px-3 py-4 md:px-4 md:py-6">
           {/* Hero */}
-          <div className="mb-6 rounded-2xl border border-primary/30 bg-gradient-to-br from-primary/15 via-primary/5 to-transparent p-5">
-            <div className="flex items-start gap-3">
-              <div className="rounded-xl bg-primary/20 p-2.5">
-                <Brain className="h-6 w-6 text-primary" />
+          <div className="mb-4 rounded-xl border border-primary/30 bg-gradient-to-br from-primary/15 via-primary/5 to-transparent p-3.5">
+            <div className="flex items-start gap-2.5">
+              <div className="rounded-lg bg-primary/20 p-2">
+                <Brain className="h-5 w-5 text-primary" />
               </div>
               <div className="min-w-0">
-                <h1 className="text-xl font-black md:text-2xl">
+                <h1 className="text-lg font-black md:text-xl leading-tight">
                   Match Predictor
                 </h1>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Type any two teams and let our AI generate a pick, confidence
-                  level and recommended bet — across markets a real tipster
-                  would consider.
+                <p className="mt-0.5 text-xs text-muted-foreground leading-snug">
+                  AI analysis for any matchup — pick, confidence level, and recommended markets.
                 </p>
               </div>
             </div>
           </div>
 
-          <div className="grid gap-4 md:grid-cols-5">
+          <div className="grid gap-3 md:grid-cols-5">
             {/* Form */}
             <Card className="md:col-span-2">
-              <CardHeader className="pb-3">
-                <CardTitle className="flex items-center gap-2 text-base">
-                  <Target className="h-4 w-4 text-primary" />
-                  Enter the matchup
+              <CardHeader className="py-2.5 px-3">
+                <CardTitle className="flex items-center gap-1.5 text-sm">
+                  <Target className="h-3.5 w-3.5 text-primary" />
+                  Matchup Details
                 </CardTitle>
               </CardHeader>
-              <CardContent>
-                <form onSubmit={submit} className="space-y-4">
-                  <div className="space-y-1.5">
-                    <Label htmlFor="home">Home team</Label>
+              <CardContent className="px-3 pb-3">
+                <form onSubmit={submit} className="space-y-3">
+                  <div className="space-y-1">
+                    <Label htmlFor="home" className="text-[11px]">Home team</Label>
                     <Input
                       id="home"
                       placeholder="e.g. Manchester City"
                       value={homeTeam}
                       onChange={(e) => setHomeTeam(e.target.value)}
                       required
+                      className="h-8 text-xs"
                     />
                   </div>
-                  <div className="space-y-1.5">
-                    <Label htmlFor="away">Away team</Label>
+                  <div className="space-y-1">
+                    <Label htmlFor="away" className="text-[11px]">Away team</Label>
                     <Input
                       id="away"
                       placeholder="e.g. Liverpool"
                       value={awayTeam}
                       onChange={(e) => setAwayTeam(e.target.value)}
                       required
+                      className="h-8 text-xs"
                     />
                   </div>
-                  <div className="space-y-1.5">
-                    <Label htmlFor="league">League / Competition (optional)</Label>
+                  <div className="space-y-1">
+                    <Label htmlFor="league" className="text-[11px]">League (optional)</Label>
                     <Input
                       id="league"
                       placeholder="e.g. Premier League"
                       value={league}
                       onChange={(e) => setLeague(e.target.value)}
+                      className="h-8 text-xs"
                     />
                   </div>
-                  <div className="space-y-1.5">
-                    <Label htmlFor="notes">Extra context (optional)</Label>
+                  <div className="space-y-1">
+                    <Label htmlFor="notes" className="text-[11px]">Context (optional)</Label>
                     <Textarea
                       id="notes"
-                      placeholder="e.g. Haaland injury doubt, Liverpool away in Europe midweek…"
-                      rows={3}
+                      placeholder="e.g. Key injuries, rotation…"
+                      rows={2}
                       value={notes}
                       onChange={(e) => setNotes(e.target.value)}
+                      className="text-xs"
                     />
                   </div>
 
                   {error && (
-                    <div className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/10 p-2 text-xs text-destructive">
-                      <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                    <div className="flex items-start gap-1.5 rounded-md border border-destructive/30 bg-destructive/10 p-2 text-[10px] text-destructive">
+                      <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" />
                       <span>{error}</span>
                     </div>
                   )}
 
-                  <Button type="submit" className="w-full gap-2" disabled={loading}>
+                  <Button type="submit" className="w-full h-8 gap-1.5 text-xs font-bold" disabled={loading}>
                     {loading ? (
                       <>
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        Generating prediction…
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        Generating…
                       </>
                     ) : (
                       <>
-                        <Sparkles className="h-4 w-4" />
-                        Predict match
+                        <Sparkles className="h-3.5 w-3.5" />
+                        Predict
                       </>
                     )}
                   </Button>

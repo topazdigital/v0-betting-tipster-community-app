@@ -100,48 +100,48 @@ function ComparePageInner() {
     <div className="flex">
       <SidebarNew />
       <div className="flex-1 overflow-hidden">
-        <div className="mx-auto max-w-6xl px-4 py-3 pb-24">
-          <Button variant="ghost" size="sm" asChild className="mb-3">
-            <Link href="/tipsters"><ArrowLeft className="mr-2 h-4 w-4" />Back to tipsters</Link>
+        <div className="mx-auto max-w-6xl px-3 py-2.5 pb-24">
+          <Button variant="ghost" size="sm" asChild className="mb-2 h-7 text-xs">
+            <Link href="/tipsters"><ArrowLeft className="mr-1.5 h-3.5 w-3.5" />Back to tipsters</Link>
           </Button>
 
-          <div className="mb-5">
-            <h1 className="text-xl font-bold">Compare tipsters</h1>
-            <p className="text-sm text-muted-foreground">
+          <div className="mb-4">
+            <h1 className="text-lg font-bold">Compare tipsters</h1>
+            <p className="text-xs text-muted-foreground">
               Pick up to {MAX_COMPARE} tipsters to compare side-by-side. Best value in each row is highlighted.
             </p>
           </div>
 
           {loadingList ? (
-            <div className="flex h-64 items-center justify-center"><Spinner className="h-8 w-8" /></div>
+            <div className="flex h-64 items-center justify-center"><Spinner className="h-6 w-6" /></div>
           ) : (
             <>
               {/* Slot row */}
-              <div className="mb-5 grid grid-cols-2 gap-3 md:grid-cols-4">
+              <div className="mb-4 grid grid-cols-2 gap-2 md:grid-cols-4">
                 {Array.from({ length: MAX_COMPARE }).map((_, idx) => {
                   const t = selected[idx];
                   if (t) {
                     return (
-                      <div key={t.id} className="relative rounded-xl border border-border bg-card p-3">
+                      <div key={t.id} className="relative rounded-lg border border-border bg-card p-2.5">
                         <button onClick={() => remove(t.id)}
-                          className="absolute right-2 top-2 rounded-md p-1 text-muted-foreground hover:bg-muted">
-                          <X className="h-4 w-4" />
+                          className="absolute right-1.5 top-1.5 rounded-md p-1 text-muted-foreground hover:bg-muted">
+                          <X className="h-3.5 w-3.5" />
                         </button>
                         <Link href={`/tipsters/${t.id}`} className="flex flex-col items-center text-center">
                           {t.avatar ? (
                             // eslint-disable-next-line @next/next/no-img-element
-                            <img src={t.avatar} alt="" className="h-14 w-14 rounded-full bg-muted" />
+                            <img src={t.avatar} alt="" className="h-10 w-10 rounded-full bg-muted" />
                           ) : (
-                            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-primary text-lg font-bold text-primary-foreground">
+                            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary text-sm font-bold text-primary-foreground">
                               {t.displayName.charAt(0)}
                             </div>
                           )}
-                          <div className="mt-2 flex items-center gap-1 text-sm font-semibold">
+                          <div className="mt-1.5 flex items-center gap-1 text-xs font-semibold">
                             {t.displayName}
                             {t.verified && <Check className="h-3 w-3 rounded-full bg-primary p-0.5 text-primary-foreground" />}
                           </div>
-                          <div className="text-xs text-muted-foreground">@{t.username}</div>
-                          {t.isPro && <Badge className="mt-1 h-4 bg-primary px-1.5 text-[9px]">PRO</Badge>}
+                          <div className="text-[10px] text-muted-foreground">@{t.username}</div>
+                          {t.isPro && <Badge className="mt-1 h-3.5 bg-primary px-1 text-[8px]">PRO</Badge>}
                         </Link>
                       </div>
                     );
@@ -149,10 +149,10 @@ function ComparePageInner() {
                   return (
                     <button key={`slot-${idx}`}
                       onClick={() => setPickerOpen(true)}
-                      className="flex h-[148px] flex-col items-center justify-center rounded-xl border border-dashed border-border bg-card text-muted-foreground hover:border-primary hover:text-primary"
+                      className="flex h-[110px] flex-col items-center justify-center rounded-lg border border-dashed border-border bg-card text-muted-foreground hover:border-primary hover:text-primary transition-colors"
                     >
-                      <Plus className="mb-1 h-6 w-6" />
-                      <span className="text-xs">Add tipster</span>
+                      <Plus className="mb-0.5 h-5 w-5" />
+                      <span className="text-[10px]">Add tipster</span>
                     </button>
                   );
                 })}
@@ -161,15 +161,15 @@ function ComparePageInner() {
               {/* Comparison table */}
               {selected.length >= 2 ? (
                 <Card>
-                  <CardHeader className="pb-3"><CardTitle className="text-base">Performance comparison</CardTitle></CardHeader>
-                  <CardContent>
-                    <div className="overflow-x-auto -mx-4 px-4">
-                      <table className="w-full min-w-[500px] text-sm">
+                  <CardHeader className="pb-2"><CardTitle className="text-sm font-semibold">Performance comparison</CardTitle></CardHeader>
+                  <CardContent className="pt-0">
+                    <div className="overflow-x-auto -mx-3 px-3">
+                      <table className="w-full min-w-[500px] text-xs">
                         <thead>
-                          <tr className="border-b text-xs uppercase text-muted-foreground">
-                            <th className="py-2 text-left font-medium">Metric</th>
+                          <tr className="border-b text-[11px] uppercase text-muted-foreground">
+                            <th className="py-1.5 text-left font-medium">Metric</th>
                             {selected.map(t => (
-                              <th key={t.id} className="py-2 text-center font-medium">{t.displayName.split(' ')[0]}</th>
+                              <th key={t.id} className="py-1.5 text-center font-medium">{t.displayName.split(' ')[0]}</th>
                             ))}
                           </tr>
                         </thead>
@@ -181,20 +181,20 @@ function ComparePageInner() {
                           <Row label="Followers" icon={Users} fmt={(v) => v.toLocaleString()} values={selected.map(t => ({ id: t.id, v: t.followers }))} bestId={best.followers} />
                           <Row label="Avg odds" icon={Target} fmt={(v) => v.toFixed(2)} values={selected.map(t => ({ id: t.id, v: t.avgOdds }))} bestId={best.avgOdds} />
                           <tr className="border-b">
-                            <td className="py-2 text-muted-foreground">Won / Lost / Pending</td>
+                            <td className="py-1.5 text-muted-foreground text-[11px] uppercase tracking-wider">Won / Lost / Pending</td>
                             {selected.map(t => (
-                              <td key={t.id} className="py-2 text-center text-xs">
+                              <td key={t.id} className="py-1.5 text-center text-[10px] font-medium">
                                 <span className="text-success">{t.wonTips}</span> / <span className="text-destructive">{t.lostTips}</span> / <span className="text-warning">{t.pendingTips}</span>
                               </td>
                             ))}
                           </tr>
                           <tr>
-                            <td className="py-2 text-muted-foreground">Subscription</td>
+                            <td className="py-1.5 text-muted-foreground text-[11px] uppercase tracking-wider">Subscription</td>
                             {selected.map(t => (
-                              <td key={t.id} className="py-2 text-center">
+                              <td key={t.id} className="py-1.5 text-center">
                                 {t.isPro && t.subscriptionPrice
-                                  ? <span className="text-xs">KES {t.subscriptionPrice}/mo</span>
-                                  : <span className="text-xs text-muted-foreground">Free</span>}
+                                  ? <span className="text-[10px] font-medium">KES {t.subscriptionPrice}/mo</span>
+                                  : <span className="text-[10px] text-muted-foreground">Free</span>}
                               </td>
                             ))}
                           </tr>
@@ -204,7 +204,7 @@ function ComparePageInner() {
                   </CardContent>
                 </Card>
               ) : (
-                <div className="rounded-xl border border-dashed border-border bg-card p-10 text-center text-sm text-muted-foreground">
+                <div className="rounded-lg border border-dashed border-border bg-card p-8 text-center text-xs text-muted-foreground">
                   Pick at least 2 tipsters to see a side-by-side comparison.
                 </div>
               )}
@@ -217,43 +217,43 @@ function ComparePageInner() {
       {pickerOpen && (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-3 sm:items-center"
              onClick={() => setPickerOpen(false)}>
-          <div className="flex max-h-[80vh] w-full max-w-md flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-xl"
+          <div className="flex max-h-[70vh] w-full max-w-sm flex-col overflow-hidden rounded-xl border border-border bg-card shadow-xl"
                onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between border-b border-border p-3">
-              <span className="text-sm font-semibold">Add a tipster</span>
+            <div className="flex items-center justify-between border-b border-border p-2.5">
+              <span className="text-xs font-semibold">Add a tipster</span>
               <button onClick={() => setPickerOpen(false)} className="rounded-md p-1 hover:bg-muted">
-                <X className="h-4 w-4" />
+                <X className="h-3.5 w-3.5" />
               </button>
             </div>
-            <div className="border-b border-border p-3">
+            <div className="border-b border-border p-2">
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
                 <Input autoFocus placeholder="Search..." value={search}
-                       onChange={(e) => setSearch(e.target.value)} className="pl-9" />
+                       onChange={(e) => setSearch(e.target.value)} className="h-8 pl-8 text-xs" />
               </div>
             </div>
             <div className="flex-1 overflow-y-auto">
               {candidates.length === 0 ? (
-                <div className="p-6 text-center text-sm text-muted-foreground">No matches.</div>
+                <div className="p-4 text-center text-xs text-muted-foreground">No matches.</div>
               ) : candidates.map(t => (
                 <button key={t.id} onClick={() => add(t.id)}
-                        className="flex w-full items-center gap-3 border-b border-border p-3 text-left hover:bg-muted">
+                        className="flex w-full items-center gap-2.5 border-b border-border p-2 text-left hover:bg-muted">
                   {t.avatar ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={t.avatar} alt="" className="h-9 w-9 rounded-full bg-muted" />
+                    <img src={t.avatar} alt="" className="h-8 w-8 rounded-full bg-muted" />
                   ) : (
-                    <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary text-sm font-bold text-primary-foreground">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground">
                       {t.displayName.charAt(0)}
                     </div>
                   )}
                   <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-1 text-sm font-medium">
+                    <div className="flex items-center gap-1 text-[11px] font-semibold">
                       {t.displayName}
                       {t.verified && <Check className="h-3 w-3 rounded-full bg-primary p-0.5 text-primary-foreground" />}
                     </div>
-                    <div className="text-xs text-muted-foreground">@{t.username} · {t.winRate}% · ROI +{t.roi}%</div>
+                    <div className="text-[10px] text-muted-foreground">@{t.username} · {t.winRate}% · ROI +{t.roi}%</div>
                   </div>
-                  <Plus className="h-4 w-4 text-muted-foreground" />
+                  <Plus className="h-3.5 w-3.5 text-muted-foreground" />
                 </button>
               ))}
             </div>

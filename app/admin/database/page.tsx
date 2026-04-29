@@ -100,20 +100,20 @@ export default function DatabaseSettingsPage() {
   const hasEnvVar = apiState?.hasEnvVar ?? false;
 
   return (
-    <div className="max-w-2xl mx-auto py-8 px-4 space-y-8">
+    <div className="max-w-2xl mx-auto py-4 px-4 space-y-4">
 
         {/* Header */}
         <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <Database className="h-6 w-6 text-primary" /> Database Connection
+          <h1 className="text-lg font-bold flex items-center gap-2">
+            <Database className="h-5 w-5 text-primary" /> Database Connection
           </h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Configure your MySQL database. Settings are stored locally and applied on the next server restart.
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            Configure your MySQL database. Settings are applied on the next server restart.
           </p>
         </div>
 
         {/* Status banner */}
-        <div className={`rounded-xl border p-4 flex items-start gap-3 ${
+        <div className={`rounded-xl border p-3 flex items-start gap-2.5 ${
           source === 'none'
             ? 'border-amber-500/40 bg-amber-50 dark:bg-amber-950/30'
             : source === 'env'
@@ -121,35 +121,34 @@ export default function DatabaseSettingsPage() {
             : 'border-green-500/40 bg-green-50 dark:bg-green-950/30'
         }`}>
           {source === 'none' ? (
-            <XCircle className="h-5 w-5 text-amber-500 mt-0.5 shrink-0" />
+            <XCircle className="h-4 w-4 text-amber-500 mt-0.5 shrink-0" />
           ) : source === 'env' ? (
-            <ShieldAlert className="h-5 w-5 text-blue-500 mt-0.5 shrink-0" />
+            <ShieldAlert className="h-4 w-4 text-blue-500 mt-0.5 shrink-0" />
           ) : (
-            <CheckCircle className="h-5 w-5 text-green-500 mt-0.5 shrink-0" />
+            <CheckCircle className="h-4 w-4 text-green-500 mt-0.5 shrink-0" />
           )}
           <div>
             {source === 'none' && (
               <>
-                <p className="text-sm font-semibold text-amber-700 dark:text-amber-400">No database configured</p>
-                <p className="text-xs text-amber-600/80 dark:text-amber-400/70 mt-0.5">
-                  The app is running on mock / in-memory data. Fill in the form below to connect your MySQL database.
+                <p className="text-xs font-semibold text-amber-700 dark:text-amber-400">No database configured</p>
+                <p className="text-[10px] text-amber-600/80 dark:text-amber-400/70 mt-0.5 leading-tight">
+                  The app is running on mock data. Fill in the form below to connect your MySQL database.
                 </p>
               </>
             )}
             {source === 'env' && (
               <>
-                <p className="text-sm font-semibold text-blue-700 dark:text-blue-300">Using DATABASE_URL environment variable</p>
-                <p className="text-xs text-blue-600/80 dark:text-blue-300/70 mt-0.5">
-                  A <code className="font-mono">DATABASE_URL</code> env var is set and takes priority over any form settings below.
-                  To override it, update the environment variable directly.
+                <p className="text-xs font-semibold text-blue-700 dark:text-blue-300">Using DATABASE_URL env var</p>
+                <p className="text-[10px] text-blue-600/80 dark:text-blue-300/70 mt-0.5 leading-tight">
+                  A <code className="font-mono">DATABASE_URL</code> is set and takes priority.
                 </p>
               </>
             )}
             {source === 'file' && (
               <>
-                <p className="text-sm font-semibold text-green-700 dark:text-green-300">Configuration saved</p>
-                <p className="text-xs text-green-600/80 dark:text-green-300/70 mt-0.5">
-                  Using settings from the admin panel. Click "Test Connection" to verify the credentials are working.
+                <p className="text-xs font-semibold text-green-700 dark:text-green-300">Configuration saved</p>
+                <p className="text-[10px] text-green-600/80 dark:text-green-300/70 mt-0.5 leading-tight">
+                  Using admin panel settings. Click "Test Connection" to verify.
                 </p>
               </>
             )}
@@ -157,31 +156,30 @@ export default function DatabaseSettingsPage() {
         </div>
 
         {/* Form */}
-        <div className="rounded-xl border bg-card p-6 space-y-5">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Connection Details</h2>
+        <div className="rounded-xl border bg-card p-4 space-y-4">
+          <h2 className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground px-0.5">Connection Details</h2>
 
           {hasEnvVar && (
-            <div className="rounded-lg bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 p-3 text-xs text-blue-700 dark:text-blue-300">
-              <strong>Note:</strong> A <code className="font-mono">DATABASE_URL</code> environment variable is already set and will be used at runtime.
-              The form below lets you store a backup/fallback configuration for when that variable is absent.
+            <div className="rounded-lg bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 p-2.5 text-[10px] text-blue-700 dark:text-blue-300 leading-tight">
+              <strong>Note:</strong> <code className="font-mono">DATABASE_URL</code> is set. This form stores a fallback configuration.
             </div>
           )}
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div className="sm:col-span-2 space-y-1">
-              <label className="text-xs font-medium text-muted-foreground">Host</label>
+              <label className="text-[10px] font-medium text-muted-foreground px-0.5 uppercase tracking-wider">Host</label>
               <input
-                className="w-full rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
-                placeholder="db.example.com or 192.168.1.1"
+                className="w-full h-8 rounded-md border bg-background px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-primary/50"
+                placeholder="db.example.com"
                 value={form.host}
                 onChange={e => field('host', e.target.value)}
               />
             </div>
             <div className="space-y-1">
-              <label className="text-xs font-medium text-muted-foreground">Port</label>
+              <label className="text-[10px] font-medium text-muted-foreground px-0.5 uppercase tracking-wider">Port</label>
               <input
                 type="number"
-                className="w-full rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                className="w-full h-8 rounded-md border bg-background px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-primary/50"
                 placeholder="3306"
                 value={form.port}
                 onChange={e => field('port', parseInt(e.target.value) || 3306)}
@@ -189,23 +187,23 @@ export default function DatabaseSettingsPage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-1">
-              <label className="text-xs font-medium text-muted-foreground">Username</label>
+              <label className="text-[10px] font-medium text-muted-foreground px-0.5 uppercase tracking-wider">Username</label>
               <input
-                className="w-full rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
-                placeholder="betcheza_user"
+                className="w-full h-8 rounded-md border bg-background px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-primary/50"
+                placeholder="user"
                 autoComplete="off"
                 value={form.user}
                 onChange={e => field('user', e.target.value)}
               />
             </div>
             <div className="space-y-1">
-              <label className="text-xs font-medium text-muted-foreground">Password</label>
+              <label className="text-[10px] font-medium text-muted-foreground px-0.5 uppercase tracking-wider">Password</label>
               <input
                 type="password"
-                className="w-full rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
-                placeholder="••••••••••••"
+                className="w-full h-8 rounded-md border bg-background px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-primary/50"
+                placeholder="••••••••"
                 autoComplete="new-password"
                 value={form.password}
                 onChange={e => field('password', e.target.value)}
@@ -214,28 +212,28 @@ export default function DatabaseSettingsPage() {
           </div>
 
           <div className="space-y-1">
-            <label className="text-xs font-medium text-muted-foreground">Database Name</label>
+            <label className="text-[10px] font-medium text-muted-foreground px-0.5 uppercase tracking-wider">Database Name</label>
             <input
-              className="w-full rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
-              placeholder="betcheza_db"
+              className="w-full h-8 rounded-md border bg-background px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-primary/50"
+              placeholder="db_name"
               value={form.database}
               onChange={e => field('database', e.target.value)}
             />
           </div>
 
-          <label className="flex items-center gap-2 cursor-pointer">
+          <label className="flex items-center gap-2 cursor-pointer select-none px-0.5">
             <input
               type="checkbox"
               className="rounded"
               checked={form.ssl}
               onChange={e => field('ssl', e.target.checked)}
             />
-            <span className="text-sm">Require SSL / TLS</span>
+            <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Require SSL / TLS</span>
           </label>
 
           {/* Save message */}
           {saveMsg && (
-            <p className={`text-sm rounded-md px-3 py-2 ${
+            <p className={`text-[11px] rounded-md px-2.5 py-1.5 ${
               saveMsg.includes('saved')
                 ? 'bg-green-50 dark:bg-green-950/30 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-800'
                 : 'bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800'
@@ -246,35 +244,35 @@ export default function DatabaseSettingsPage() {
 
           {/* Test result */}
           {testResult && (
-            <div className={`flex items-center gap-2 rounded-md border px-3 py-2 text-sm ${
+            <div className={`flex items-center gap-2 rounded-md border px-2.5 py-1.5 text-[11px] ${
               testResult.success
                 ? 'border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950/30 text-green-700 dark:text-green-300'
                 : 'border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-300'
             }`}>
               {testResult.success
-                ? <CheckCircle className="h-4 w-4 shrink-0" />
-                : <XCircle className="h-4 w-4 shrink-0" />}
+                ? <CheckCircle className="h-3.5 w-3.5 shrink-0" />
+                : <XCircle className="h-3.5 w-3.5 shrink-0" />}
               {testResult.message}
             </div>
           )}
 
           {/* Action buttons */}
-          <div className="flex flex-wrap items-center gap-2 pt-2">
+          <div className="flex flex-wrap items-center gap-2 pt-1">
             <button
               onClick={save}
               disabled={saving || !form.host || !form.user || !form.database}
-              className="flex items-center gap-2 rounded-md bg-primary text-primary-foreground px-4 py-2 text-sm font-semibold hover:bg-primary/90 disabled:opacity-50"
+              className="flex items-center gap-2 rounded-md bg-primary text-primary-foreground px-3 py-1.5 text-xs font-semibold hover:bg-primary/90 disabled:opacity-50"
             >
-              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-              Save Configuration
+              {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+              Save Config
             </button>
 
             <button
               onClick={test}
               disabled={testing}
-              className="flex items-center gap-2 rounded-md border px-4 py-2 text-sm font-semibold hover:bg-muted disabled:opacity-50"
+              className="flex items-center gap-2 rounded-md border px-3 py-1.5 text-xs font-semibold hover:bg-muted disabled:opacity-50"
             >
-              {testing ? <Loader2 className="h-4 w-4 animate-spin" /> : <TestTube className="h-4 w-4" />}
+              {testing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <TestTube className="h-3.5 w-3.5" />}
               Test Connection
             </button>
 
@@ -282,9 +280,9 @@ export default function DatabaseSettingsPage() {
               <button
                 onClick={clear}
                 disabled={deleting}
-                className="flex items-center gap-2 rounded-md border border-destructive/40 text-destructive px-4 py-2 text-sm font-semibold hover:bg-destructive/5 disabled:opacity-50 ml-auto"
+                className="flex items-center gap-2 rounded-md border border-destructive/40 text-destructive px-3 py-1.5 text-xs font-semibold hover:bg-destructive/5 disabled:opacity-50 ml-auto"
               >
-                {deleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                {deleting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
                 Clear
               </button>
             )}
@@ -292,14 +290,13 @@ export default function DatabaseSettingsPage() {
         </div>
 
         {/* How it works */}
-        <div className="rounded-xl border bg-muted/40 p-5 space-y-2">
-          <h3 className="text-sm font-semibold">How this works</h3>
-          <ol className="text-xs text-muted-foreground space-y-1 list-decimal list-inside">
-            <li>Fill in your VPS MySQL host, port, username, password and database name above.</li>
-            <li>Click <strong>Save Configuration</strong> — credentials are stored securely on this server only.</li>
-            <li>Click <strong>Test Connection</strong> to verify the server can reach your database.</li>
-            <li>Restart the server (or redeploy) for the connection to take full effect across all routes.</li>
-            <li>If a <code className="font-mono">DATABASE_URL</code> environment variable is also set, it takes priority.</li>
+        <div className="rounded-xl border bg-muted/40 p-3.5 space-y-1.5">
+          <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">How this works</h3>
+          <ol className="text-[10px] text-muted-foreground space-y-1 list-decimal list-inside">
+            <li>Fill in your VPS MySQL details above.</li>
+            <li>Click <strong>Save Config</strong> — credentials stored securely.</li>
+            <li>Click <strong>Test Connection</strong> to verify reachability.</li>
+            <li>Restart server (or redeploy) to apply changes.</li>
           </ol>
         </div>
 

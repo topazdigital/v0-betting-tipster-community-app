@@ -49,18 +49,18 @@ export default function AdminFeedPage() {
   const today = posts.filter(p => Date.now() - new Date(p.createdAt).getTime() < 86_400_000).length
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Community Feed</h1>
-          <p className="text-sm text-muted-foreground">Moderate posts shared by users</p>
+          <h1 className="text-lg font-bold">Community Feed</h1>
+          <p className="text-xs text-muted-foreground">Moderate posts shared by users</p>
         </div>
-        <Button onClick={load} variant="outline" size="sm">
-          <RefreshCw className="mr-2 h-4 w-4" /> Refresh
+        <Button onClick={load} variant="outline" size="sm" className="h-7 text-xs px-2.5">
+          <RefreshCw className="mr-1.5 h-3.5 w-3.5" /> Refresh
         </Button>
       </div>
 
-      <div className="grid gap-3 md:grid-cols-4">
+      <div className="grid gap-2.5 md:grid-cols-4">
         <StatCard icon={FileText} label="Total posts" value={posts.length} color="text-blue-500 bg-blue-500/10" />
         <StatCard icon={FileText} label="Posts today" value={today} color="text-emerald-500 bg-emerald-500/10" />
         <StatCard icon={Heart} label="Total likes" value={totalLikes} color="text-pink-500 bg-pink-500/10" />
@@ -68,39 +68,41 @@ export default function AdminFeedPage() {
       </div>
 
       <Card>
-        <CardHeader><CardTitle>Recent posts</CardTitle></CardHeader>
-        <CardContent>
+        <CardHeader className="py-2 pb-1.5 px-3">
+          <CardTitle className="text-sm font-semibold">Recent posts</CardTitle>
+        </CardHeader>
+        <CardContent className="p-0">
           {loading ? (
             <div className="flex items-center justify-center p-12">
               <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
             </div>
           ) : posts.length === 0 ? (
-            <p className="py-8 text-center text-sm text-muted-foreground">No posts yet</p>
+            <p className="py-8 text-center text-xs text-muted-foreground">No posts yet</p>
           ) : (
             <ul className="divide-y divide-border">
               {posts.map(p => (
-                <li key={p.id} className="flex items-start gap-3 py-3">
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">
+                <li key={p.id} className="flex items-start gap-2.5 p-3 hover:bg-muted/30 transition-colors">
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[10px] font-bold text-primary">
                     {p.authorName.charAt(0).toUpperCase()}
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
-                      <span className="font-medium text-sm">{p.authorName}</span>
-                      <span className="text-xs text-muted-foreground">user #{p.userId}</span>
-                      <span className="text-xs text-muted-foreground">·</span>
-                      <span className="text-xs text-muted-foreground">{new Date(p.createdAt).toLocaleString()}</span>
+                      <span className="font-medium text-xs">{p.authorName}</span>
+                      <span className="text-[10px] text-muted-foreground leading-none pt-0.5">user #{p.userId}</span>
+                      <span className="text-[10px] text-muted-foreground">·</span>
+                      <span className="text-[10px] text-muted-foreground">{new Date(p.createdAt).toLocaleString()}</span>
                     </div>
-                    <p className="mt-1 text-sm">{p.content}</p>
+                    <p className="mt-1 text-xs leading-relaxed">{p.content}</p>
                     <div className="mt-2 flex flex-wrap items-center gap-2">
-                      {p.pick && <Badge variant="outline" className="text-xs">{p.pick}</Badge>}
-                      {p.odds && <Badge variant="outline" className="text-xs">@ {p.odds}</Badge>}
-                      {p.matchTitle && <Badge variant="secondary" className="text-xs">{p.matchTitle}</Badge>}
-                      <span className="text-xs text-muted-foreground inline-flex items-center gap-1"><Heart className="h-3 w-3" /> {p.likes}</span>
-                      <span className="text-xs text-muted-foreground inline-flex items-center gap-1"><MessageSquare className="h-3 w-3" /> {p.commentCount}</span>
+                      {p.pick && <Badge variant="outline" className="text-[9px] h-4 px-1.5">{p.pick}</Badge>}
+                      {p.odds && <Badge variant="outline" className="text-[9px] h-4 px-1.5">@ {p.odds}</Badge>}
+                      {p.matchTitle && <Badge variant="secondary" className="text-[9px] h-4 px-1.5">{p.matchTitle}</Badge>}
+                      <span className="text-[10px] text-muted-foreground inline-flex items-center gap-1 leading-none pt-0.5"><Heart className="h-2.5 w-2.5" /> {p.likes}</span>
+                      <span className="text-[10px] text-muted-foreground inline-flex items-center gap-1 leading-none pt-0.5"><MessageSquare className="h-2.5 w-2.5" /> {p.commentCount}</span>
                     </div>
                   </div>
-                  <Button size="sm" variant="ghost" onClick={() => remove(p.id)} disabled={busyId === p.id} className="text-red-500 hover:bg-red-500/10">
-                    {busyId === p.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                  <Button size="icon" variant="ghost" onClick={() => remove(p.id)} disabled={busyId === p.id} className="h-7 w-7 text-red-500 hover:bg-red-500/10">
+                    {busyId === p.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
                   </Button>
                 </li>
               ))}

@@ -101,19 +101,19 @@ export default function LivePage() {
       <SidebarNew selectedSportId={selectedSport} onSelectSport={setSelectedSport} />
 
       <div className="flex-1 overflow-hidden">
-        <div className="mx-auto max-w-7xl px-3 py-4 md:px-6 md:py-5">
+        <div className="mx-auto max-w-7xl px-3 py-3 md:px-5 md:py-4">
           {/* Compact Header */}
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-2.5">
-              <span className="relative flex h-2.5 w-2.5">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <span className="relative flex h-2 w-2">
                 <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-live opacity-75"></span>
-                <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-live"></span>
+                <span className="relative inline-flex h-2 w-2 rounded-full bg-live"></span>
               </span>
-              <h1 className="text-xl font-bold">Live</h1>
-              <Badge variant="destructive" className="font-bold">{totalLive}</Badge>
+              <h1 className="text-lg font-bold">Live</h1>
+              <Badge variant="destructive" className="h-5 px-1.5 text-[10px] font-bold">{totalLive}</Badge>
             </div>
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <Users className="h-3.5 w-3.5" />
+            <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+              <Users className="h-3 w-3" />
               <span className="tabular-nums">{totalWatching.toLocaleString()} watching</span>
               <span className="hidden sm:inline">·</span>
               <span className="hidden sm:inline tabular-nums">{totalPredictions} tips</span>
@@ -121,15 +121,15 @@ export default function LivePage() {
           </div>
 
           {/* Sport Filter Pills */}
-          <div className="mb-4 flex gap-1.5 overflow-x-auto pb-1 scrollbar-hide">
+          <div className="mb-3 flex gap-1 overflow-x-auto pb-1 scrollbar-hide">
             <Button
               variant={selectedSport === null ? "default" : "outline"}
               size="sm"
               onClick={() => setSelectedSport(null)}
-              className="shrink-0 h-8 text-xs"
+              className="shrink-0 h-7 text-[11px] px-2.5"
             >
               All
-              <Badge variant="secondary" className="ml-1.5 h-4 px-1 text-[10px]">{matches.length}</Badge>
+              <Badge variant="secondary" className="ml-1.5 h-3.5 px-1 text-[9px] font-bold">{matches.length}</Badge>
             </Button>
             {sportCounts.map(sport => (
               <Button
@@ -137,33 +137,33 @@ export default function LivePage() {
                 variant={selectedSport === sport.id ? "default" : "outline"}
                 size="sm"
                 onClick={() => setSelectedSport(sport.id)}
-                className="shrink-0 h-8 gap-1.5 text-xs"
+                className="shrink-0 h-7 gap-1.5 text-[11px] px-2.5"
               >
-                <span className="text-sm leading-none">{sport.icon}</span>
+                <span className="text-xs leading-none">{sport.icon}</span>
                 <span>{sport.name}</span>
-                <Badge variant="secondary" className="h-4 px-1 text-[10px]">{sport.count}</Badge>
+                <Badge variant="secondary" className="h-3.5 px-1 text-[9px] font-bold">{sport.count}</Badge>
               </Button>
             ))}
           </div>
 
           {/* Live Matches grouped by league — DENSE single-column rows */}
           {groupedMatches.length > 0 ? (
-            <div className="space-y-3">
+            <div className="space-y-2.5">
               {groupedMatches.map(group => (
                 <section key={`${group.sportSlug}-${group.leagueName}`} className="overflow-hidden rounded-xl border border-border bg-card">
                   {/* League header row */}
-                  <header className="flex items-center justify-between gap-2 border-b border-border bg-muted/40 px-3 py-2">
-                    <div className="flex min-w-0 items-center gap-2">
-                      <span className="text-base leading-none">{getSportIcon(group.sportSlug)}</span>
+                  <header className="flex items-center justify-between gap-2 border-b border-border bg-muted/40 px-2.5 py-1.5">
+                    <div className="flex min-w-0 items-center gap-1.5">
+                      <span className="text-sm leading-none">{getSportIcon(group.sportSlug)}</span>
                       {group.countryCode && (
                         <FlagIcon countryCode={group.countryCode} size="sm" />
                       )}
-                      <h2 className="truncate text-sm font-semibold">{group.leagueName}</h2>
+                      <h2 className="truncate text-[11px] font-bold uppercase tracking-tight">{group.leagueName}</h2>
                       {group.country && (
-                        <span className="hidden text-xs text-muted-foreground sm:inline">· {group.country}</span>
+                        <span className="hidden text-[10px] text-muted-foreground sm:inline">· {group.country}</span>
                       )}
                     </div>
-                    <Badge variant="destructive" className="h-5 gap-1 px-1.5 text-[10px] font-bold">
+                    <Badge variant="destructive" className="h-4.5 gap-1 px-1 text-[9px] font-bold">
                       <span className="relative flex h-1.5 w-1.5">
                         <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-white opacity-75"></span>
                         <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-white"></span>
@@ -181,22 +181,22 @@ export default function LivePage() {
               ))}
             </div>
           ) : (
-            <div className="flex h-72 flex-col items-center justify-center rounded-xl border border-dashed border-border px-6 text-center">
-              <Radio className="mb-3 h-10 w-10 text-muted-foreground" />
-              <p className="text-lg font-semibold">
-                {selectedSport ? "No live matches in this sport right now" : "Nothing live at this minute"}
+            <div className="flex h-64 flex-col items-center justify-center rounded-xl border border-dashed border-border px-5 text-center">
+              <Radio className="mb-2 h-8 w-8 text-muted-foreground" />
+              <p className="text-base font-semibold">
+                {selectedSport ? "No live matches in this sport" : "Nothing live right now"}
               </p>
-              <p className="mt-1 max-w-md text-sm text-muted-foreground">
-                Live games typically peak between 14:00 and 23:00 UTC. We poll the feeds every 20 seconds — anything that kicks off will pop up here automatically.
+              <p className="mt-1 max-w-sm text-xs text-muted-foreground">
+                We poll the feeds every 20s — anything that kicks off will pop up here automatically.
               </p>
-              <div className="mt-4 flex gap-2">
+              <div className="mt-3 flex gap-2">
                 {selectedSport && (
-                  <Button size="sm" variant="outline" onClick={() => setSelectedSport(null)}>
+                  <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => setSelectedSport(null)}>
                     See all sports
                   </Button>
                 )}
-                <Button size="sm" asChild>
-                  <a href="/matches">Browse upcoming matches</a>
+                <Button size="sm" className="h-8 text-xs" asChild>
+                  <a href="/matches">Upcoming matches</a>
                 </Button>
               </div>
             </div>

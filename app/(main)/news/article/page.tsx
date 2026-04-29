@@ -60,79 +60,79 @@ function ArticleReader() {
     }, []);
 
   return (
-    <article className="mx-auto max-w-3xl px-4 py-6">
+    <article className="mx-auto max-w-2xl px-3 py-4">
       <button
         type="button"
         onClick={() => router.back()}
-        className="mb-4 inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+        className="mb-3 inline-flex items-center gap-1 text-[11px] font-medium text-muted-foreground transition-colors hover:text-foreground"
       >
-        <ArrowLeft className="h-4 w-4" />
+        <ArrowLeft className="h-3 w-3" />
         Back
       </button>
 
-      <div className="mb-4 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-        <Badge variant="secondary" className="gap-1">
-          <Newspaper className="h-3 w-3" />
+      <div className="mb-3 flex flex-wrap items-center gap-2 text-[10px] text-muted-foreground uppercase tracking-tight">
+        <Badge variant="secondary" className="gap-1 h-5 px-1.5 text-[9px] font-bold">
+          <Newspaper className="h-2.5 w-2.5" />
           {source}
         </Badge>
         {publishedLabel && (
           <span className="inline-flex items-center gap-1">
-            <Calendar className="h-3 w-3" />
+            <Calendar className="h-2.5 w-2.5" />
             {publishedLabel}
           </span>
         )}
       </div>
 
-      <h1 className="mb-6 text-balance text-3xl font-bold tracking-tight sm:text-4xl">
+      <h1 className="mb-4 text-balance text-xl font-bold tracking-tight sm:text-2xl leading-tight">
         {headline}
       </h1>
 
       {image && (
-        <div className="mb-6 overflow-hidden rounded-2xl">
+        <div className="mb-4 overflow-hidden rounded-xl">
           <Image
             src={image}
             alt={headline}
-            width={1200}
-            height={675}
+            width={800}
+            height={450}
             unoptimized
             className="h-auto w-full object-cover"
           />
         </div>
       )}
 
-      <div className="prose prose-sm sm:prose-base max-w-none text-foreground">
+      <div className="prose prose-sm max-w-none text-foreground leading-snug">
         {bodyParagraphs.length > 0 ? (
           bodyParagraphs.map((p, i) => (
-            <p key={i} className="leading-relaxed text-foreground/90">
+            <p key={i} className="mb-3 text-[13px] text-foreground/90">
               {p}
             </p>
           ))
         ) : (
-          <p className="text-muted-foreground">No preview available for this story.</p>
+          <p className="text-xs text-muted-foreground italic">No preview available for this story.</p>
         )}
       </div>
 
       {sourceUrl && (
-        <Card className="mt-8 border-primary/20 bg-primary/5">
-          <CardContent className="flex flex-wrap items-center justify-between gap-3 p-4">
+        <Card className="mt-6 border-primary/20 bg-primary/5 rounded-lg">
+          <CardContent className="flex flex-wrap items-center justify-between gap-2 p-3">
             <div className="min-w-0">
-              <p className="text-sm font-semibold">Want the full story?</p>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-xs font-bold leading-tight">Full story available</p>
+              <p className="text-[10px] text-muted-foreground leading-tight">
                 Read the complete article on the original source.
               </p>
             </div>
-            <Button asChild size="sm" variant="outline">
+            <Button asChild size="sm" variant="outline" className="h-7 px-2.5 text-[11px]">
               <a href={sourceUrl} target="_blank" rel="noopener noreferrer">
                 Read on {source}
-                <ExternalLink className="ml-1.5 h-3.5 w-3.5" />
+                <ExternalLink className="ml-1 h-3 w-3" />
               </a>
             </Button>
           </CardContent>
         </Card>
       )}
 
-      <div className="mt-6 text-center">
-        <Button variant="ghost" size="sm" asChild>
+      <div className="mt-6 border-t border-border pt-4 text-center">
+        <Button variant="ghost" size="sm" asChild className="h-7 text-xs text-muted-foreground">
           <Link href="/matches">Back to matches</Link>
         </Button>
       </div>
