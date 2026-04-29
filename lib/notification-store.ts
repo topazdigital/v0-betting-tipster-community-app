@@ -130,15 +130,15 @@ export async function setPreferences(userId: number, prefs: Partial<Notification
            email_team_updates, email_tipster_updates, email_daily_digest,
            push_team_updates, push_tipster_updates, push_odds_alerts, updated_at)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
-         ON CONFLICT (user_id) DO UPDATE SET
-           inapp_team_updates = EXCLUDED.inapp_team_updates,
-           inapp_tipster_updates = EXCLUDED.inapp_tipster_updates,
-           email_team_updates = EXCLUDED.email_team_updates,
-           email_tipster_updates = EXCLUDED.email_tipster_updates,
-           email_daily_digest = EXCLUDED.email_daily_digest,
-           push_team_updates = EXCLUDED.push_team_updates,
-           push_tipster_updates = EXCLUDED.push_tipster_updates,
-           push_odds_alerts = EXCLUDED.push_odds_alerts,
+         ON DUPLICATE KEY UPDATE
+           inapp_team_updates = VALUES(inapp_team_updates),
+           inapp_tipster_updates = VALUES(inapp_tipster_updates),
+           email_team_updates = VALUES(email_team_updates),
+           email_tipster_updates = VALUES(email_tipster_updates),
+           email_daily_digest = VALUES(email_daily_digest),
+           push_team_updates = VALUES(push_team_updates),
+           push_tipster_updates = VALUES(push_tipster_updates),
+           push_odds_alerts = VALUES(push_odds_alerts),
            updated_at = NOW()`,
         [
           userId,
@@ -202,13 +202,13 @@ export async function createNotification(input: Omit<NotificationRow, 'id' | 'cr
   };
   if (hasDb()) {
     try {
-      const r = await query<{ id: number }>(
+      const res = await query<{ insertId?: number }>(
         `INSERT INTO notifications (user_id, type, title, content, link, channel, is_read)
-         VALUES (?, ?, ?, ?, ?, ?, FALSE)
-         RETURNING id`,
+         VALUES (?, ?, ?, ?, ?, ?, 0)`,
         [row.userId, row.type, row.title, row.content, row.link || null, row.channel || 'inapp']
       );
-      if (r.rows[0]?.id) row.id = r.rows[0].id;
+      const insertId = (res as unknown as { insertId?: number }).insertId;
+      if (insertId) row.id = insertId;
     } catch {}
   }
   stores.notifications.push(row);
@@ -261,7 +261,7 @@ export async function savePushSubscription(input: Omit<PushSubscriptionRow, 'id'
         `INSERT INTO push_subscriptions
           (id, user_id, endpoint, p256dh, auth, topics, country_code, created_at)
          VALUES (?, ?, ?, ?, ?, ?, ?, NOW())
-         ON CONFLICT (endpoint) DO UPDATE SET topics = EXCLUDED.topics`,
+         ON DUPLICATE KEY UPDATE topics = VALUES(topics)`,
         [id, row.userId, row.endpoint, row.p256dh, row.auth, JSON.stringify(row.topics), row.countryCode || null]
       );
     } catch {}
@@ -303,7 +303,7 @@ export async function subscribeEmail(input: { email: string; topics: string[]; c
         `INSERT INTO email_subscribers
           (id, email, topics, country_code, unsubscribe_token, active, created_at)
          VALUES (?, ?, ?, ?, ?, TRUE, NOW())
-         ON CONFLICT (email) DO UPDATE SET topics = EXCLUDED.topics, active = TRUE, country_code = EXCLUDED.country_code`,
+         ON DUPLICATE KEY UPDATE topics = VALUES(topics), active = 1, country_code = VALUES(country_code)`,
         [id, row.email, JSON.stringify(row.topics), row.countryCode || null, row.unsubscribeToken]
       );
     } catch {}
@@ -362,6 +362,22 @@ export async function listEmailSubscribers(): Promise<EmailSubscriberRow[]> {
     } catch {}
   }
   return Array.from(stores.emailSubs.values()).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+}
+
+/** Returns IDs of ALL registered users — used by admin broadcast to notify everyone. */
+export async function listAllUserIds(): Promise<number[]> {
+  if (hasDb()) {
+    try {
+      const r = await query<{ id: number }>(
+        `SELECT id FROM users ORDER BY id ASC LIMIT 10000`
+      );
+      if (r.rows.length > 0) return r.rows.map(x => x.id);
+    } catch {}
+  }
+  // Fallback: derive from in-memory notifications
+  const ids = new Set<number>();
+  stores.notifications.forEach(n => ids.add(n.userId));
+  return Array.from(ids);
 }
 
 function safeJson<T>(s: string | null | undefined, fallback: T): T {

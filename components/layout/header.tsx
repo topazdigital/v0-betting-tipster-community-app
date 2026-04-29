@@ -2,9 +2,10 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import { Bell, User, ChevronDown, Settings, LogOut, Menu, X } from 'lucide-react';
+import { User, ChevronDown, Settings, LogOut, Menu, X, Bookmark } from 'lucide-react';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { HeaderSearch } from '@/components/layout/header-search';
+import { NotificationBell } from '@/components/layout/notification-bell';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -138,13 +139,8 @@ export function Header() {
 
           {isAuthenticated && user ? (
             <>
-              {/* Notifications */}
-              <Button variant="ghost" size="icon" className="relative">
-                <Bell className="h-4 w-4" />
-                <span className="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-live text-[10px] text-live-foreground">
-                  3
-                </span>
-              </Button>
+              {/* Real-time Notification Bell */}
+              <NotificationBell />
 
               {/* User Menu */}
               <DropdownMenu>
@@ -170,6 +166,12 @@ export function Header() {
                     <Link href="/dashboard">
                       <User className="mr-2 h-4 w-4" />
                       Dashboard
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link href="/bookmarks">
+                      <Bookmark className="mr-2 h-4 w-4" />
+                      My Bookmarks
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuItem asChild>

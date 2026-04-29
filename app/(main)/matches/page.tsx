@@ -36,10 +36,9 @@ function toLocalISODate(d: Date): string {
 }
 
 const statusOptions = [
-  { value: 'all', label: 'All Matches' },
+  { value: 'all', label: 'All (Live & Upcoming)' },
   { value: 'live', label: 'Live Now' },
-  { value: 'scheduled', label: 'Upcoming' },
-  { value: 'finished', label: 'Finished' },
+  { value: 'scheduled', label: 'Upcoming Only' },
 ];
 
 function MatchesContent() {
@@ -85,7 +84,8 @@ function MatchesContent() {
 
   // Apply additional filters
   const filteredMatches = useMemo(() => {
-    let result = matches;
+    // Always exclude finished matches — those are in the Results page
+    let result = matches.filter(m => m.status !== 'finished');
     const tz = getBrowserTimezone();
 
     // Date tab filter — applies on top of all other filters

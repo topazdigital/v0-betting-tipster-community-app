@@ -1,13 +1,13 @@
 "use client"
 
-import { use } from "react"
+import { use, useState } from "react"
 import Link from "next/link"
 import Image from "next/image"
 import useSWR from "swr"
 import {
   ArrowLeft, Trophy, Calendar, TrendingUp,
   ChevronRight, Clock, Star, Target, Loader2,
-  AlertCircle,
+  AlertCircle, ChevronDown,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -23,6 +23,13 @@ import { ALL_LEAGUES, getSportIcon } from "@/lib/sports-data"
 import { playerHref } from "@/lib/utils/slug"
 import { resolveLeagueSlug } from "@/lib/league-aliases"
 import { useMatches } from "@/lib/hooks/use-matches"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 
 interface PageProps {
   params: Promise<{ slug: string }>
@@ -85,8 +92,25 @@ function titleCase(s: string) {
   return s.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
 }
 
+// Generate a list of seasons: current + past 4 years.
+// The "current" year is the first year of the season (e.g. 2025 for 2025/26).
+function generateSeasons(): { label: string; year: number | null }[] {
+  const currentYear = new Date().getFullYear();
+  const seasons: { label: string; year: number | null }[] = [
+    { label: `${currentYear}/${String(currentYear + 1).slice(-2)} (Current)`, year: null },
+  ];
+  for (let i = 1; i <= 4; i++) {
+    const y = currentYear - i;
+    seasons.push({ label: `${y}/${String(y + 1).slice(-2)}`, year: y });
+  }
+  return seasons;
+}
+
+const SEASONS = generateSeasons();
+
 export default function LeaguePage({ params }: PageProps) {
   const { slug } = use(params)
+  const [selectedSeason, setSelectedSeason] = useState<number | null>(null)
 
   // Accept both friendly slugs (premier-league) and ESPN-style codes (eng-1,
   // ken-1, usa-1, …) so older links from the matches page keep working.
@@ -96,7 +120,7 @@ export default function LeaguePage({ params }: PageProps) {
   // Live matches feed — when we don't have a known league id, fetch ALL
   // matches and filter client-side by slugified league name.
   const { matches: allMatches, isLoading: matchesLoading } = useMatches(
-    knownLeague ? { leagueId: knownLeague.id } : undefined
+    knownLeague && !selectedSeason ? { leagueId: knownLeague.id } : undefined
   )
 
   // Filter matches when no known league: match by slug derived from name.
@@ -121,9 +145,10 @@ export default function LeaguePage({ params }: PageProps) {
     tier: firstMatch.league?.tier ?? 1,
   } : null)
 
-  // Real backend data
+  // Real backend data — include season param when a past season is selected
+  const seasonQuery = selectedSeason ? `?season=${selectedSeason}` : ''
   const { data: standingsRes, isLoading: standingsLoading } = useSWR<{ success: boolean; data: StandingRow[] }>(
-    league ? `/api/leagues/${league.id}/standings` : null,
+    league ? `/api/leagues/${league.id}/standings${seasonQuery}` : null,
     fetcher,
     { revalidateOnFocus: false, dedupingInterval: 5 * 60_000 },
   )
@@ -133,7 +158,7 @@ export default function LeaguePage({ params }: PageProps) {
     { revalidateOnFocus: false, dedupingInterval: 5 * 60_000 },
   )
   const { data: scorersRes, isLoading: scorersLoading } = useSWR<{ scorers: ScorerRow[] }>(
-    league ? `/api/leagues/${league.id}/scorers` : null,
+    league ? `/api/leagues/${league.id}/scorers${seasonQuery}` : null,
     fetcher,
     { revalidateOnFocus: false, dedupingInterval: 5 * 60_000 },
   )
@@ -209,18 +234,33 @@ export default function LeaguePage({ params }: PageProps) {
                   </div>
                   <p className="text-sm text-muted-foreground">{league.country}</p>
                 </div>
-                <div className="flex flex-wrap gap-2">
-                  <Badge variant="outline" className="gap-1">
-                    <Calendar className="h-3 w-3" />
-                    Season 2025/26
-                  </Badge>
+                <div className="flex flex-wrap items-center gap-2">
+                  {/* Season Selector */}
+                  <Select
+                    value={selectedSeason === null ? 'current' : String(selectedSeason)}
+                    onValueChange={(v) => setSelectedSeason(v === 'current' ? null : Number(v))}
+                  >
+                    <SelectTrigger className="h-8 gap-1 border-border bg-card/80 text-xs w-auto min-w-[140px]">
+                      <Calendar className="h-3 w-3 text-muted-foreground" />
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {SEASONS.map(s => (
+                        <SelectItem key={s.year ?? 'current'} value={s.year === null ? 'current' : String(s.year)}>
+                          {s.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   <Badge variant="secondary" className="gap-1">
                     {matches.length} matches
                   </Badge>
-                  <Badge variant="outline" className="gap-1">
-                    <Trophy className="h-3 w-3" />
-                    {standings.length} teams
-                  </Badge>
+                  {standings.length > 0 && (
+                    <Badge variant="outline" className="gap-1">
+                      <Trophy className="h-3 w-3" />
+                      {standings.length} teams
+                    </Badge>
+                  )}
                 </div>
               </div>
 

@@ -36,8 +36,7 @@ function resolveEntity(body: BookmarkBody): { type: string; id: string } | null 
   return null;
 }
 
-// GET /api/bookmarks?type=match — list current user's bookmarks (optionally
-// filtered by entity type).
+// GET /api/bookmarks?type=match — list current user's bookmarks (optionally filtered by entity type).
 export async function GET(req: NextRequest) {
   const userId = await getUserId();
   if (!userId) return NextResponse.json({ bookmarks: [] }, { status: 200 });
@@ -53,8 +52,8 @@ export async function GET(req: NextRequest) {
   }
   try {
     const sql = type
-      ? 'SELECT entity_type, entity_id, created_at FROM user_bookmarks WHERE user_id = $1 AND entity_type = $2 ORDER BY created_at DESC'
-      : 'SELECT entity_type, entity_id, created_at FROM user_bookmarks WHERE user_id = $1 ORDER BY created_at DESC';
+      ? 'SELECT entity_type, entity_id, created_at FROM user_bookmarks WHERE user_id = ? AND entity_type = ? ORDER BY created_at DESC'
+      : 'SELECT entity_type, entity_id, created_at FROM user_bookmarks WHERE user_id = ? ORDER BY created_at DESC';
     const params = type ? [userId, type] : [userId];
     const r = await query(sql, params);
     return NextResponse.json({ bookmarks: r.rows });
@@ -80,14 +79,12 @@ export async function POST(req: NextRequest) {
   }
   try {
     await execute(
-      `INSERT INTO user_bookmarks (user_id, entity_type, entity_id, created_at)
-       VALUES ($1, $2, $3, NOW())
-       ON CONFLICT (user_id, entity_type, entity_id) DO NOTHING`,
+      `INSERT IGNORE INTO user_bookmarks (user_id, entity_type, entity_id, created_at)
+       VALUES (?, ?, ?, NOW())`,
       [userId, ent.type, ent.id],
     );
     return NextResponse.json({ ok: true });
   } catch (err) {
-    // Best-effort fallback so the UI keeps working.
     mem.set(memKey(userId, ent.type, ent.id), {
       entity_type: ent.type, entity_id: ent.id, created_at: new Date().toISOString(),
     });
@@ -107,7 +104,7 @@ export async function DELETE(req: NextRequest) {
   if (pool) {
     try {
       await execute(
-        'DELETE FROM user_bookmarks WHERE user_id = $1 AND entity_type = $2 AND entity_id = $3',
+        'DELETE FROM user_bookmarks WHERE user_id = ? AND entity_type = ? AND entity_id = ?',
         [userId, ent.type, ent.id],
       );
     } catch { /* fall through to memory cleanup */ }

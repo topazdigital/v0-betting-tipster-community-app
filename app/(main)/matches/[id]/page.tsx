@@ -1107,25 +1107,25 @@ export default function MatchDetailPage({ params }: PageProps) {
 
               {/* Away */}
               <div className="flex flex-col items-center text-center">
-                <div className="mb-3">
-                  <TeamLogo teamName={match.awayTeam.name} logoUrl={match.awayTeam.logo} size="lg" />
+                <div className="mb-1.5">
+                  <TeamLogo teamName={match.awayTeam.name} logoUrl={match.awayTeam.logo} size="md" />
                 </div>
                 {match.awayTeam.espnTeamId ? (
                   <Link
                     href={teamHref(match.awayTeam.name, match.awayTeam.espnTeamId)}
-                    className="text-base md:text-lg font-bold text-white line-clamp-2 hover:text-white/80 hover:underline"
+                    className="text-sm md:text-base font-bold text-white line-clamp-2 hover:text-white/80 hover:underline"
                     onClick={e => e.stopPropagation()}
                   >
                     {match.awayTeam.name}
                   </Link>
                 ) : (
-                  <p className="text-base md:text-lg font-bold text-white line-clamp-2">{match.awayTeam.name}</p>
+                  <p className="text-sm md:text-base font-bold text-white line-clamp-2">{match.awayTeam.name}</p>
                 )}
                 {match.awayTeam.record && (
-                  <p className="mt-0.5 text-xs text-white/40">{match.awayTeam.record}</p>
+                  <p className="mt-0.5 text-[10px] text-white/40">{match.awayTeam.record}</p>
                 )}
                 {match.awayTeam.form && (
-                  <div className="mt-2 flex gap-1 justify-center">
+                  <div className="mt-1 flex gap-1 justify-center">
                     {match.awayTeam.form.split('').slice(0, 5).map((r, i) => <FormBadge key={i} result={r} />)}
                   </div>
                 )}

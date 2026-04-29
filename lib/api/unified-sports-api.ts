@@ -2543,8 +2543,8 @@ function pickStat(stats: ESPNStandingEntry['stats'], names: string[]): number {
   return 0;
 }
 
-export async function getLeagueStandings(leagueId: number): Promise<Standing[]> {
-  const cacheKey = `standings-${leagueId}`;
+export async function getLeagueStandings(leagueId: number, seasonYear?: number): Promise<Standing[]> {
+  const cacheKey = `standings-${leagueId}-${seasonYear ?? 'current'}`;
   const cached = getCached<Standing[]>(cacheKey, CACHE_DURATION.standings);
   if (cached) return cached;
 
@@ -2552,9 +2552,15 @@ export async function getLeagueStandings(leagueId: number): Promise<Standing[]> 
   if (!config) return [];
 
   // Soccer uses a slightly different host/path that exposes table directly.
-  const url = config.sportType === 'soccer'
-    ? `https://site.web.api.espn.com/apis/v2/sports/soccer/${config.league}/standings`
-    : `https://site.api.espn.com/apis/v2/sports/${config.sport}/${config.league}/standings`;
+  // For past seasons, use the core API with explicit year.
+  let url: string;
+  if (seasonYear) {
+    url = `https://sports.core.api.espn.com/v2/sports/${config.sport}/leagues/${config.league}/seasons/${seasonYear}/types/2/groups/1/standings`;
+  } else {
+    url = config.sportType === 'soccer'
+      ? `https://site.web.api.espn.com/apis/v2/sports/soccer/${config.league}/standings`
+      : `https://site.api.espn.com/apis/v2/sports/${config.sport}/${config.league}/standings`;
+  }
 
   let data: ESPNStandingsResponse | null = null;
   try {

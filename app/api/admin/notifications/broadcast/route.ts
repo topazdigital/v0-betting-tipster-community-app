@@ -4,6 +4,7 @@ import {
   createNotification,
   listEmailSubscribers,
   listPushSubscriptions,
+  listAllUserIds,
 } from '@/lib/notification-store';
 import { sendBulkMail } from '@/lib/mailer';
 
@@ -32,18 +33,22 @@ export async function POST(req: Request) {
 
   let count = 0;
 
-  // In-app notifications for any logged-in users derived from push subs (best-effort)
+  // In-app notifications for ALL registered users
   if (audience === 'all' || audience === 'push') {
+    // Get all registered user IDs (falls back to push-subscriber user IDs when no DB)
+    const allUserIds = await listAllUserIds();
+    // Also include any push-subscriber user IDs not already in the list
     const pushSubs = await listPushSubscriptions();
-    const userIds = Array.from(new Set(pushSubs.map((s) => s.userId).filter((id): id is number => !!id)));
+    const pushUserIds = pushSubs.map((s) => s.userId).filter((id): id is number => !!id);
+    const userIds = Array.from(new Set([...allUserIds, ...pushUserIds]));
     for (const uid of userIds) {
       await createNotification({
         userId: uid,
-        type: 'system',
+        type: 'admin_broadcast',
         title,
         content: body,
         link: data.link ?? null,
-        channel: 'push',
+        channel: 'inapp',
       });
       count++;
     }

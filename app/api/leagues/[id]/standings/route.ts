@@ -5,12 +5,14 @@ export const dynamic = 'force-dynamic';
 export const revalidate = 900; // Revalidate every 15 minutes
 
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { id } = await params;
     const leagueId = parseInt(id);
+    const seasonParam = request.nextUrl.searchParams.get('season');
+    const seasonYear = seasonParam ? parseInt(seasonParam) : undefined;
 
     if (isNaN(leagueId)) {
       return NextResponse.json(
@@ -19,7 +21,7 @@ export async function GET(
       );
     }
 
-    const standings = await getLeagueStandings(leagueId);
+    const standings = await getLeagueStandings(leagueId, seasonYear);
 
     // Resolve the ESPN league key (e.g. "eng.1" → "eng1") so each row can
     // expose a fully-qualified team page URL the client can link to.

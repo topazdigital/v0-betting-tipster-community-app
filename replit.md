@@ -18,7 +18,7 @@ The BetTips Pro platform is built with Next.js 16 (App Router) and React 19, usi
 
 State management and data fetching are handled by SWR. Authentication uses a custom JWT implementation with `jose` and `bcryptjs`, securing user sessions via HTTP-only cookies.
 
-The backend uses **PostgreSQL** via the `pg` driver (Replit's built-in PostgreSQL database), with a graceful fallback to mock data for development or disconnected environments. This fallback strategy extends to AI services and external sports APIs to ensure core functionality. The `DATABASE_URL` environment variable is automatically set by Replit. SQL queries use `?` placeholders (auto-converted to `$N` for PostgreSQL by the query helper).
+The backend uses **MySQL** via the `mysql2/promise` driver, with a graceful fallback to in-memory mock data when no MySQL connection is available (e.g. Replit dev where `DATABASE_URL` is not a MySQL URL). All SQL uses `?` placeholders (MySQL style). The `lib/db.ts` module exports `query`, `queryOne`, `execute`, `getPool`, `withTransaction`, and `closePool`. `execute()` returns `mysql.ResultSetHeader` with `.insertId`. In production the app connects to a MySQL 8+ server using `DATABASE_URL`.
 
 Key architectural decisions include:
 - **Modular Project Structure**: Organized for maintainability and scalability.
@@ -29,7 +29,11 @@ Key architectural decisions include:
 - **Sidebar League Grouping**: Organizes leagues by user's home country, international competitions, and top European leagues.
 - **League ID Reconciliation**: Ensures consistent mapping between UI and data layer league IDs.
 - **AI Variety**: AI chat generates genuinely different replies for similar queries using temperature, frequency, and presence penalties.
-- **Notification System**: Web push and email notifications for user engagement and administrative broadcasts.
+- **Notification System**: Web push and email notifications for user engagement. Admin broadcast sends in-app notifications to ALL registered users (queries `users` table) plus email to subscribers. Real-time notification bell in header (30-second polling).
+- **My Bookmarks Page**: `/bookmarks` shows saved matches with filter tabs and search. Synced to DB for logged-in users, localStorage fallback for guests.
+- **Season Selector in League Pages**: Dropdown lets users browse past seasons (up to 4 years back). SWR keys include `?season=` param so standings/scorers reload correctly.
+- **Finished Matches Hidden**: Matches page excludes `status === 'finished'` so only live/upcoming matches appear. Results go to the Results page.
+- **Expanded League Coverage**: `ALL_LEAGUES` now mirrors `ESPN_LEAGUES` with 180+ leagues across all sports including second divisions, cup competitions, women's leagues, international qualifiers, and more.
 - **Two-Factor Authentication (2FA)**: Enhanced security via existing messaging channels.
 - **Login Security & Captcha**: Implements rate limiting and captcha (Turnstile/reCAPTCHA or math fallback) for login and registration.
 - **Branding and SEO**: Dynamic site-wide branding and per-page SEO management through an admin interface with URL rewrite middleware.

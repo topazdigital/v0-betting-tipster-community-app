@@ -196,12 +196,12 @@ export function MatchCardNew({
 
   return (
     <div className={cn(
-      'group rounded-xl border border-border bg-card p-4 transition-all hover:border-primary/50 hover:shadow-lg hover:shadow-primary/5',
+      'group rounded-lg border border-border bg-card px-3 py-2.5 transition-all hover:border-primary/50 hover:shadow-md hover:shadow-primary/5',
       isLive && 'border-live/30 bg-gradient-to-br from-live/5 to-transparent',
       variant === 'featured' && 'bg-gradient-to-br from-card to-muted/30'
     )}>
       {/* Header with clickable league */}
-      <div className="mb-3 flex items-center justify-between">
+      <div className="mb-2 flex items-center justify-between">
         <div className="flex items-center gap-2">
           {showSport && (
             <SportIcon sportSlug={match.sport.slug} size="md" />
@@ -247,7 +247,7 @@ export function MatchCardNew({
 
       {/* Teams and Score with logos */}
       <Link href={`/matches/${matchIdToSlug(match.id)}`} className="block">
-        <div className="mb-3 space-y-2">
+        <div className="mb-2 space-y-1.5">
           {/* Home Team */}
           <div className="flex items-center justify-between gap-3">
             <div className="flex min-w-0 flex-1 items-center gap-2">
@@ -319,7 +319,7 @@ export function MatchCardNew({
       )}
 
       {/* Footer */}
-      <div className="mt-3 flex items-center justify-between text-xs text-muted-foreground">
+      <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
         <span>{match.tipsCount} tips</span>
         <Link href={`/matches/${matchIdToSlug(match.id)}`} className="opacity-0 transition-opacity group-hover:opacity-100 hover:text-primary">
           View details
