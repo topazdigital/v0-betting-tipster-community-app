@@ -29,6 +29,7 @@ import { matchIdToSlug } from "@/lib/utils/match-url"
 import { AIMatchPrediction } from "@/components/ai/ai-match-prediction"
 import { AIMultiMarket } from "@/components/ai/ai-multi-market"
 import { AddTipForm } from "@/components/matches/add-tip-form"
+import { MatchFacts } from "@/components/matches/match-facts"
 import { WinnerVote } from "@/components/matches/winner-vote"
 import { useAuth } from "@/contexts/auth-context"
 import { useMatches } from "@/lib/hooks/use-matches"
@@ -1193,41 +1194,67 @@ export default function MatchDetailPage({ params }: PageProps) {
           </div>
         )}
 
-        {/* ─── TABS ─── */}
+        {/* ─── PROMINENT "ADD TIP" CTA — sits right under the hero so the
+            primary action is impossible to miss. ─── */}
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-500/30 bg-gradient-to-r from-amber-500/15 via-amber-500/5 to-transparent px-3 py-2">
+          <div className="flex items-center gap-2 min-w-0">
+            <Star className="h-4 w-4 shrink-0 fill-amber-400 text-amber-400" />
+            <div className="min-w-0">
+              <p className="text-xs font-bold leading-tight">
+                {tips.length > 0
+                  ? `${tips.length} tipster${tips.length === 1 ? '' : 's'} have already posted`
+                  : 'Be the first to post a tip on this match'}
+              </p>
+              <p className="text-[10px] text-muted-foreground leading-tight">
+                Pick from 25+ markets — 1X2, Asian Handicap, BTTS, Over/Under, HT/FT…
+              </p>
+            </div>
+          </div>
+          <Button
+            size="sm"
+            className="h-8 gap-1.5 bg-amber-500 text-amber-950 hover:bg-amber-400 font-bold shadow-sm"
+            onClick={() => setActiveTab('tips')}
+          >
+            <Star className="h-3.5 w-3.5" />
+            Add a Tip
+          </Button>
+        </div>
+
+        {/* ─── TABS — compact, scrollable on mobile, Tips first ─── */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="w-full h-auto flex flex-wrap gap-1 bg-muted/60 p-1 rounded-xl mb-4">
-            <TabsTrigger value="overview" className="flex-1 text-xs md:text-sm rounded-lg">
-              <BarChart3 className="mr-1 h-3.5 w-3.5 hidden sm:inline" />Overview
-            </TabsTrigger>
-            <TabsTrigger value="tips" className="flex-1 text-xs md:text-sm rounded-lg relative">
-              <Star className="mr-1 h-3.5 w-3.5 hidden sm:inline text-amber-400" />
+          <TabsList className="w-full h-auto flex flex-wrap gap-0.5 bg-muted/60 p-0.5 rounded-lg mb-3">
+            <TabsTrigger value="tips" className="flex-1 min-w-[64px] px-1.5 py-1 text-[11px] md:text-xs font-semibold rounded-md relative data-[state=active]:bg-amber-500 data-[state=active]:text-amber-950">
+              <Star className="mr-0.5 h-3 w-3 hidden sm:inline text-amber-400 data-[state=active]:text-amber-950" />
               Tips
               {tips.length > 0 && (
-                <span className="ml-1 rounded-full bg-amber-500 px-1.5 py-0 text-[9px] font-bold text-white leading-4">{tips.length}</span>
+                <span className="ml-1 rounded-full bg-amber-500 px-1 py-0 text-[9px] font-bold text-white leading-4">{tips.length}</span>
               )}
             </TabsTrigger>
-            <TabsTrigger value="events" className="flex-1 text-xs md:text-sm rounded-lg relative">
-              <Zap className="mr-1 h-3.5 w-3.5 hidden sm:inline" />Events
+            <TabsTrigger value="overview" className="flex-1 min-w-[64px] px-1.5 py-1 text-[11px] md:text-xs font-semibold rounded-md">
+              <BarChart3 className="mr-0.5 h-3 w-3 hidden sm:inline" />Overview
+            </TabsTrigger>
+            <TabsTrigger value="events" className="flex-1 min-w-[58px] px-1.5 py-1 text-[11px] md:text-xs font-semibold rounded-md relative">
+              <Zap className="mr-0.5 h-3 w-3 hidden sm:inline" />Events
               {isLive && <span className="absolute -top-1 -right-1 h-2 w-2 rounded-full bg-rose-500 animate-pulse" />}
             </TabsTrigger>
-            <TabsTrigger value="stats" className="flex-1 text-xs md:text-sm rounded-lg relative">
-              <BarChart3 className="mr-1 h-3.5 w-3.5 hidden sm:inline" />Stats
+            <TabsTrigger value="stats" className="flex-1 min-w-[52px] px-1.5 py-1 text-[11px] md:text-xs font-semibold rounded-md relative">
+              <BarChart3 className="mr-0.5 h-3 w-3 hidden sm:inline" />Stats
               {hasTeamStats && isLive && <span className="absolute -top-1 -right-1 h-2 w-2 rounded-full bg-rose-500 animate-pulse" />}
             </TabsTrigger>
-            <TabsTrigger value="odds" className="flex-1 text-xs md:text-sm rounded-lg">
-              <TrendingUp className="mr-1 h-3.5 w-3.5 hidden sm:inline" />Odds
+            <TabsTrigger value="odds" className="flex-1 min-w-[52px] px-1.5 py-1 text-[11px] md:text-xs font-semibold rounded-md">
+              <TrendingUp className="mr-0.5 h-3 w-3 hidden sm:inline" />Odds
             </TabsTrigger>
-            <TabsTrigger value="lineups" className="flex-1 text-xs md:text-sm rounded-lg">
-              <Shirt className="mr-1 h-3.5 w-3.5 hidden sm:inline" />Lineups
+            <TabsTrigger value="lineups" className="flex-1 min-w-[60px] px-1.5 py-1 text-[11px] md:text-xs font-semibold rounded-md">
+              <Shirt className="mr-0.5 h-3 w-3 hidden sm:inline" />Lineups
             </TabsTrigger>
-            <TabsTrigger value="h2h" className="flex-1 text-xs md:text-sm rounded-lg">
-              <Award className="mr-1 h-3.5 w-3.5 hidden sm:inline" />H2H
+            <TabsTrigger value="h2h" className="flex-1 min-w-[44px] px-1.5 py-1 text-[11px] md:text-xs font-semibold rounded-md">
+              <Award className="mr-0.5 h-3 w-3 hidden sm:inline" />H2H
             </TabsTrigger>
-            <TabsTrigger value="standings" className="flex-1 text-xs md:text-sm rounded-lg">
-              <Trophy className="mr-1 h-3.5 w-3.5 hidden sm:inline" />Table
+            <TabsTrigger value="standings" className="flex-1 min-w-[52px] px-1.5 py-1 text-[11px] md:text-xs font-semibold rounded-md">
+              <Trophy className="mr-0.5 h-3 w-3 hidden sm:inline" />Table
             </TabsTrigger>
-            <TabsTrigger value="news" className="flex-1 text-xs md:text-sm rounded-lg">
-              <Newspaper className="mr-1 h-3.5 w-3.5 hidden sm:inline" />News
+            <TabsTrigger value="news" className="flex-1 min-w-[52px] px-1.5 py-1 text-[11px] md:text-xs font-semibold rounded-md">
+              <Newspaper className="mr-0.5 h-3 w-3 hidden sm:inline" />News
             </TabsTrigger>
           </TabsList>
 
@@ -1254,6 +1281,13 @@ export default function MatchDetailPage({ params }: PageProps) {
               homeForm={match.homeTeam.form}
               awayForm={match.awayTeam.form}
               h2h={data.h2h}
+            />
+
+            {/* Match Facts — trends from form + H2H (like OddsPortal Match Facts) */}
+            <MatchFacts
+              homeTeam={match.homeTeam}
+              awayTeam={match.awayTeam}
+              h2h={data.h2h as unknown as Parameters<typeof MatchFacts>[0]['h2h']}
             />
 
             {/* AI Multi-Market Predictions */}

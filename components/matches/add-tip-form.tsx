@@ -68,7 +68,11 @@ function generateMarketsFromOdds(
   const seed = hashCode(homeTeam + awayTeam);
   const seededRandom = (offset: number) => ((seed + offset) % 100) / 100;
 
+  const r2 = (n: number) => Math.round(n * 100) / 100
+  const dc = (a: number, b: number) => r2(1 / (1 / a + 1 / b))
+
   return [
+    // ── Headline markets ───────────────────────────────────────────
     {
       key: 'h2h',
       name: 'Match Result (1X2)',
@@ -76,93 +80,306 @@ function generateMarketsFromOdds(
         { name: `${homeTeam} Win`, price: home },
         { name: 'Draw', price: draw },
         { name: `${awayTeam} Win`, price: away },
-      ]
+      ],
     },
     {
       key: 'double_chance',
       name: 'Double Chance',
       outcomes: [
-        { name: `${homeTeam} or Draw`, price: Math.round((1 / (1/home + 1/draw)) * 100) / 100 },
-        { name: `${awayTeam} or Draw`, price: Math.round((1 / (1/away + 1/draw)) * 100) / 100 },
-        { name: `${homeTeam} or ${awayTeam}`, price: Math.round((1 / (1/home + 1/away)) * 100) / 100 },
-      ]
+        { name: `${homeTeam} or Draw`, price: dc(home, draw) },
+        { name: `${awayTeam} or Draw`, price: dc(away, draw) },
+        { name: `${homeTeam} or ${awayTeam}`, price: dc(home, away) },
+      ],
     },
+    {
+      key: 'dnb',
+      name: 'Draw No Bet',
+      outcomes: [
+        { name: `${homeTeam}`, price: r2(home * 1.15) },
+        { name: `${awayTeam}`, price: r2(away * 1.15) },
+      ],
+    },
+
+    // ── Goals — Both Teams To Score ────────────────────────────────
     {
       key: 'btts',
       name: 'Both Teams to Score',
       outcomes: [
-        { name: 'Yes', price: Math.round((1.7 + seededRandom(1) * 0.3) * 100) / 100 },
-        { name: 'No', price: Math.round((2.0 + seededRandom(2) * 0.3) * 100) / 100 },
-      ]
+        { name: 'Yes', price: r2(1.7 + seededRandom(1) * 0.3) },
+        { name: 'No', price: r2(2.0 + seededRandom(2) * 0.3) },
+      ],
+    },
+    {
+      key: 'btts_and_result',
+      name: 'BTTS & Result',
+      outcomes: [
+        { name: `${homeTeam} & BTTS Yes`, price: r2(home * 2.0) },
+        { name: 'Draw & BTTS Yes', price: r2(draw * 1.4) },
+        { name: `${awayTeam} & BTTS Yes`, price: r2(away * 2.0) },
+        { name: `${homeTeam} & BTTS No`, price: r2(home * 1.6) },
+        { name: `${awayTeam} & BTTS No`, price: r2(away * 1.6) },
+      ],
+    },
+    {
+      key: 'btts_and_over25',
+      name: 'BTTS & Over 2.5',
+      outcomes: [
+        { name: 'Yes / Over 2.5', price: r2(2.0 + seededRandom(31) * 0.5) },
+        { name: 'Yes / Under 2.5', price: r2(5.5 + seededRandom(32) * 1.5) },
+        { name: 'No / Over 2.5', price: r2(7.5 + seededRandom(33) * 2) },
+        { name: 'No / Under 2.5', price: r2(2.7 + seededRandom(34) * 0.6) },
+      ],
+    },
+
+    // ── Goals — Over / Under ───────────────────────────────────────
+    {
+      key: 'over_under_0_5',
+      name: 'Over/Under 0.5 Goals',
+      outcomes: [
+        { name: 'Over 0.5', price: r2(1.07 + seededRandom(35) * 0.05) },
+        { name: 'Under 0.5', price: r2(8.5 + seededRandom(36) * 2) },
+      ],
     },
     {
       key: 'over_under_1_5',
       name: 'Over/Under 1.5 Goals',
       outcomes: [
-        { name: 'Over 1.5', price: Math.round((1.35 + seededRandom(3) * 0.2) * 100) / 100 },
-        { name: 'Under 1.5', price: Math.round((2.8 + seededRandom(4) * 0.4) * 100) / 100 },
-      ]
+        { name: 'Over 1.5', price: r2(1.35 + seededRandom(3) * 0.2) },
+        { name: 'Under 1.5', price: r2(2.8 + seededRandom(4) * 0.4) },
+      ],
     },
     {
       key: 'over_under_2_5',
       name: 'Over/Under 2.5 Goals',
       outcomes: [
-        { name: 'Over 2.5', price: Math.round((1.8 + seededRandom(5) * 0.4) * 100) / 100 },
-        { name: 'Under 2.5', price: Math.round((1.95 + seededRandom(6) * 0.3) * 100) / 100 },
-      ]
+        { name: 'Over 2.5', price: r2(1.8 + seededRandom(5) * 0.4) },
+        { name: 'Under 2.5', price: r2(1.95 + seededRandom(6) * 0.3) },
+      ],
     },
     {
       key: 'over_under_3_5',
       name: 'Over/Under 3.5 Goals',
       outcomes: [
-        { name: 'Over 3.5', price: Math.round((2.3 + seededRandom(7) * 0.5) * 100) / 100 },
-        { name: 'Under 3.5', price: Math.round((1.55 + seededRandom(8) * 0.2) * 100) / 100 },
-      ]
+        { name: 'Over 3.5', price: r2(2.3 + seededRandom(7) * 0.5) },
+        { name: 'Under 3.5', price: r2(1.55 + seededRandom(8) * 0.2) },
+      ],
     },
+    {
+      key: 'over_under_4_5',
+      name: 'Over/Under 4.5 Goals',
+      outcomes: [
+        { name: 'Over 4.5', price: r2(3.6 + seededRandom(37) * 1.0) },
+        { name: 'Under 4.5', price: r2(1.28 + seededRandom(38) * 0.1) },
+      ],
+    },
+
+    // ── Asian Handicap (multi-line) ────────────────────────────────
+    {
+      key: 'ah_05',
+      name: 'Asian Handicap ±0.5',
+      outcomes: [
+        { name: `${homeTeam} -0.5`, price: home },
+        { name: `${awayTeam} +0.5`, price: r2(dc(away, draw)) },
+      ],
+    },
+    {
+      key: 'ah_15',
+      name: 'Asian Handicap ±1.5',
+      outcomes: [
+        { name: `${homeTeam} -1.5`, price: r2(home * 1.65) },
+        { name: `${awayTeam} +1.5`, price: r2(away * 0.6) },
+      ],
+    },
+    {
+      key: 'ah_25',
+      name: 'Asian Handicap ±2.5',
+      outcomes: [
+        { name: `${homeTeam} -2.5`, price: r2(home * 2.6) },
+        { name: `${awayTeam} +2.5`, price: r2(away * 0.45) },
+      ],
+    },
+    {
+      key: 'eh_3way',
+      name: 'European Handicap (3-way)',
+      outcomes: [
+        { name: `${homeTeam} -1`, price: r2(home * 1.6) },
+        { name: 'Draw -1', price: r2(draw * 1.2) },
+        { name: `${awayTeam} +1`, price: r2(away * 0.65) },
+      ],
+    },
+
+    // ── Halves ─────────────────────────────────────────────────────
     {
       key: 'ht_result',
-      name: 'Half Time Result',
+      name: 'Half Time Result (1X2)',
       outcomes: [
-        { name: `${homeTeam} HT`, price: Math.round((home * 1.4) * 100) / 100 },
-        { name: 'Draw HT', price: Math.round((draw * 0.75) * 100) / 100 },
-        { name: `${awayTeam} HT`, price: Math.round((away * 1.4) * 100) / 100 },
-      ]
+        { name: `${homeTeam} HT`, price: r2(home * 1.4) },
+        { name: 'Draw HT', price: r2(draw * 0.75) },
+        { name: `${awayTeam} HT`, price: r2(away * 1.4) },
+      ],
     },
     {
-      key: 'correct_score',
-      name: 'Correct Score',
+      key: '2h_result',
+      name: '2nd Half Result (1X2)',
       outcomes: [
-        { name: '1-0', price: Math.round((6.5 + seededRandom(9) * 2) * 100) / 100 },
-        { name: '2-0', price: Math.round((8 + seededRandom(10) * 3) * 100) / 100 },
-        { name: '2-1', price: Math.round((8.5 + seededRandom(11) * 3) * 100) / 100 },
-        { name: '0-0', price: Math.round((10 + seededRandom(12) * 4) * 100) / 100 },
-        { name: '1-1', price: Math.round((6 + seededRandom(13) * 2) * 100) / 100 },
-        { name: '0-1', price: Math.round((9 + seededRandom(14) * 3) * 100) / 100 },
-        { name: '0-2', price: Math.round((12 + seededRandom(15) * 4) * 100) / 100 },
-        { name: '1-2', price: Math.round((11 + seededRandom(16) * 4) * 100) / 100 },
-        { name: '2-2', price: Math.round((12 + seededRandom(17) * 5) * 100) / 100 },
-        { name: '3-0', price: Math.round((15 + seededRandom(18) * 5) * 100) / 100 },
-        { name: '3-1', price: Math.round((14 + seededRandom(19) * 5) * 100) / 100 },
-      ]
+        { name: `${homeTeam} 2H`, price: r2(home * 1.25) },
+        { name: 'Draw 2H', price: r2(draw * 0.85) },
+        { name: `${awayTeam} 2H`, price: r2(away * 1.25) },
+      ],
+    },
+    {
+      key: 'ht_ft',
+      name: 'Half Time / Full Time',
+      outcomes: [
+        { name: `${homeTeam} / ${homeTeam}`, price: r2(home * 1.5) },
+        { name: `Draw / ${homeTeam}`, price: r2(home * 2.6) },
+        { name: `Draw / Draw`, price: r2(draw * 1.6) },
+        { name: `Draw / ${awayTeam}`, price: r2(away * 2.6) },
+        { name: `${awayTeam} / ${awayTeam}`, price: r2(away * 1.5) },
+        { name: `${homeTeam} / ${awayTeam}`, price: r2(home * 12) },
+        { name: `${awayTeam} / ${homeTeam}`, price: r2(away * 12) },
+      ],
+    },
+    {
+      key: 'ht_over_05',
+      name: 'Over/Under 0.5 Goals 1st Half',
+      outcomes: [
+        { name: 'Over 0.5 HT', price: r2(1.4 + seededRandom(41) * 0.2) },
+        { name: 'Under 0.5 HT', price: r2(2.7 + seededRandom(42) * 0.4) },
+      ],
+    },
+    {
+      key: 'ht_over_15',
+      name: 'Over/Under 1.5 Goals 1st Half',
+      outcomes: [
+        { name: 'Over 1.5 HT', price: r2(2.5 + seededRandom(43) * 0.4) },
+        { name: 'Under 1.5 HT', price: r2(1.5 + seededRandom(44) * 0.2) },
+      ],
+    },
+
+    // ── Specials ───────────────────────────────────────────────────
+    {
+      key: 'win_to_nil',
+      name: 'Win to Nil',
+      outcomes: [
+        { name: `${homeTeam} Win to Nil`, price: r2(home * 1.7) },
+        { name: `${awayTeam} Win to Nil`, price: r2(away * 1.9) },
+      ],
+    },
+    {
+      key: 'clean_sheet',
+      name: 'Clean Sheet',
+      outcomes: [
+        { name: `${homeTeam} CS Yes`, price: r2(2.4 + seededRandom(51) * 0.4) },
+        { name: `${homeTeam} CS No`, price: r2(1.55 + seededRandom(52) * 0.2) },
+        { name: `${awayTeam} CS Yes`, price: r2(3.0 + seededRandom(53) * 0.6) },
+        { name: `${awayTeam} CS No`, price: r2(1.35 + seededRandom(54) * 0.15) },
+      ],
+    },
+    {
+      key: 'odd_even',
+      name: 'Total Goals — Odd / Even',
+      outcomes: [
+        { name: 'Odd', price: r2(1.95 + seededRandom(55) * 0.1) },
+        { name: 'Even', price: r2(1.95 + seededRandom(56) * 0.1) },
+      ],
+    },
+    {
+      key: 'team_total_home',
+      name: `${homeTeam} Total Goals`,
+      outcomes: [
+        { name: `Over 0.5`, price: r2(1.25 + seededRandom(61) * 0.15) },
+        { name: `Over 1.5`, price: r2(2.0 + seededRandom(62) * 0.3) },
+        { name: `Over 2.5`, price: r2(3.5 + seededRandom(63) * 0.7) },
+        { name: `Under 1.5`, price: r2(1.85 + seededRandom(64) * 0.25) },
+      ],
+    },
+    {
+      key: 'team_total_away',
+      name: `${awayTeam} Total Goals`,
+      outcomes: [
+        { name: `Over 0.5`, price: r2(1.35 + seededRandom(71) * 0.2) },
+        { name: `Over 1.5`, price: r2(2.4 + seededRandom(72) * 0.4) },
+        { name: `Over 2.5`, price: r2(4.5 + seededRandom(73) * 1.0) },
+        { name: `Under 1.5`, price: r2(1.55 + seededRandom(74) * 0.2) },
+      ],
     },
     {
       key: 'first_goal',
       name: 'First Team to Score',
       outcomes: [
-        { name: homeTeam, price: Math.round((1.8 + seededRandom(20) * 0.3) * 100) / 100 },
-        { name: awayTeam, price: Math.round((2.1 + seededRandom(21) * 0.4) * 100) / 100 },
-        { name: 'No Goal', price: Math.round((9 + seededRandom(22) * 3) * 100) / 100 },
-      ]
+        { name: homeTeam, price: r2(1.8 + seededRandom(20) * 0.3) },
+        { name: awayTeam, price: r2(2.1 + seededRandom(21) * 0.4) },
+        { name: 'No Goal', price: r2(9 + seededRandom(22) * 3) },
+      ],
     },
     {
-      key: 'handicap',
-      name: 'Asian Handicap',
+      key: 'last_goal',
+      name: 'Last Team to Score',
       outcomes: [
-        { name: `${homeTeam} -1`, price: Math.round((home * 1.6) * 100) / 100 },
-        { name: `${awayTeam} +1`, price: Math.round((away * 0.7) * 100) / 100 },
-        { name: `${homeTeam} -2`, price: Math.round((home * 2.5) * 100) / 100 },
-        { name: `${awayTeam} +2`, price: Math.round((away * 0.5) * 100) / 100 },
-      ]
+        { name: homeTeam, price: r2(2.0 + seededRandom(81) * 0.3) },
+        { name: awayTeam, price: r2(2.3 + seededRandom(82) * 0.4) },
+        { name: 'No Goal', price: r2(9 + seededRandom(83) * 3) },
+      ],
+    },
+    {
+      key: 'race_to_2',
+      name: 'Race to 2 Goals',
+      outcomes: [
+        { name: homeTeam, price: r2(home * 1.1) },
+        { name: awayTeam, price: r2(away * 1.1) },
+        { name: 'Neither', price: r2(6 + seededRandom(84) * 1.5) },
+      ],
+    },
+    {
+      key: 'race_to_3',
+      name: 'Race to 3 Goals',
+      outcomes: [
+        { name: homeTeam, price: r2(home * 1.7) },
+        { name: awayTeam, price: r2(away * 1.7) },
+        { name: 'Neither', price: r2(3.0 + seededRandom(85) * 0.6) },
+      ],
+    },
+    {
+      key: 'correct_score',
+      name: 'Correct Score',
+      outcomes: [
+        { name: '1-0', price: r2(6.5 + seededRandom(9) * 2) },
+        { name: '2-0', price: r2(8 + seededRandom(10) * 3) },
+        { name: '2-1', price: r2(8.5 + seededRandom(11) * 3) },
+        { name: '0-0', price: r2(10 + seededRandom(12) * 4) },
+        { name: '1-1', price: r2(6 + seededRandom(13) * 2) },
+        { name: '0-1', price: r2(9 + seededRandom(14) * 3) },
+        { name: '0-2', price: r2(12 + seededRandom(15) * 4) },
+        { name: '1-2', price: r2(11 + seededRandom(16) * 4) },
+        { name: '2-2', price: r2(12 + seededRandom(17) * 5) },
+        { name: '3-0', price: r2(15 + seededRandom(18) * 5) },
+        { name: '3-1', price: r2(14 + seededRandom(19) * 5) },
+        { name: '3-2', price: r2(22 + seededRandom(91) * 6) },
+        { name: '3-3', price: r2(40 + seededRandom(92) * 10) },
+        { name: '0-3', price: r2(18 + seededRandom(93) * 5) },
+        { name: '4+ : 0-2', price: r2(20 + seededRandom(94) * 6) },
+      ],
+    },
+    {
+      key: 'corners_total',
+      name: 'Total Corners',
+      outcomes: [
+        { name: 'Over 8.5', price: r2(1.8 + seededRandom(101) * 0.3) },
+        { name: 'Under 8.5', price: r2(1.95 + seededRandom(102) * 0.3) },
+        { name: 'Over 10.5', price: r2(2.6 + seededRandom(103) * 0.5) },
+        { name: 'Under 10.5', price: r2(1.45 + seededRandom(104) * 0.2) },
+      ],
+    },
+    {
+      key: 'cards_total',
+      name: 'Total Cards',
+      outcomes: [
+        { name: 'Over 3.5', price: r2(1.7 + seededRandom(111) * 0.3) },
+        { name: 'Under 3.5', price: r2(2.05 + seededRandom(112) * 0.3) },
+        { name: 'Over 4.5', price: r2(2.4 + seededRandom(113) * 0.4) },
+        { name: 'Under 4.5', price: r2(1.55 + seededRandom(114) * 0.2) },
+      ],
     },
   ]
 }

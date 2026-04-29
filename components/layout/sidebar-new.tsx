@@ -16,7 +16,8 @@ import {
   Zap,
   LayoutDashboard,
   Bell,
-  MessageCircle
+  MessageCircle,
+  Brain
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ALL_SPORTS, ALL_LEAGUES, BOOKMAKERS, getSportIcon } from '@/lib/sports-data';
@@ -334,6 +335,19 @@ export function SidebarNew({ selectedSportId, onSelectSport }: SidebarNewProps) 
               >
                 <Users className="h-4 w-4" />
                 <span>Tipsters</span>
+              </Link>
+              <Link
+                href="/predictor"
+                className={cn(
+                  'flex items-center gap-2 rounded-lg px-2 py-2 text-sm transition-colors',
+                  pathname === '/predictor'
+                    ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+                    : 'text-sidebar-foreground hover:bg-sidebar-accent/50'
+                )}
+              >
+                <Brain className="h-4 w-4 text-primary" />
+                <span>Match Predictor</span>
+                <span className="ml-auto rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-bold text-primary">AI</span>
               </Link>
               <Link
                 href="/dashboard"

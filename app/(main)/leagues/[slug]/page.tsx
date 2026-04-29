@@ -93,14 +93,26 @@ function titleCase(s: string) {
 }
 
 // Generate a list of seasons: current + past 4 years.
-// The "current" year is the first year of the season (e.g. 2025 for 2025/26).
+// European football seasons run Aug → May. The "year" we pass to ESPN is the
+// START year of the season (ESPN convention: seasons/2024 = 2024-25 season).
+// We must NOT use new Date().getFullYear() blindly — in April 2026 the current
+// real-world season is still 2025/26, not 2026/27.
 function generateSeasons(): { label: string; year: number | null }[] {
-  const currentYear = new Date().getFullYear();
+  const now = new Date();
+  const month = now.getMonth(); // 0=Jan … 11=Dec
+  const year = now.getFullYear();
+  // If we're past July (month index >= 7), the new season has started this
+  // calendar year. Otherwise, the active season started last year.
+  const currentSeasonStart = month >= 7 ? year : year - 1;
+
   const seasons: { label: string; year: number | null }[] = [
-    { label: `${currentYear}/${String(currentYear + 1).slice(-2)} (Current)`, year: null },
+    {
+      label: `${currentSeasonStart}/${String(currentSeasonStart + 1).slice(-2)} (Current)`,
+      year: null,
+    },
   ];
   for (let i = 1; i <= 4; i++) {
-    const y = currentYear - i;
+    const y = currentSeasonStart - i;
     seasons.push({ label: `${y}/${String(y + 1).slice(-2)}`, year: y });
   }
   return seasons;
