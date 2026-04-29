@@ -395,9 +395,9 @@ export async function GET(request: NextRequest) {
          FROM users u
          LEFT JOIN tipster_profiles t ON t.user_id = u.id
          WHERE u.role IN ('tipster','admin')
-           AND (u.username ILIKE $1 OR u.display_name ILIKE $2)
+           AND (u.username LIKE ? OR u.display_name LIKE ?)
          ORDER BY t.followers_count DESC
-         LIMIT $3`,
+         LIMIT ?`,
       [`%${rawQ}%`, `%${rawQ}%`, limitPerKind],
     );
     const rows = (list as unknown as { rows?: DbTipsterRow[] }).rows ?? (list as unknown as DbTipsterRow[]);

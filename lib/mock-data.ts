@@ -20,9 +20,9 @@ import type {
 
 // Sports
 export const mockSports: Sport[] = [
-  { id: 1, name: 'Football', slug: 'football', icon: 'soccer' },
-  { id: 2, name: 'Basketball', slug: 'basketball', icon: 'basketball' },
-  { id: 3, name: 'Tennis', slug: 'tennis', icon: 'tennis' },
+  { id: 1, name: 'Football', slug: 'football', icon: '⚽' },
+  { id: 2, name: 'Basketball', slug: 'basketball', icon: '🏀' },
+  { id: 3, name: 'Tennis', slug: 'tennis', icon: '🎾' },
 ];
 
 // Countries

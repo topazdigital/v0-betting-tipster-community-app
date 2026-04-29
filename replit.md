@@ -11,6 +11,8 @@ BetTips Pro is a sports betting tipster community platform providing real-time s
 - Ask before making major changes.
 - I prefer simple language.
 - I like functional programming.
+- **CRITICAL: Always use MySQL. NEVER switch to PostgreSQL or any other database without explicit user permission. The user will deploy to a live MySQL server.**
+- Sport icons in `ALL_SPORTS` (lib/sports-data.ts) and `mockSports` (lib/mock-data.ts) must use emoji characters directly (e.g. '⚽', '🏀') — not text keys like 'soccer'.
 
 ## System Architecture
 

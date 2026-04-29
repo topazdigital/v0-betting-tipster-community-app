@@ -14,51 +14,51 @@ export interface SportConfig {
 // All 35 sports supported
 export const ALL_SPORTS: SportConfig[] = [
   // Popular Sports
-  { id: 1, name: 'Football', slug: 'football', icon: 'soccer', category: 'popular' },
-  { id: 2, name: 'Basketball', slug: 'basketball', icon: 'basketball', category: 'popular' },
-  { id: 3, name: 'Tennis', slug: 'tennis', icon: 'tennis', category: 'popular' },
-  { id: 4, name: 'Cricket', slug: 'cricket', icon: 'cricket', category: 'popular' },
-  { id: 5, name: 'American Football', slug: 'american-football', icon: 'football', category: 'popular' },
-  { id: 6, name: 'Baseball', slug: 'baseball', icon: 'baseball', category: 'popular' },
-  { id: 7, name: 'Ice Hockey', slug: 'ice-hockey', icon: 'hockey', category: 'popular' },
+  { id: 1, name: 'Football', slug: 'football', icon: '⚽', category: 'popular' },
+  { id: 2, name: 'Basketball', slug: 'basketball', icon: '🏀', category: 'popular' },
+  { id: 3, name: 'Tennis', slug: 'tennis', icon: '🎾', category: 'popular' },
+  { id: 4, name: 'Cricket', slug: 'cricket', icon: '🏏', category: 'popular' },
+  { id: 5, name: 'American Football', slug: 'american-football', icon: '🏈', category: 'popular' },
+  { id: 6, name: 'Baseball', slug: 'baseball', icon: '⚾', category: 'popular' },
+  { id: 7, name: 'Ice Hockey', slug: 'ice-hockey', icon: '🏒', category: 'popular' },
   
   // Team Sports
-  { id: 8, name: 'Rugby', slug: 'rugby', icon: 'rugby', category: 'team' },
-  { id: 9, name: 'Volleyball', slug: 'volleyball', icon: 'volleyball', category: 'team' },
-  { id: 10, name: 'Handball', slug: 'handball', icon: 'handball', category: 'team' },
-  { id: 11, name: 'Water Polo', slug: 'water-polo', icon: 'water-polo', category: 'team' },
-  { id: 12, name: 'Field Hockey', slug: 'field-hockey', icon: 'field-hockey', category: 'team' },
-  { id: 13, name: 'Futsal', slug: 'futsal', icon: 'futsal', category: 'team' },
-  { id: 14, name: 'Beach Volleyball', slug: 'beach-volleyball', icon: 'beach-volleyball', category: 'team' },
-  { id: 15, name: 'Lacrosse', slug: 'lacrosse', icon: 'lacrosse', category: 'team' },
-  { id: 16, name: 'Aussie Rules', slug: 'aussie-rules', icon: 'aussie-rules', category: 'team' },
+  { id: 8, name: 'Rugby', slug: 'rugby', icon: '🏉', category: 'team' },
+  { id: 9, name: 'Volleyball', slug: 'volleyball', icon: '🏐', category: 'team' },
+  { id: 10, name: 'Handball', slug: 'handball', icon: '🤾', category: 'team' },
+  { id: 11, name: 'Water Polo', slug: 'water-polo', icon: '🤽', category: 'team' },
+  { id: 12, name: 'Field Hockey', slug: 'field-hockey', icon: '🏑', category: 'team' },
+  { id: 13, name: 'Futsal', slug: 'futsal', icon: '⚽', category: 'team' },
+  { id: 14, name: 'Beach Volleyball', slug: 'beach-volleyball', icon: '🏐', category: 'team' },
+  { id: 15, name: 'Lacrosse', slug: 'lacrosse', icon: '🥍', category: 'team' },
+  { id: 16, name: 'Aussie Rules', slug: 'aussie-rules', icon: '🏉', category: 'team' },
   
   // Individual Sports
-  { id: 17, name: 'Golf', slug: 'golf', icon: 'golf', category: 'individual' },
-  { id: 18, name: 'Snooker', slug: 'snooker', icon: 'snooker', category: 'individual' },
-  { id: 19, name: 'Darts', slug: 'darts', icon: 'darts', category: 'individual' },
-  { id: 20, name: 'Table Tennis', slug: 'table-tennis', icon: 'table-tennis', category: 'individual' },
-  { id: 21, name: 'Badminton', slug: 'badminton', icon: 'badminton', category: 'individual' },
-  { id: 22, name: 'Squash', slug: 'squash', icon: 'squash', category: 'individual' },
-  { id: 23, name: 'Cycling', slug: 'cycling', icon: 'cycling', category: 'individual' },
-  { id: 24, name: 'Athletics', slug: 'athletics', icon: 'athletics', category: 'individual' },
-  { id: 25, name: 'Swimming', slug: 'swimming', icon: 'swimming', category: 'individual' },
+  { id: 17, name: 'Golf', slug: 'golf', icon: '⛳', category: 'individual' },
+  { id: 18, name: 'Snooker', slug: 'snooker', icon: '🎱', category: 'individual' },
+  { id: 19, name: 'Darts', slug: 'darts', icon: '🎯', category: 'individual' },
+  { id: 20, name: 'Table Tennis', slug: 'table-tennis', icon: '🏓', category: 'individual' },
+  { id: 21, name: 'Badminton', slug: 'badminton', icon: '🏸', category: 'individual' },
+  { id: 22, name: 'Squash', slug: 'squash', icon: '🎾', category: 'individual' },
+  { id: 23, name: 'Cycling', slug: 'cycling', icon: '🚴', category: 'individual' },
+  { id: 24, name: 'Athletics', slug: 'athletics', icon: '🏃', category: 'individual' },
+  { id: 25, name: 'Swimming', slug: 'swimming', icon: '🏊', category: 'individual' },
   
   // Combat Sports
-  { id: 26, name: 'Boxing', slug: 'boxing', icon: 'boxing', category: 'combat' },
-  { id: 27, name: 'MMA', slug: 'mma', icon: 'mma', category: 'combat' },
-  { id: 28, name: 'Wrestling', slug: 'wrestling', icon: 'wrestling', category: 'combat' },
+  { id: 26, name: 'Boxing', slug: 'boxing', icon: '🥊', category: 'combat' },
+  { id: 27, name: 'MMA', slug: 'mma', icon: '🥋', category: 'combat' },
+  { id: 28, name: 'Wrestling', slug: 'wrestling', icon: '🤼', category: 'combat' },
   
   // Racing Sports
-  { id: 29, name: 'Formula 1', slug: 'formula-1', icon: 'formula-1', category: 'racing' },
-  { id: 30, name: 'Horse Racing', slug: 'horse-racing', icon: 'horse-racing', category: 'racing' },
-  { id: 31, name: 'NASCAR', slug: 'nascar', icon: 'nascar', category: 'racing' },
-  { id: 32, name: 'MotoGP', slug: 'motogp', icon: 'motogp', category: 'racing' },
+  { id: 29, name: 'Formula 1', slug: 'formula-1', icon: '🏎️', category: 'racing' },
+  { id: 30, name: 'Horse Racing', slug: 'horse-racing', icon: '🏇', category: 'racing' },
+  { id: 31, name: 'NASCAR', slug: 'nascar', icon: '🏎️', category: 'racing' },
+  { id: 32, name: 'MotoGP', slug: 'motogp', icon: '🏍️', category: 'racing' },
   
   // Esports & Other
-  { id: 33, name: 'Esports', slug: 'esports', icon: 'esports', category: 'other' },
-  { id: 34, name: 'Chess', slug: 'chess', icon: 'chess', category: 'other' },
-  { id: 35, name: 'Ski Jumping', slug: 'ski-jumping', icon: 'ski-jumping', category: 'other' },
+  { id: 33, name: 'Esports', slug: 'esports', icon: '🎮', category: 'other' },
+  { id: 34, name: 'Chess', slug: 'chess', icon: '♟️', category: 'other' },
+  { id: 35, name: 'Ski Jumping', slug: 'ski-jumping', icon: '⛷️', category: 'other' },
 ];
 
 // Leagues per sport

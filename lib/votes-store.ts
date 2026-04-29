@@ -67,7 +67,7 @@ export async function getVoteTotals(matchId: string): Promise<VoteTotals> {
     await ensureTable();
     try {
       const r = await query<{ pick: VotePick; c: number }>(
-        `SELECT pick, COUNT(*) AS c FROM match_votes WHERE match_id = $1 GROUP BY pick`,
+        `SELECT pick, COUNT(*) AS c FROM match_votes WHERE match_id = ? GROUP BY pick`,
         [matchId],
       );
       const t = emptyTotals();
@@ -100,7 +100,7 @@ export async function getUserVote(
     await ensureTable();
     try {
       const r = await query<{ pick: VotePick }>(
-        `SELECT pick FROM match_votes WHERE match_id = $1 AND voter_id = $2 LIMIT 1`,
+        `SELECT pick FROM match_votes WHERE match_id = ? AND voter_id = ? LIMIT 1`,
         [matchId, voterId],
       );
       return r.rows[0]?.pick ?? null;
@@ -133,7 +133,7 @@ export async function castVote(
     await ensureTable();
     try {
       await execute(
-        `INSERT INTO match_votes (match_id, voter_id, pick) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING`,
+        `INSERT IGNORE INTO match_votes (match_id, voter_id, pick) VALUES (?, ?, ?)`,
         [matchId, voterId, pick],
       );
       const totals = await getVoteTotals(matchId);

@@ -1,22 +1,17 @@
-import { Pool, PoolClient } from 'pg';
+import mysql from 'mysql2/promise';
 
-// PostgreSQL connection pool
-// Uses DATABASE_URL environment variable set by Replit
+// MySQL connection pool
+// In production: set DATABASE_URL to a MySQL connection string
+// In dev on Replit without MySQL: the pool stays null and stores fall back to in-memory.
 
-let pool: Pool | null = null;
+let pool: mysql.Pool | null = null;
 
-export function getPool(): Pool | null {
+export function getPool(): mysql.Pool | null {
   const url = process.env.DATABASE_URL;
-  if (!url) return null;
+  if (!url || !url.startsWith('mysql')) return null;
 
   if (!pool) {
-    pool = new Pool({
-      connectionString: url,
-      ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
-      max: 10,
-      idleTimeoutMillis: 30000,
-      connectionTimeoutMillis: 2000,
-    });
+    pool = mysql.createPool(url);
   }
 
   return pool;
@@ -28,17 +23,13 @@ export interface QueryResult<T> {
 }
 
 export async function query<T>(sql: string, params?: unknown[]): Promise<QueryResult<T>> {
-  const pool = getPool();
-  
-  if (!pool) {
-    console.warn('No database connection, returning empty result');
+  const p = getPool();
+  if (!p) {
+    console.warn('[db] No MySQL connection, returning empty result');
     return { rows: [] };
   }
-  
-  // Convert MySQL ? placeholders to PostgreSQL $1, $2, ... style
-  const pgSql = convertToPostgres(sql);
-  const result = await pool.query(pgSql, params);
-  return { rows: result.rows as T[], affectedRows: result.rowCount ?? 0 };
+  const [rows] = await p.query<mysql.RowDataPacket[]>(sql, params);
+  return { rows: rows as T[], affectedRows: undefined };
 }
 
 export async function queryOne<T>(sql: string, params?: unknown[]): Promise<T | null> {
@@ -52,40 +43,33 @@ export interface ExecuteResult {
 }
 
 export async function execute(sql: string, params?: unknown[]): Promise<ExecuteResult> {
-  const pool = getPool();
-  
-  if (!pool) {
-    throw new Error('No database connection available');
+  const p = getPool();
+  if (!p) {
+    throw new Error('No MySQL database connection available');
   }
-  
-  const pgSql = convertToPostgres(sql);
-  const result = await pool.query(pgSql, params);
-  const insertId = result.rows?.[0]?.id ?? 0;
-  return { insertId, affectedRows: result.rowCount ?? 0 };
+  const [result] = await p.execute<mysql.ResultSetHeader>(sql, params);
+  return { insertId: result.insertId, affectedRows: result.affectedRows };
 }
 
 // Transaction helper
 export async function withTransaction<T>(
-  callback: (connection: PoolClient) => Promise<T>
+  callback: (connection: mysql.Connection) => Promise<T>
 ): Promise<T> {
-  const pool = getPool();
-  
-  if (!pool) {
-    throw new Error('No database connection available');
+  const p = getPool();
+  if (!p) {
+    throw new Error('No MySQL database connection available');
   }
-  
-  const client = await pool.connect();
-  
+  const conn = await p.getConnection();
   try {
-    await client.query('BEGIN');
-    const result = await callback(client);
-    await client.query('COMMIT');
+    await conn.beginTransaction();
+    const result = await callback(conn);
+    await conn.commit();
     return result;
   } catch (error) {
-    await client.query('ROLLBACK');
+    await conn.rollback();
     throw error;
   } finally {
-    client.release();
+    conn.release();
   }
 }
 
@@ -95,14 +79,4 @@ export async function closePool(): Promise<void> {
     await pool.end();
     pool = null;
   }
-}
-
-/**
- * Convert MySQL-style ? placeholders to PostgreSQL $1, $2, ...
- * Also converts MySQL-specific syntax to PostgreSQL equivalents.
- */
-function convertToPostgres(sql: string): string {
-  let index = 0;
-  // Replace ? with $1, $2, ...
-  return sql.replace(/\?/g, () => `$${++index}`);
 }
