@@ -228,7 +228,7 @@ export async function getStaticPage(slug: string): Promise<StaticPage | null> {
   if (pool) {
     try {
       const r = await query<{ slug: string; title: string; body: string; meta_description: string | null; updated_at: Date }>(
-        'SELECT slug, title, body, meta_description, updated_at FROM static_pages WHERE slug = ?',
+        'SELECT slug, title, body, meta_description, updated_at FROM static_pages WHERE slug = $1',
         [slug],
       );
       if (r.rows.length) {
@@ -281,8 +281,8 @@ export async function saveStaticPage(p: StaticPage): Promise<StaticPage> {
     try {
       await execute(
         `INSERT INTO static_pages (slug, title, body, meta_description)
-         VALUES (?, ?, ?, ?)
-         ON DUPLICATE KEY UPDATE title = VALUES(title), body = VALUES(body), meta_description = VALUES(meta_description)`,
+         VALUES ($1, $2, $3, $4)
+         ON CONFLICT (slug) DO UPDATE SET title = EXCLUDED.title, body = EXCLUDED.body, meta_description = EXCLUDED.meta_description`,
         [p.slug, p.title, p.body, p.meta_description ?? null],
       );
     } catch (e) {

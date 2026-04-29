@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { query } from '@/lib/db';
+import { query, execute } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,25 +15,26 @@ export async function GET(request: NextRequest) {
     
     const offset = (page - 1) * limit;
     
-    let whereClause = '1=1';
+    const conditions: string[] = ['1=1'];
     const params: (string | number)[] = [];
     
     if (sportId && sportId !== 'all') {
-      whereClause += ' AND t.sport_id = ?';
+      conditions.push(`t.sport_id = $${params.length + 1}`);
       params.push(parseInt(sportId));
     }
     
     if (leagueId && leagueId !== 'all') {
-      whereClause += ' AND tl.league_id = ?';
+      conditions.push(`t.league_id = $${params.length + 1}`);
       params.push(parseInt(leagueId));
     }
     
     if (search) {
-      whereClause += ' AND t.name LIKE ?';
+      conditions.push(`t.name ILIKE $${params.length + 1}`);
       params.push(`%${search}%`);
     }
     
-    // Get teams with sport and country info
+    const whereClause = conditions.join(' AND ');
+
     const result = await query(`
       SELECT 
         t.id,
@@ -50,24 +51,18 @@ export async function GET(request: NextRequest) {
       LEFT JOIN sports s ON t.sport_id = s.id
       WHERE ${whereClause}
       ORDER BY t.name
-      LIMIT ? OFFSET ?
+      LIMIT $${params.length + 1} OFFSET $${params.length + 2}
     `, [...params, limit, offset]);
     
-    // Get total count
     const countResult = await query(`
-      SELECT COUNT(*) as total FROM teams t WHERE ${whereClause.replace(' AND tl.league_id = ?', '')}
-    `, params.filter((_, i) => !(leagueId && i === params.length - 1)));
+      SELECT COUNT(*) as total FROM teams t WHERE ${whereClause}
+    `, params);
     
     const total = (countResult.rows as Array<{ total: number }>)[0]?.total || 0;
     
     return NextResponse.json({
       teams: result.rows,
-      pagination: {
-        page,
-        limit,
-        total,
-        totalPages: Math.ceil(total / limit)
-      }
+      pagination: { page, limit, total, totalPages: Math.ceil(total / limit) }
     });
   } catch (error) {
     console.error('[Admin API] Failed to get teams:', error);
@@ -91,28 +86,17 @@ export async function POST(request: NextRequest) {
       );
     }
     
-    // Generate slug from name
     const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
     
-    const { execute: execQuery } = await import('@/lib/db');
-    const result = await execQuery(
-      `INSERT INTO teams (name, slug, sport_id, country_id, logo_url) VALUES (?, ?, ?, ?, ?)`,
+    const result = await execute(
+      `INSERT INTO teams (name, slug, sport_id, country_id, logo_url) VALUES ($1, $2, $3, $4, $5) RETURNING id`,
       [name, slug, sportId, countryId, logoUrl || null]
     );
     
-    const teamId = result.insertId;
-    
-    return NextResponse.json({
-      success: true,
-      teamId,
-      message: 'Team created successfully'
-    });
+    return NextResponse.json({ success: true, teamId: result.insertId, message: 'Team created successfully' });
   } catch (error) {
     console.error('[Admin API] Failed to create team:', error);
-    return NextResponse.json(
-      { error: 'Failed to create team' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Failed to create team' }, { status: 500 });
   }
 }
 
@@ -123,55 +107,37 @@ export async function PUT(request: NextRequest) {
     const { id, name, logoUrl } = body;
     
     if (!id) {
-      return NextResponse.json(
-        { error: 'Team ID is required' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'Team ID is required' }, { status: 400 });
     }
     
     const updates: string[] = [];
     const params: (string | number | null)[] = [];
     
     if (name !== undefined) {
-      updates.push('name = ?');
+      updates.push(`name = $${params.length + 1}`);
       params.push(name);
-      
-      // Update slug too
       const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
-      updates.push('slug = ?');
+      updates.push(`slug = $${params.length + 1}`);
       params.push(slug);
     }
     
     if (logoUrl !== undefined) {
-      updates.push('logo_url = ?');
+      updates.push(`logo_url = $${params.length + 1}`);
       params.push(logoUrl);
     }
     
     if (updates.length === 0) {
-      return NextResponse.json(
-        { error: 'No updates provided' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'No updates provided' }, { status: 400 });
     }
     
     params.push(id);
     
-    await query(`
-      UPDATE teams
-      SET ${updates.join(', ')}
-      WHERE id = ?
-    `, params);
+    await query(`UPDATE teams SET ${updates.join(', ')} WHERE id = $${params.length}`, params);
     
-    return NextResponse.json({
-      success: true,
-      message: 'Team updated successfully'
-    });
+    return NextResponse.json({ success: true, message: 'Team updated successfully' });
   } catch (error) {
     console.error('[Admin API] Failed to update team:', error);
-    return NextResponse.json(
-      { error: 'Failed to update team' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Failed to update team' }, { status: 500 });
   }
 }
 
@@ -182,23 +148,14 @@ export async function DELETE(request: NextRequest) {
     const id = searchParams.get('id');
     
     if (!id) {
-      return NextResponse.json(
-        { error: 'Team ID is required' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'Team ID is required' }, { status: 400 });
     }
     
-    await query('DELETE FROM teams WHERE id = ?', [id]);
+    await query('DELETE FROM teams WHERE id = $1', [id]);
     
-    return NextResponse.json({
-      success: true,
-      message: 'Team deleted successfully'
-    });
+    return NextResponse.json({ success: true, message: 'Team deleted successfully' });
   } catch (error) {
     console.error('[Admin API] Failed to delete team:', error);
-    return NextResponse.json(
-      { error: 'Failed to delete team' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Failed to delete team' }, { status: 500 });
   }
 }

@@ -7,7 +7,7 @@ import { query, getPool, execute } from './db';
  * Logged-out users can still vote — we just key off a long-lived cookie.
  *
  * Storage:
- *   1. MySQL when DATABASE_URL is set (table `match_votes`).
+ *   1. PostgreSQL when DATABASE_URL is set (table `match_votes`).
  *   2. In-memory fallback on globalThis so dev installs without a DB still
  *      persist within the running process.
  */
@@ -44,13 +44,12 @@ async function ensureTable(): Promise<void> {
   try {
     await query(`
       CREATE TABLE IF NOT EXISTS match_votes (
-        id BIGINT AUTO_INCREMENT PRIMARY KEY,
+        id BIGSERIAL PRIMARY KEY,
         match_id VARCHAR(191) NOT NULL,
         voter_id VARCHAR(191) NOT NULL,
-        pick ENUM('home','draw','away') NOT NULL,
+        pick VARCHAR(10) NOT NULL CHECK (pick IN ('home','draw','away')),
         created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        UNIQUE KEY uq_match_voter (match_id, voter_id),
-        KEY idx_match_votes_match (match_id)
+        UNIQUE (match_id, voter_id)
       )
     `);
     tableReady = true;
@@ -68,7 +67,7 @@ export async function getVoteTotals(matchId: string): Promise<VoteTotals> {
     await ensureTable();
     try {
       const r = await query<{ pick: VotePick; c: number }>(
-        `SELECT pick, COUNT(*) AS c FROM match_votes WHERE match_id = ? GROUP BY pick`,
+        `SELECT pick, COUNT(*) AS c FROM match_votes WHERE match_id = $1 GROUP BY pick`,
         [matchId],
       );
       const t = emptyTotals();
@@ -101,7 +100,7 @@ export async function getUserVote(
     await ensureTable();
     try {
       const r = await query<{ pick: VotePick }>(
-        `SELECT pick FROM match_votes WHERE match_id = ? AND voter_id = ? LIMIT 1`,
+        `SELECT pick FROM match_votes WHERE match_id = $1 AND voter_id = $2 LIMIT 1`,
         [matchId, voterId],
       );
       return r.rows[0]?.pick ?? null;
@@ -123,10 +122,7 @@ export async function castVote(
   matchId: string,
   voterId: string,
   pick: VotePick,
-): Promise<
-  | { ok: true; totals: VoteTotals; pick: VotePick }
-  | { ok: false; reason: 'already_voted'; totals: VoteTotals; pick: VotePick }
-> {
+): Promise<{ ok: boolean; reason?: string; totals: VoteTotals; pick: VotePick }> {
   const existing = await getUserVote(matchId, voterId);
   if (existing) {
     const totals = await getVoteTotals(matchId);
@@ -137,7 +133,7 @@ export async function castVote(
     await ensureTable();
     try {
       await execute(
-        `INSERT IGNORE INTO match_votes (match_id, voter_id, pick) VALUES (?, ?, ?)`,
+        `INSERT INTO match_votes (match_id, voter_id, pick) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING`,
         [matchId, voterId, pick],
       );
       const totals = await getVoteTotals(matchId);

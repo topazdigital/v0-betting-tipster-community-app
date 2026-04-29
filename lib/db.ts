@@ -1,61 +1,21 @@
-import mysql from 'mysql2/promise';
-import fs from 'fs';
-import path from 'path';
+import { Pool, PoolClient } from 'pg';
 
-// MySQL connection pool
-// Priority: DATABASE_URL env var > admin panel config file > no connection (mock data fallback)
+// PostgreSQL connection pool
+// Uses DATABASE_URL environment variable set by Replit
 
-const DB_CONFIG_PATH = path.join(process.cwd(), '.db-config.json');
+let pool: Pool | null = null;
 
-interface DbFileConfig {
-  host: string;
-  port: number;
-  user: string;
-  password: string;
-  database: string;
-  ssl: boolean;
-}
-
-function getConnectionUrl(): string | null {
-  if (process.env.DATABASE_URL) {
-    const url = process.env.DATABASE_URL;
-    // Only use if it's a MySQL URL
-    if (url.startsWith('mysql://') || url.startsWith('mysql2://')) return url;
-    // Skip PostgreSQL URLs silently
-    if (url.startsWith('postgres')) return null;
-    return url;
-  }
-
-  try {
-    if (fs.existsSync(DB_CONFIG_PATH)) {
-      const cfg: DbFileConfig = JSON.parse(fs.readFileSync(DB_CONFIG_PATH, 'utf8'));
-      if (cfg.host && cfg.user && cfg.database) {
-        const auth = cfg.password
-          ? `${encodeURIComponent(cfg.user)}:${encodeURIComponent(cfg.password)}`
-          : encodeURIComponent(cfg.user);
-        const sslSuffix = cfg.ssl ? '?ssl=true' : '';
-        return `mysql://${auth}@${cfg.host}:${cfg.port || 3306}/${cfg.database}${sslSuffix}`;
-      }
-    }
-  } catch {}
-
-  return null;
-}
-
-let pool: mysql.Pool | null = null;
-
-export function getPool(): mysql.Pool | null {
-  const url = getConnectionUrl();
+export function getPool(): Pool | null {
+  const url = process.env.DATABASE_URL;
   if (!url) return null;
 
   if (!pool) {
-    pool = mysql.createPool({
-      uri: url,
-      waitForConnections: true,
-      connectionLimit: 10,
-      queueLimit: 0,
-      enableKeepAlive: true,
-      keepAliveInitialDelay: 0,
+    pool = new Pool({
+      connectionString: url,
+      ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+      max: 10,
+      idleTimeoutMillis: 30000,
+      connectionTimeoutMillis: 2000,
     });
   }
 
@@ -75,8 +35,10 @@ export async function query<T>(sql: string, params?: unknown[]): Promise<QueryRe
     return { rows: [] };
   }
   
-  const [rows] = await pool.execute(sql, params);
-  return { rows: rows as T[] };
+  // Convert MySQL ? placeholders to PostgreSQL $1, $2, ... style
+  const pgSql = convertToPostgres(sql);
+  const result = await pool.query(pgSql, params);
+  return { rows: result.rows as T[], affectedRows: result.rowCount ?? 0 };
 }
 
 export async function queryOne<T>(sql: string, params?: unknown[]): Promise<T | null> {
@@ -84,20 +46,27 @@ export async function queryOne<T>(sql: string, params?: unknown[]): Promise<T | 
   return result.rows[0] || null;
 }
 
-export async function execute(sql: string, params?: unknown[]): Promise<mysql.ResultSetHeader> {
+export interface ExecuteResult {
+  insertId: number;
+  affectedRows: number;
+}
+
+export async function execute(sql: string, params?: unknown[]): Promise<ExecuteResult> {
   const pool = getPool();
   
   if (!pool) {
     throw new Error('No database connection available');
   }
   
-  const [result] = await pool.execute(sql, params);
-  return result as mysql.ResultSetHeader;
+  const pgSql = convertToPostgres(sql);
+  const result = await pool.query(pgSql, params);
+  const insertId = result.rows?.[0]?.id ?? 0;
+  return { insertId, affectedRows: result.rowCount ?? 0 };
 }
 
 // Transaction helper
 export async function withTransaction<T>(
-  callback: (connection: mysql.PoolConnection) => Promise<T>
+  callback: (connection: PoolClient) => Promise<T>
 ): Promise<T> {
   const pool = getPool();
   
@@ -105,18 +74,18 @@ export async function withTransaction<T>(
     throw new Error('No database connection available');
   }
   
-  const connection = await pool.getConnection();
+  const client = await pool.connect();
   
   try {
-    await connection.beginTransaction();
-    const result = await callback(connection);
-    await connection.commit();
+    await client.query('BEGIN');
+    const result = await callback(client);
+    await client.query('COMMIT');
     return result;
   } catch (error) {
-    await connection.rollback();
+    await client.query('ROLLBACK');
     throw error;
   } finally {
-    connection.release();
+    client.release();
   }
 }
 
@@ -126,4 +95,14 @@ export async function closePool(): Promise<void> {
     await pool.end();
     pool = null;
   }
+}
+
+/**
+ * Convert MySQL-style ? placeholders to PostgreSQL $1, $2, ...
+ * Also converts MySQL-specific syntax to PostgreSQL equivalents.
+ */
+function convertToPostgres(sql: string): string {
+  let index = 0;
+  // Replace ? with $1, $2, ...
+  return sql.replace(/\?/g, () => `$${++index}`);
 }

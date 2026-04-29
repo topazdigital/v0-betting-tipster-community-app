@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { query } from '@/lib/db';
+import { query, execute } from '@/lib/db';
 import { getAllMatches } from '@/lib/api/unified-sports-api';
 
 export const dynamic = 'force-dynamic';
@@ -34,11 +34,15 @@ export async function GET(request: NextRequest) {
   if (hasDb()) {
     try {
       const offset = (page - 1) * limit;
-      let whereClause = '1=1';
+      const conditions: string[] = ['1=1'];
       const params: (string | number)[] = [];
-      if (status && status !== 'all') { whereClause += ' AND m.status = ?'; params.push(status); }
-      if (sportId && sportId !== 'all') { whereClause += ' AND l.sport_id = ?'; params.push(parseInt(sportId)); }
-      if (search) { whereClause += ' AND (ht.name LIKE ? OR at.name LIKE ?)'; params.push(`%${search}%`, `%${search}%`); }
+      if (status && status !== 'all') { conditions.push(`m.status = $${params.length + 1}`); params.push(status); }
+      if (sportId && sportId !== 'all') { conditions.push(`l.sport_id = $${params.length + 1}`); params.push(parseInt(sportId)); }
+      if (search) {
+        conditions.push(`(ht.name ILIKE $${params.length + 1} OR at.name ILIKE $${params.length + 2})`);
+        params.push(`%${search}%`, `%${search}%`);
+      }
+      const whereClause = conditions.join(' AND ');
       const result = await query(`
         SELECT m.id, m.kickoff_time, m.status, m.home_score, m.away_score, m.minute,
                ht.name as home_team_name, ht.logo_url as home_team_logo,
@@ -52,7 +56,7 @@ export async function GET(request: NextRequest) {
           JOIN sports s ON l.sport_id = s.id
          WHERE ${whereClause}
          ORDER BY m.kickoff_time DESC
-         LIMIT ? OFFSET ?
+         LIMIT $${params.length + 1} OFFSET $${params.length + 2}
       `, [...params, limit, offset]);
       const countResult = await query(
         `SELECT COUNT(*) as total FROM matches m JOIN leagues l ON m.league_id = l.id JOIN teams ht ON m.home_team_id = ht.id JOIN teams at ON m.away_team_id = at.id WHERE ${whereClause}`,
@@ -121,17 +125,8 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const {
-      leagueId,
-      homeTeamId,
-      awayTeamId,
-      kickoffTime,
-      homeOdds,
-      drawOdds,
-      awayOdds
-    } = body;
+    const { leagueId, homeTeamId, awayTeamId, kickoffTime, homeOdds, drawOdds, awayOdds } = body;
     
-    // Validate required fields
     if (!leagueId || !homeTeamId || !awayTeamId || !kickoffTime) {
       return NextResponse.json(
         { error: 'Missing required fields: leagueId, homeTeamId, awayTeamId, kickoffTime' },
@@ -139,40 +134,28 @@ export async function POST(request: NextRequest) {
       );
     }
     
-    // Insert match
-    const { execute: execQuery } = await import('@/lib/db');
-    const result = await execQuery(
+    const result = await execute(
       `INSERT INTO matches (league_id, home_team_id, away_team_id, kickoff_time, status)
-       VALUES (?, ?, ?, ?, 'scheduled')`,
+       VALUES ($1, $2, $3, $4, 'scheduled') RETURNING id`,
       [leagueId, homeTeamId, awayTeamId, kickoffTime]
     );
     
     const matchId = result.insertId;
     
-    // If odds provided, insert them
     if (homeOdds && awayOdds) {
-      // Get first available bookmaker or create default
-      const bookmakerResult = await query(`
-        SELECT id FROM bookmakers LIMIT 1
-      `);
-      
+      const bookmakerResult = await query(`SELECT id FROM bookmakers LIMIT 1`);
       const bookmakerId = (bookmakerResult.rows as Array<{ id: number }>)[0]?.id;
       
       if (bookmakerId) {
-        // Get or create the h2h market
-        const marketResult = await query(`
-          SELECT id FROM markets WHERE slug = 'h2h' LIMIT 1
-        `);
-        
+        const marketResult = await query(`SELECT id FROM markets WHERE slug = 'h2h' LIMIT 1`);
         const marketId = (marketResult.rows as Array<{ id: number }>)[0]?.id || 1;
         
-        // Insert odds
         await query(`
           INSERT INTO odds (match_id, bookmaker_id, market_id, selection, value)
           VALUES 
-            (?, ?, ?, 'home', ?),
-            (?, ?, ?, 'draw', ?),
-            (?, ?, ?, 'away', ?)
+            ($1, $2, $3, 'home', $4),
+            ($5, $6, $7, 'draw', $8),
+            ($9, $10, $11, 'away', $12)
         `, [
           matchId, bookmakerId, marketId, homeOdds,
           matchId, bookmakerId, marketId, drawOdds || 3.0,
@@ -181,17 +164,10 @@ export async function POST(request: NextRequest) {
       }
     }
     
-    return NextResponse.json({
-      success: true,
-      matchId,
-      message: 'Match created successfully'
-    });
+    return NextResponse.json({ success: true, matchId, message: 'Match created successfully' });
   } catch (error) {
     console.error('[Admin API] Failed to create match:', error);
-    return NextResponse.json(
-      { error: 'Failed to create match' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Failed to create match' }, { status: 500 });
   }
 }
 
@@ -202,60 +178,29 @@ export async function PUT(request: NextRequest) {
     const { id, status, homeScore, awayScore, minute } = body;
     
     if (!id) {
-      return NextResponse.json(
-        { error: 'Match ID is required' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'Match ID is required' }, { status: 400 });
     }
     
     const updates: string[] = [];
     const params: (string | number)[] = [];
     
-    if (status !== undefined) {
-      updates.push('status = ?');
-      params.push(status);
-    }
-    
-    if (homeScore !== undefined) {
-      updates.push('home_score = ?');
-      params.push(homeScore);
-    }
-    
-    if (awayScore !== undefined) {
-      updates.push('away_score = ?');
-      params.push(awayScore);
-    }
-    
-    if (minute !== undefined) {
-      updates.push('minute = ?');
-      params.push(minute);
-    }
+    if (status !== undefined) { updates.push(`status = $${params.length + 1}`); params.push(status); }
+    if (homeScore !== undefined) { updates.push(`home_score = $${params.length + 1}`); params.push(homeScore); }
+    if (awayScore !== undefined) { updates.push(`away_score = $${params.length + 1}`); params.push(awayScore); }
+    if (minute !== undefined) { updates.push(`minute = $${params.length + 1}`); params.push(minute); }
     
     if (updates.length === 0) {
-      return NextResponse.json(
-        { error: 'No updates provided' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'No updates provided' }, { status: 400 });
     }
     
     params.push(id);
     
-    await query(`
-      UPDATE matches
-      SET ${updates.join(', ')}
-      WHERE id = ?
-    `, params);
+    await query(`UPDATE matches SET ${updates.join(', ')} WHERE id = $${params.length}`, params);
     
-    return NextResponse.json({
-      success: true,
-      message: 'Match updated successfully'
-    });
+    return NextResponse.json({ success: true, message: 'Match updated successfully' });
   } catch (error) {
     console.error('[Admin API] Failed to update match:', error);
-    return NextResponse.json(
-      { error: 'Failed to update match' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Failed to update match' }, { status: 500 });
   }
 }
 
@@ -266,23 +211,14 @@ export async function DELETE(request: NextRequest) {
     const id = searchParams.get('id');
     
     if (!id) {
-      return NextResponse.json(
-        { error: 'Match ID is required' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'Match ID is required' }, { status: 400 });
     }
     
-    await query('DELETE FROM matches WHERE id = ?', [id]);
+    await query('DELETE FROM matches WHERE id = $1', [id]);
     
-    return NextResponse.json({
-      success: true,
-      message: 'Match deleted successfully'
-    });
+    return NextResponse.json({ success: true, message: 'Match deleted successfully' });
   } catch (error) {
     console.error('[Admin API] Failed to delete match:', error);
-    return NextResponse.json(
-      { error: 'Failed to delete match' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Failed to delete match' }, { status: 500 });
   }
 }
