@@ -3,6 +3,7 @@ import { ALL_LEAGUES, ALL_SPORTS } from '@/lib/sports-data';
 import { getAllMatches, type UnifiedMatch } from '@/lib/api/unified-sports-api';
 import { query } from '@/lib/db';
 import { teamHref } from '@/lib/utils/slug';
+import { SENIOR_FOOTBALL_TEAMS, type CatalogTeam } from '@/lib/data/team-catalog';
 
 // Unified search endpoint backing the header typeahead.
 // Returns up to ~5 hits per category for: leagues, matches, teams, tipsters.
@@ -93,6 +94,14 @@ function isNoisyTeamName(name: string): boolean {
   return TEAM_NOISE_PATTERNS.some(rx => rx.test(name));
 }
 
+// Detect women's-team variants ("Arsenal Women", "Chelsea FC Women",
+// "Barcelona Femení", "Olympique Lyonnais Féminin"). We still surface
+// them in search but rank them BELOW the senior side when both match.
+const WOMEN_TEAM_RX = /\b(women|wfc|fem(en[ií]?)?|ladies?|lfc|ddl)\b/i;
+function isWomenTeamName(name: string): boolean {
+  return WOMEN_TEAM_RX.test(name);
+}
+
 // Tiny scorer so "man u" beats "Manchester City" for matches starting with the query.
 // Also checks aliases — typing "PSG" should score Paris Saint-Germain as if
 // the user typed the canonical name directly.
@@ -171,11 +180,53 @@ export async function GET(request: NextRequest) {
   // ── 2. Matches + teams (from unified feed; cached upstream) ──────────
   // We run team derivation off the same fetch so we only hit ESPN once.
   const matchHits: SearchHit[] = [];
+  // Each team-map entry tracks its raw text-match score AND whether the
+  // entry is a senior side (so women's variants can be surfaced too but
+  // ranked below the senior club when a query matches both — i.e. typing
+  // "Arsenal" returns Arsenal first, "Arsenal Women" second instead of
+  // only the women's side).
+  type TeamEntry = { hit: SearchHit; score: number; isWomen: boolean };
   // Dedupe by *normalized team name* — ESPN often lists the same club
   // under multiple feeds with different IDs (e.g. PSG appears once under
   // Ligue 1 with id 160 and again under a friendly/cup feed with id 19258),
   // and we don't want both to surface in search.
-  const teamMap = new Map<string, SearchHit>();
+  const teamMap = new Map<string, TeamEntry>();
+
+  // Score helper that also considers a team's aliases — typing "PSG" should
+  // hit Paris Saint-Germain, "Spurs" should hit Tottenham, etc.
+  const scoreCatalogTeam = (team: CatalogTeam): number => {
+    let best = scoreMatch(q, team.name);
+    for (const a of team.aliases || []) {
+      const s = scoreMatch(q, a);
+      if (s > best) best = s;
+    }
+    return best;
+  };
+
+  // Seed the team map with the senior-club catalog so well-known clubs
+  // (Arsenal, Chelsea, Liverpool, Real Madrid, Bayern, …) ALWAYS show up
+  // even when they aren't playing today. Without this, only teams in the
+  // current fixture feed surface — which is why "Arsenal" returned only
+  // "Arsenal Women" on midweeks the senior side wasn't in the feed.
+  for (const team of SENIOR_FOOTBALL_TEAMS) {
+    const score = scoreCatalogTeam(team);
+    if (score <= 0) continue;
+    const dedupeKey = normTeamName(team.name);
+    if (!dedupeKey) continue;
+    teamMap.set(dedupeKey, {
+      score,
+      isWomen: false,
+      hit: {
+        type: 'team',
+        id: team.id,
+        title: team.name,
+        subtitle: `${team.league} • ${team.country}`,
+        href: teamHref(team.name, team.id),
+        logoUrl: team.logo,
+        sportSlug: 'football',
+      },
+    });
+  }
   // Prefer entries whose league country is a real country (not "World" /
   // "Europe" / "International") and whose sport is football — that keeps
   // PSG → Ligue 1 · France instead of PSG → Champions League · Europe.
@@ -192,8 +243,9 @@ export async function GET(request: NextRequest) {
 
       // Team hits — dedupe by normalized team name (id alone is not enough,
       // ESPN duplicates clubs across competition feeds). Skip noisy variants
-      // (women's, U-teams, reserves) so the senior side surfaces cleanly
-      // when a user searches "Marseille" / "Liverpool" etc.
+      // (U-teams, reserves) so the senior side surfaces cleanly. Women's
+      // teams ARE included but tagged so we can rank them below the senior
+      // side when both match the same query (e.g. "Arsenal" → senior first).
       for (const t of [m.homeTeam, m.awayTeam]) {
         if (isNoisyTeamName(t.name)) continue;
         const ts = scoreMatch(q, t.name);
@@ -203,23 +255,33 @@ export async function GET(request: NextRequest) {
         // collapse to a single entry — and we always prefer the ESPN id.
         const dedupeKey = normTeamName(t.name);
         if (!dedupeKey) continue;
+        const isWomen = isWomenTeamName(t.name);
         const existing = teamMap.get(dedupeKey);
-        const candidate: SearchHit = {
-          type: 'team',
-          id: t.id,
-          title: t.name,
-          subtitle: `${m.league.name} • ${m.league.country}`,
-          href: teamHref(t.name, t.id),
-          logoUrl: t.logo,
-          sportSlug: m.sport?.slug,
+        const candidate: TeamEntry = {
+          score: ts,
+          isWomen,
+          hit: {
+            type: 'team',
+            id: t.id,
+            title: t.name,
+            subtitle: `${m.league.name} • ${m.league.country}`,
+            href: teamHref(t.name, t.id),
+            logoUrl: t.logo,
+            sportSlug: m.sport?.slug,
+          },
         };
         if (!existing) {
           teamMap.set(dedupeKey, candidate);
           continue;
         }
+        // Never let a feed entry overwrite a catalog (senior) entry.
+        if (!existing.isWomen && existing.hit.id && !existing.hit.id.startsWith('fd_team_') && !isWomen) {
+          // Catalog entry already there — keep it. Skip overwrite from feed.
+          continue;
+        }
         // Prefer ESPN-sourced ids (numeric or `espn_…`) over football-data
         // (`fd_team_…`) — ESPN ids power our team page, FD ids 404.
-        const existingIsFd = existing.id.startsWith('fd_team_');
+        const existingIsFd = existing.hit.id.startsWith('fd_team_');
         const candidateIsFd = t.id.startsWith('fd_team_');
         if (existingIsFd && !candidateIsFd) {
           teamMap.set(dedupeKey, candidate);
@@ -228,7 +290,7 @@ export async function GET(request: NextRequest) {
         if (!existingIsFd && candidateIsFd) continue;
         // Same-source tie-break: prefer the entry whose subtitle uses a
         // real country over generic continental/international labels.
-        const existingCountry = (existing.subtitle.split('•')[1] || '').trim();
+        const existingCountry = (existing.hit.subtitle.split('•')[1] || '').trim();
         const candidateCountry = (m.league.country || '').trim();
         if (!isPreferredSubtitle(existingCountry) && isPreferredSubtitle(candidateCountry)) {
           teamMap.set(dedupeKey, candidate);
@@ -266,7 +328,16 @@ export async function GET(request: NextRequest) {
     return (a.kickoffIso || '').localeCompare(b.kickoffIso || '');
   });
 
-  const teamHits = Array.from(teamMap.values()).slice(0, limitPerKind);
+  // Senior teams first, then women's variants, both sorted by raw score.
+  // This guarantees that searching "Arsenal" puts Arsenal (id 359) above
+  // Arsenal Women (id 19256) instead of the other way round.
+  const teamHits: SearchHit[] = Array.from(teamMap.values())
+    .sort((a, b) => {
+      if (a.isWomen !== b.isWomen) return a.isWomen ? 1 : -1;
+      return b.score - a.score;
+    })
+    .slice(0, limitPerKind)
+    .map(e => e.hit);
   const trimmedMatches = matchHits.slice(0, limitPerKind);
 
   // ── 3. Tipsters (DB; gracefully empty if no DB) ──────────────────────
