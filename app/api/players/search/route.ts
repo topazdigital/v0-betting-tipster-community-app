@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 // Player-only search — backs the Compare Players picker so users get athletes,
-// not teams. We hit ESPN's public site search and filter to athlete results.
+// not teams. We hit ESPN's public site search v2 endpoint and filter to
+// athlete results.
 //
 // ESPN endpoint shape (public, no key):
-//   https://site.web.api.espn.com/apis/common/v3/search?query=mbappe&type=player&limit=10
-// The response groups results into an array of "results" with a `type` and
-// nested `contents` items. We normalise to a flat list the UI understands.
+//   https://site.web.api.espn.com/apis/search/v2?query=mbappe&type=player&limit=10
+// Note: the older /apis/common/v3/search endpoint returns empty results,
+// so v2 is the canonical search to use here.
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 30;
@@ -19,11 +20,15 @@ interface EspnContent {
   displayName?: string;
   name?: string;
   shortName?: string;
+  description?: string;
+  subtitle?: string;
+  defaultLeagueSlug?: string;
+  sport?: string;
   defaultLeague?: { name?: string };
   defaultTeam?: { displayName?: string; logo?: string; logos?: { href?: string }[] };
   position?: { displayName?: string; abbreviation?: string };
   image?: { default?: string; href?: string };
-  link?: { web?: { href?: string } };
+  link?: { web?: string | { href?: string } };
 }
 
 interface EspnSearchResult {
@@ -43,10 +48,33 @@ interface PlayerHit {
   teamLogo?: string;
   headshot?: string;
   href: string;
+  league?: string;
 }
 
-function pickHeadshot(c: EspnContent): string | undefined {
-  return c.image?.default || c.image?.href || undefined;
+// Extract the numeric ESPN athlete id from any of the available fields.
+// ESPN uses several shapes:
+//   uid:  "s:600~a:231388"      → "231388"
+//   link: "https://www.espn.com/soccer/player/_/id/231388/kylian-mbappe"
+//   id:   GUID like "61edbcca-..."  → not usable for our routes
+// We prefer uid → link → numeric id.
+function extractAthleteId(c: EspnContent): string | null {
+  const uid = c.uid || '';
+  const aMatch = uid.match(/~a:(\d+)/);
+  if (aMatch) return aMatch[1];
+  const linkHref = typeof c.link?.web === 'string' ? c.link.web : c.link?.web?.href;
+  if (linkHref) {
+    const lm = linkHref.match(/\/id\/(\d+)/);
+    if (lm) return lm[1];
+  }
+  if (c.id && /^\d+$/.test(String(c.id))) return String(c.id);
+  return null;
+}
+
+// Headshot CDN guess — ESPN exposes athlete headshots at a predictable URL.
+function headshotForId(id: string, sport?: string): string {
+  // Soccer headshots live under i/headshots/soccer/players/full
+  const s = (sport || 'soccer').toLowerCase();
+  return `https://a.espncdn.com/i/headshots/${s}/players/full/${id}.png`;
 }
 
 export async function GET(req: NextRequest) {
@@ -58,15 +86,17 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ q, hits: [] as PlayerHit[] });
   }
 
-  // ESPN's search supports `type=player` to narrow to athletes. We also call
-  // with no `type` and filter client-side, because some sports return players
-  // grouped under different result-set types.
-  const url = `https://site.web.api.espn.com/apis/common/v3/search?query=${encodeURIComponent(q)}&type=player&limit=${limit * 2}`;
+  // v2 search returns athletes mixed with articles/clips — we filter to
+  // results.type === "player" and pick the athlete entries from .contents.
+  const url = `https://site.web.api.espn.com/apis/search/v2?query=${encodeURIComponent(q)}&type=player&limit=${limit * 2}`;
 
   let payload: EspnSearchResponse | null = null;
   try {
     const r = await fetch(url, {
-      headers: { 'User-Agent': 'BetTipsPro/1.0 (+https://bettipspro.com)' },
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (compatible; BetTipsPro/1.0; +https://bettipspro.com)',
+        Accept: 'application/json',
+      },
       next: { revalidate: 30 },
     });
     if (r.ok) payload = (await r.json()) as EspnSearchResponse;
@@ -79,9 +109,9 @@ export async function GET(req: NextRequest) {
 
   for (const result of payload?.results || []) {
     const tag = (result.type || '').toLowerCase();
-    if (tag && !tag.includes('player') && !tag.includes('athlete')) continue;
+    if (tag && tag !== 'player' && tag !== 'athlete') continue;
     for (const c of result.contents || []) {
-      const id = String(c.id || c.uid || '').replace(/^.*~a:/, '');
+      const id = extractAthleteId(c);
       if (!id || seen.has(id)) continue;
       seen.add(id);
       const name = c.displayName || c.name || c.shortName;
@@ -90,10 +120,11 @@ export async function GET(req: NextRequest) {
         id,
         name,
         position: c.position?.displayName || c.position?.abbreviation,
-        team: c.defaultTeam?.displayName,
+        team: c.subtitle || c.defaultTeam?.displayName,
         teamLogo: c.defaultTeam?.logo || c.defaultTeam?.logos?.[0]?.href,
-        headshot: pickHeadshot(c),
+        headshot: c.image?.default || c.image?.href || headshotForId(id, c.sport),
         href: `/players/${id}`,
+        league: c.description || c.defaultLeague?.name,
       });
       if (hits.length >= limit) break;
     }

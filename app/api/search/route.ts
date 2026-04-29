@@ -102,6 +102,29 @@ function isWomenTeamName(name: string): boolean {
   return WOMEN_TEAM_RX.test(name);
 }
 
+// Detect women's competitions from the league name or id. ESPN's WSL/UWCL
+// feeds list teams under the bare club name (e.g. "Arsenal"), so without a
+// league-context check the women's side gets de-duplicated against the men's
+// senior catalog entry and never appears in search.
+const WOMEN_LEAGUE_NAME_RX = /\b(women|wsl|nwsl|fem(en[ií]?)?|ladies?|w-league|wcl)\b/i;
+const WOMEN_LEAGUE_ID_RX = /(\.w\.|wchampions|wnba|nwsl|w-league)/i;
+function isWomenCompetition(leagueName: string, leagueId: string): boolean {
+  return WOMEN_LEAGUE_NAME_RX.test(leagueName || '') || WOMEN_LEAGUE_ID_RX.test(leagueId || '');
+}
+
+// Detect youth/reserve competitions (U19 UEFA Youth League, Premier League 2,
+// reserve leagues, etc) so we can show those teams as "Arsenal U19" /
+// "Arsenal Reserves" alongside the senior side instead of dropping them.
+const YOUTH_LEAGUE_RX = /\b(u-?(15|16|17|18|19|20|21|23)|youth|reserves?|primavera|junior)\b/i;
+function detectYouthSuffix(leagueName: string, leagueId: string): string | null {
+  const text = `${leagueName} ${leagueId}`;
+  const m = text.match(/\bu-?(15|16|17|18|19|20|21|23)\b/i);
+  if (m) return `U${m[1]}`;
+  if (/\b(youth|primavera|junior)\b/i.test(text)) return 'Youth';
+  if (/\breserves?\b/i.test(text)) return 'Reserves';
+  return null;
+}
+
 // Tiny scorer so "man u" beats "Manchester City" for matches starting with the query.
 // Also checks aliases — typing "PSG" should score Paris Saint-Germain as if
 // the user typed the canonical name directly.
@@ -211,8 +234,11 @@ export async function GET(request: NextRequest) {
   for (const team of SENIOR_FOOTBALL_TEAMS) {
     const score = scoreCatalogTeam(team);
     if (score <= 0) continue;
-    const dedupeKey = normTeamName(team.name);
-    if (!dedupeKey) continue;
+    const baseKey = normTeamName(team.name);
+    if (!baseKey) continue;
+    // Catalog seeds are always senior-tier — they share the `::s` namespace
+    // with senior team hits derived from the live feed.
+    const dedupeKey = `${baseKey}::s`;
     teamMap.set(dedupeKey, {
       score,
       isWomen: false,
@@ -241,21 +267,38 @@ export async function GET(request: NextRequest) {
       const awayS = scoreMatch(q, m.awayTeam.name);
       const matchScore = Math.max(homeS, awayS);
 
-      // Team hits — dedupe by normalized team name (id alone is not enough,
-      // ESPN duplicates clubs across competition feeds). Skip noisy variants
-      // (U-teams, reserves) so the senior side surfaces cleanly. Women's
-      // teams ARE included but tagged so we can rank them below the senior
-      // side when both match the same query (e.g. "Arsenal" → senior first).
+      // Team hits — dedupe by normalized team name + competition tier
+      // (senior / women / U19 / reserves). ESPN's WSL feed lists teams
+      // under bare club names ("Arsenal"), so without a tier-aware key the
+      // women's side gets dropped in favour of the men's catalog entry.
+      // We DO surface women's, U-team and reserve sides as separate hits
+      // (e.g. "Arsenal", "Arsenal Women", "Arsenal U21") instead of just
+      // hiding them.
+      const leagueIsWomen = isWomenCompetition(m.league.name, String(m.league.id || ''));
+      const youthSuffix = detectYouthSuffix(m.league.name, String(m.league.id || ''));
       for (const t of [m.homeTeam, m.awayTeam]) {
-        if (isNoisyTeamName(t.name)) continue;
+        const teamIsWomen = leagueIsWomen || isWomenTeamName(t.name);
+        // Build the display name: ensure women's variants always show
+        // "Women" so the user can tell them apart from the senior side.
+        let displayName = t.name;
+        if (teamIsWomen && !isWomenTeamName(t.name)) {
+          displayName = `${t.name} Women`;
+        } else if (youthSuffix && !new RegExp(`\\b${youthSuffix}\\b`, 'i').test(t.name)) {
+          displayName = `${t.name} ${youthSuffix}`;
+        }
+        // Skip pure noise (e.g. "Arsenal Reserves II" from a noisy feed)
+        // BUT only if not part of a women's/youth competition — we want
+        // women's and U-teams to surface, just labelled clearly.
+        if (!teamIsWomen && !youthSuffix && isNoisyTeamName(t.name)) continue;
         const ts = scoreMatch(q, t.name);
         if (ts <= 0) continue;
-        // Use stripped-suffix normalisation so "Arsenal" and "Arsenal FC"
-        // (the latter coming from football-data.org with an `fd_team_*` id)
-        // collapse to a single entry — and we always prefer the ESPN id.
-        const dedupeKey = normTeamName(t.name);
-        if (!dedupeKey) continue;
-        const isWomen = isWomenTeamName(t.name);
+        // Tier-aware dedupe key. Senior, women, and youth all collapse
+        // to one entry per tier, but tiers don't collide.
+        const baseKey = normTeamName(t.name);
+        if (!baseKey) continue;
+        const tier = teamIsWomen ? 'w' : youthSuffix ? `y${youthSuffix.toLowerCase()}` : 's';
+        const dedupeKey = `${baseKey}::${tier}`;
+        const isWomen = teamIsWomen;
         const existing = teamMap.get(dedupeKey);
         const candidate: TeamEntry = {
           score: ts,
@@ -263,9 +306,9 @@ export async function GET(request: NextRequest) {
           hit: {
             type: 'team',
             id: t.id,
-            title: t.name,
+            title: displayName,
             subtitle: `${m.league.name} • ${m.league.country}`,
-            href: teamHref(t.name, t.id),
+            href: teamHref(displayName, t.id),
             logoUrl: t.logo,
             sportSlug: m.sport?.slug,
           },
@@ -330,13 +373,16 @@ export async function GET(request: NextRequest) {
 
   // Senior teams first, then women's variants, both sorted by raw score.
   // This guarantees that searching "Arsenal" puts Arsenal (id 359) above
-  // Arsenal Women (id 19256) instead of the other way round.
+  // Arsenal Women (id 19256) instead of the other way round. We also raise
+  // the team cap a bit so women's + youth tiers can sit alongside the
+  // senior team without one bumping the other off the dropdown.
+  const teamLimit = Math.max(limitPerKind, 8);
   const teamHits: SearchHit[] = Array.from(teamMap.values())
     .sort((a, b) => {
       if (a.isWomen !== b.isWomen) return a.isWomen ? 1 : -1;
       return b.score - a.score;
     })
-    .slice(0, limitPerKind)
+    .slice(0, teamLimit)
     .map(e => e.hit);
   const trimmedMatches = matchHits.slice(0, limitPerKind);
 

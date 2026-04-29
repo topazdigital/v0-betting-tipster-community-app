@@ -1,6 +1,6 @@
 'use client';
 
-import { use, useEffect } from 'react';
+import { use, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import useSWR from 'swr';
@@ -19,6 +19,7 @@ import { FlagIcon } from '@/components/ui/flag-icon';
 import { FollowTeamButton } from '@/components/teams/follow-team-button';
 import { cn } from '@/lib/utils';
 import { formatDate, getBrowserTimezone, formatTime } from '@/lib/utils/timezone';
+import { playerHref } from '@/lib/utils/slug';
 
 interface PageProps { params: Promise<{ id: string }> }
 
@@ -77,10 +78,12 @@ function MatchRow({ event, timezone, teamName }: { event: MatchEvent; timezone: 
   const lost = event.result === 'L';
 
   return (
-    <div className={cn(
-      'flex items-center gap-3 rounded-lg border border-border bg-card p-3 transition-all hover:border-primary/30',
-      isLive && 'border-live/30 bg-live/5'
-    )}>
+    <Link
+      href={`/matches/${encodeURIComponent(event.id)}`}
+      className={cn(
+        'flex items-center gap-3 rounded-lg border border-border bg-card p-3 transition-all hover:border-primary/40 hover:bg-muted/40 hover:shadow-sm',
+        isLive && 'border-live/30 bg-live/5'
+      )}>
       {/* Date / status */}
       <div className="w-16 shrink-0 text-center text-xs text-muted-foreground">
         {isLive ? (
@@ -146,7 +149,8 @@ function MatchRow({ event, timezone, teamName }: { event: MatchEvent; timezone: 
           </span>
         </div>
       ) : null}
-    </div>
+      <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground/60" />
+    </Link>
   );
 }
 
@@ -947,8 +951,17 @@ function PlayerCard({ player, accentColor }: { player: Player; accentColor: stri
   // (some ESPN headshots are missing for fringe-roster players).
   const [imgError, setImgError] = useState(false);
   const hasUsableImage = !!player.headshot && !imgError;
+  // Players become a clickable link when an ESPN id is present so users can
+  // jump straight to the full player profile (and trigger the compare flow).
+  const Wrapper: React.ElementType = player.id ? Link : 'div';
+  const wrapperProps = player.id ? { href: playerHref(player.name, player.id) } : {};
   return (
-    <div className="flex items-center gap-2.5 rounded-xl border border-border bg-card p-2.5 hover:border-primary/40 transition-colors">
+    <Wrapper
+      {...(wrapperProps as Record<string, unknown>)}
+      className={cn(
+        'group flex items-center gap-2.5 rounded-xl border border-border bg-card p-2.5 transition-colors',
+        player.id ? 'hover:border-primary/50 hover:bg-muted/40 cursor-pointer' : 'hover:border-primary/40'
+      )}>
       <div
         className="relative flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full"
         style={{ background: `${accentColor}22` }}
@@ -978,7 +991,10 @@ function PlayerCard({ player, accentColor }: { player: Player; accentColor: stri
         )}
       </div>
       <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-semibold">{player.name}</p>
+        <p className={cn(
+          'truncate text-sm font-semibold',
+          player.id && 'group-hover:text-primary'
+        )}>{player.name}</p>
         <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
           {player.position && <span>{player.position}</span>}
           {player.age && <span>· {player.age}y</span>}
@@ -994,7 +1010,10 @@ function PlayerCard({ player, accentColor }: { player: Player; accentColor: stri
           )}
         </div>
       </div>
-    </div>
+      {player.id && (
+        <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground/50 group-hover:text-primary" />
+      )}
+    </Wrapper>
   );
 }
 

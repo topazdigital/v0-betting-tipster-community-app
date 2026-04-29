@@ -39,43 +39,79 @@ const memorySettings: Record<string, string> = g.__memorySettings ?? (g.__memory
     'We use cookies to improve your experience, analyse site traffic and personalise content. By clicking "Accept", you consent to our use of cookies.',
 });
 
+// Map of admin-panel keys to the matching environment-variable name.
+// When the admin opens the settings page, any key that's blank in the DB
+// but present in process.env is auto-filled from the env so the admin
+// doesn't have to copy-paste it back in. Saving the form persists the
+// value to the DB, after which the env var is no longer needed.
+const ENV_BACKED_SETTINGS: Record<string, string> = {
+  the_odds_api_key: 'THE_ODDS_API_KEY',
+  sportsgameodds_api_key: 'SPORTSGAMEODDS_API_KEY',
+  openai_api_key: 'OPENAI_API_KEY',
+  vapid_public_key: 'VAPID_PUBLIC_KEY',
+  vapid_private_key: 'VAPID_PRIVATE_KEY',
+  vapid_subject: 'VAPID_SUBJECT',
+  google_analytics_id: 'GOOGLE_ANALYTICS_ID',
+  facebook_pixel_id: 'FACEBOOK_PIXEL_ID',
+  // Football-data.org is also wired up in code but not yet surfaced in the
+  // admin UI — list it here anyway so future tabs pick it up automatically.
+  football_data_api_key: 'FOOTBALL_DATA_API_KEY',
+};
+
+function fillFromEnv(settings: Record<string, string>): Record<string, string> {
+  for (const [key, envName] of Object.entries(ENV_BACKED_SETTINGS)) {
+    const current = settings[key];
+    if (!current || !String(current).trim()) {
+      const envValue = (process.env[envName] || '').trim();
+      if (envValue) settings[key] = envValue;
+    }
+  }
+  return settings;
+}
+
 // Get all settings
 export async function GET() {
   const pool = getPool();
-  
-  // If no database, return memory settings
+
+  // If no database, return memory settings (still backfilled from env so the
+  // admin sees the API keys that are already wired up in code).
   if (!pool) {
-    return NextResponse.json({ 
-      settings: memorySettings,
-      source: 'memory'
+    return NextResponse.json({
+      settings: fillFromEnv({ ...memorySettings }),
+      source: 'memory',
     });
   }
-  
+
   try {
     const result = await query<{ setting_key: string; setting_value: string }>(`
       SELECT setting_key, setting_value
       FROM site_settings
       ORDER BY setting_key
     `);
-    
+
     // Convert to object format
     const settings: Record<string, string> = { ...memorySettings };
-    
+
     result.rows.forEach(row => {
       settings[row.setting_key] = row.setting_value;
     });
-    
-    return NextResponse.json({ 
+
+    // Backfill any blank API-key field from the matching env var so the
+    // admin can see "this is already set in code" without having to
+    // re-paste it every time they open the page.
+    fillFromEnv(settings);
+
+    return NextResponse.json({
       settings,
-      source: 'database'
+      source: 'database',
     });
   } catch (error) {
     console.error('[Admin API] Failed to get settings:', error);
-    
+
     // Return default settings on error
     return NextResponse.json({
-      settings: memorySettings,
-      source: 'memory'
+      settings: fillFromEnv({ ...memorySettings }),
+      source: 'memory',
     });
   }
 }
