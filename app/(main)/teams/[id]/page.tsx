@@ -15,6 +15,7 @@ import { Badge } from '@/components/ui/badge';
 import { Spinner } from '@/components/ui/spinner';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { TeamLogo } from '@/components/ui/team-logo';
+import { PlayerAvatar } from '@/components/ui/player-avatar';
 import { FlagIcon } from '@/components/ui/flag-icon';
 import { FollowTeamButton } from '@/components/teams/follow-team-button';
 import { cn } from '@/lib/utils';
@@ -947,12 +948,11 @@ function SquadPanel({ roster, accentColor }: { roster: Player[]; accentColor: st
 }
 
 function PlayerCard({ player, accentColor }: { player: Player; accentColor: string }) {
-  // Local state lets us silently swap a 404 headshot for the initials avatar
-  // (some ESPN headshots are missing for fringe-roster players).
-  const [imgError, setImgError] = useState(false);
-  const hasUsableImage = !!player.headshot && !imgError;
   // Players become a clickable link when an ESPN id is present so users can
   // jump straight to the full player profile (and trigger the compare flow).
+  // The PlayerAvatar component handles its own ESPN headshot fallback chain
+  // (full → default → initials), so the team grid no longer shows blank
+  // circles when a fringe-squad headshot 404s.
   const Wrapper: React.ElementType = player.id ? Link : 'div';
   const wrapperProps = player.id ? { href: playerHref(player.name, player.id) } : {};
   return (
@@ -962,34 +962,16 @@ function PlayerCard({ player, accentColor }: { player: Player; accentColor: stri
         'group flex items-center gap-2.5 rounded-xl border border-border bg-card p-2.5 transition-colors',
         player.id ? 'hover:border-primary/50 hover:bg-muted/40 cursor-pointer' : 'hover:border-primary/40'
       )}>
-      <div
-        className="relative flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full"
-        style={{ background: `${accentColor}22` }}
-      >
-        {hasUsableImage ? (
-          <Image
-            src={player.headshot!}
-            alt={player.name}
-            fill
-            sizes="44px"
-            className="object-cover"
-            onError={() => setImgError(true)}
-            unoptimized
-          />
-        ) : (
-          <span className="text-xs font-bold text-muted-foreground">
-            {player.jersey || player.name.slice(0, 2).toUpperCase()}
-          </span>
-        )}
-        {player.jersey && hasUsableImage && (
-          <span
-            className="absolute -bottom-0.5 -right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[9px] font-black text-white"
-            style={{ background: accentColor }}
-          >
-            {player.jersey}
-          </span>
-        )}
-      </div>
+      <PlayerAvatar
+        id={player.id}
+        name={player.name}
+        headshot={player.headshot}
+        jersey={player.jersey}
+        size="lg"
+        ring="none"
+        noLink
+        className="shrink-0"
+      />
       <div className="min-w-0 flex-1">
         <p className={cn(
           'truncate text-sm font-semibold',
@@ -1034,30 +1016,34 @@ interface InjuryItem {
 }
 
 function InjuryRow({ inj }: { inj: InjuryItem }) {
-  // Same image-error fallback story as PlayerCard — ESPN headshots for some
-  // injured-list players are missing.
-  const [imgError, setImgError] = useState(false);
-  const showImage = !!inj.headshot && !imgError;
+  // Wrap the row in a Link to the player profile when ESPN gives us a
+  // playerId, so users can inspect the injured player directly.
+  const Wrapper: React.ElementType = inj.playerId ? Link : 'div';
+  const wrapperProps = inj.playerId
+    ? { href: playerHref(inj.playerName, inj.playerId) }
+    : {};
   return (
-    <div className="flex items-start gap-3 rounded-xl border border-amber-500/30 bg-amber-500/5 p-3">
-      <div className="relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-muted">
-        {showImage ? (
-          <Image
-            src={inj.headshot!}
-            alt={inj.playerName || ""}
-            fill
-            sizes="40px"
-            className="object-cover"
-            onError={() => setImgError(true)}
-            unoptimized
-          />
-        ) : (
-          <AlertCircle className="h-5 w-5 text-amber-500" />
-        )}
-      </div>
+    <Wrapper
+      {...(wrapperProps as Record<string, unknown>)}
+      className={cn(
+        'group flex items-start gap-3 rounded-xl border border-amber-500/30 bg-amber-500/5 p-3 transition-colors',
+        inj.playerId && 'hover:bg-amber-500/10 cursor-pointer',
+      )}
+    >
+      <PlayerAvatar
+        id={inj.playerId}
+        name={inj.playerName}
+        headshot={inj.headshot}
+        size="md"
+        ring="none"
+        noLink
+      />
       <div className="min-w-0 flex-1">
         <div className="flex items-center justify-between gap-2">
-          <p className="truncate text-sm font-semibold">{inj.playerName || "Unknown player"}</p>
+          <p className={cn(
+            'truncate text-sm font-semibold',
+            inj.playerId && 'group-hover:text-primary group-hover:underline underline-offset-2',
+          )}>{inj.playerName || "Unknown player"}</p>
           {inj.status && (
             <Badge variant="outline" className="shrink-0 text-[10px] border-amber-500/40 text-amber-700 dark:text-amber-400">
               {inj.status}
@@ -1077,7 +1063,7 @@ function InjuryRow({ inj }: { inj: InjuryItem }) {
           </p>
         )}
       </div>
-    </div>
+    </Wrapper>
   );
 }
 

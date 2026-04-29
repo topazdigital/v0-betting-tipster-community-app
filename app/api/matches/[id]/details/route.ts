@@ -585,13 +585,33 @@ function buildLeaders(summary: ESPNSummaryResponse) {
   if (!summary.leaders) return [];
   return summary.leaders.flatMap(team =>
     (team.leaders || []).flatMap(category =>
-      (category.leaders || []).slice(0, 1).map(l => ({
-        team: team.team?.displayName,
-        category: category.displayName || category.name,
-        athlete: l.athlete?.displayName || l.athlete?.shortName,
-        headshot: l.athlete?.headshot,
-        value: l.displayValue,
-      }))
+      (category.leaders || []).slice(0, 1).map(l => {
+        // ESPN leader rows sometimes ship `athlete.id` and sometimes only the
+        // headshot URL — extract a numeric id from the headshot pattern
+        // (`/players/full/<id>.png`) so the UI can deep-link to the player
+        // profile in every case.
+        const rawHs = l.athlete?.headshot as unknown;
+        const headshotUrl = typeof rawHs === "string"
+          ? rawHs
+          : (rawHs as { href?: string } | null | undefined)?.href;
+        const explicitId = (l.athlete as { id?: string | number } | undefined)?.id;
+        let athleteId = explicitId !== undefined && explicitId !== null && String(explicitId).length > 0
+          ? String(explicitId)
+          : undefined;
+        if (!athleteId && headshotUrl) {
+          const m = headshotUrl.match(/players\/full\/(\d+)\.(?:png|jpg)/i);
+          if (m) athleteId = m[1];
+        }
+        return {
+          team: team.team?.displayName,
+          teamId: team.team?.id,
+          category: category.displayName || category.name,
+          athlete: l.athlete?.displayName || l.athlete?.shortName,
+          athleteId,
+          headshot: headshotUrl,
+          value: l.displayValue,
+        };
+      })
     )
   );
 }

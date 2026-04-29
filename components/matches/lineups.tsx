@@ -7,9 +7,9 @@ import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
 import { User, AlertCircle, CheckCircle2, ChevronDown, ChevronUp } from "lucide-react"
-import Image from "next/image"
 import { cn } from "@/lib/utils"
 import { playerHref } from "@/lib/utils/slug"
+import { PlayerAvatar } from "@/components/ui/player-avatar"
 
 interface Player {
   id?: string
@@ -40,9 +40,7 @@ interface LineupsProps {
 }
 
 function PlayerRow({ player, bench }: { player: Player; bench?: boolean }) {
-  const [imgError, setImgError] = useState(false)
-  // Larger headshot (40px) when we have one — much more recognisable than the
-  // tiny 24px chips. Players become a clickable link when an id is present.
+  // Players become a clickable link when an id is present.
   const Wrapper: React.ElementType = player.id ? Link : 'div'
   const wrapperProps = player.id ? { href: playerHref(player.fullName || player.name, player.id) } : {}
 
@@ -57,21 +55,14 @@ function PlayerRow({ player, bench }: { player: Player; bench?: boolean }) {
       <span className="w-6 text-center font-mono text-xs font-bold text-muted-foreground shrink-0">
         {player.jersey || "—"}
       </span>
-      {player.headshot && !imgError ? (
-        <Image
-          src={player.headshot}
-          alt={player.name}
-          width={36}
-          height={36}
-          className="rounded-full ring-1 ring-border shrink-0 object-cover"
-          onError={() => setImgError(true)}
-          unoptimized
-        />
-      ) : (
-        <div className="h-9 w-9 rounded-full bg-primary/10 shrink-0 flex items-center justify-center text-[11px] font-bold text-primary">
-          {(player.fullName || player.name).slice(0, 1)}
-        </div>
-      )}
+      <PlayerAvatar
+        id={player.id}
+        name={player.fullName || player.name}
+        headshot={player.headshot}
+        size="md"
+        ring="border"
+        noLink
+      />
       <span className={cn(
         "flex-1 truncate text-sm font-medium",
         player.id && "group-hover:text-primary group-hover:underline underline-offset-2"
@@ -96,7 +87,6 @@ function parseFormation(formation?: string): number[] {
 }
 
 function PitchPlayer({ player, isHome }: { player: Player; isHome: boolean }) {
-  const [imgError, setImgError] = useState(false);
   const Wrapper: React.ElementType = player.id ? Link : 'div';
   const wrapperProps = player.id ? { href: playerHref(player.fullName || player.name, player.id) } : {};
   // Show last name only on the pitch — saves space and matches every TV
@@ -111,31 +101,16 @@ function PitchPlayer({ player, isHome }: { player: Player; isHome: boolean }) {
       )}
       title={player.fullName || player.name}
     >
-      {player.headshot && !imgError ? (
-        <Image
-          src={player.headshot}
-          alt={player.name}
-          width={36}
-          height={36}
-          className={cn(
-            'rounded-full object-cover ring-2 shadow-md transition-transform',
-            isHome ? 'ring-blue-400/80' : 'ring-red-400/80',
-            player.id && 'group-hover:scale-110',
-          )}
-          onError={() => setImgError(true)}
-          unoptimized
-        />
-      ) : (
-        <div
-          className={cn(
-            'flex h-9 w-9 items-center justify-center rounded-full text-[11px] font-bold text-white shadow-md ring-2 transition-transform',
-            isHome ? 'bg-blue-600 ring-blue-400/80' : 'bg-red-600 ring-red-400/80',
-            player.id && 'group-hover:scale-110',
-          )}
-        >
-          {player.jersey || lastName.slice(0, 1)}
-        </div>
-      )}
+      <PlayerAvatar
+        id={player.id}
+        name={player.fullName || player.name}
+        headshot={player.headshot}
+        jersey={player.jersey}
+        size="md"
+        ring={isHome ? 'blue' : 'red'}
+        noLink
+        className={cn('shadow-md transition-transform', player.id && 'group-hover:scale-110')}
+      />
       <span className="max-w-[80px] truncate rounded bg-black/70 px-1 text-[10px] font-medium text-white">
         {lastName}
       </span>

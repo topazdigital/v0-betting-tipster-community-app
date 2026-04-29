@@ -19,8 +19,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent } from "@/components/ui/card"
 import { Spinner } from "@/components/ui/spinner"
 import { TeamLogo } from "@/components/ui/team-logo"
+import { PlayerAvatar } from "@/components/ui/player-avatar"
 import { cn } from "@/lib/utils"
-import { teamHref } from "@/lib/utils/slug"
+import { teamHref, playerHref } from "@/lib/utils/slug"
 import { formatTime, formatDate, getBrowserTimezone, getDayLabel } from "@/lib/utils/timezone"
 import { FlagIcon } from "@/components/ui/flag-icon"
 import { liveStatusLabel } from "@/lib/utils/live-status"
@@ -42,6 +43,7 @@ const NO_DRAW_SPORTS = new Set([
 interface PageProps { params: Promise<{ id: string }> }
 
 interface Player {
+  id?: string
   name: string
   fullName?: string
   position?: string
@@ -102,8 +104,10 @@ interface NewsItem {
 }
 interface LeaderItem {
   team?: string
+  teamId?: string
   category?: string
   athlete?: string
+  athleteId?: string
   headshot?: string
   value?: string
 }
@@ -1352,24 +1356,41 @@ export default function MatchDetailPage({ params }: PageProps) {
                     <Award className="h-4 w-4 text-amber-500" />Top Performers
                   </h3>
                   <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
-                    {leaders.slice(0, 6).map((l, i) => (
-                      <div key={i} className="flex items-center gap-3 rounded-xl border border-border/40 bg-muted/30 p-3">
-                        {l.headshot ? (
-                          <Image src={l.headshot} alt={l.athlete || ''} width={40} height={40} className="rounded-full ring-2 ring-border" unoptimized />
-                        ) : (
-                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">
-                            {l.athlete?.slice(0, 2)}
+                    {leaders.slice(0, 6).map((l, i) => {
+                      const Wrapper: React.ElementType = l.athleteId ? Link : 'div'
+                      const wrapperProps = l.athleteId
+                        ? { href: playerHref(l.athlete, l.athleteId) }
+                        : {}
+                      return (
+                        <Wrapper
+                          key={i}
+                          {...(wrapperProps as Record<string, unknown>)}
+                          className={cn(
+                            'group flex items-center gap-3 rounded-xl border border-border/40 bg-muted/30 p-3 transition-colors',
+                            l.athleteId && 'hover:border-primary/40 hover:bg-primary/5 cursor-pointer',
+                          )}
+                        >
+                          <PlayerAvatar
+                            id={l.athleteId}
+                            name={l.athlete}
+                            headshot={l.headshot}
+                            size="md"
+                            ring="border"
+                            noLink
+                          />
+                          <div className="min-w-0 flex-1">
+                            <p className={cn(
+                              'truncate text-sm font-semibold',
+                              l.athleteId && 'group-hover:text-primary',
+                            )}>{l.athlete}</p>
+                            <p className="truncate text-xs text-muted-foreground">{l.category}</p>
                           </div>
-                        )}
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm font-semibold">{l.athlete}</p>
-                          <p className="truncate text-xs text-muted-foreground">{l.category}</p>
-                        </div>
-                        <div className="text-right shrink-0">
-                          <p className="text-sm font-bold text-primary">{l.value}</p>
-                        </div>
-                      </div>
-                    ))}
+                          <div className="text-right shrink-0">
+                            <p className="text-sm font-bold text-primary">{l.value}</p>
+                          </div>
+                        </Wrapper>
+                      )
+                    })}
                   </div>
                 </CardContent>
               </Card>
@@ -1385,19 +1406,36 @@ export default function MatchDetailPage({ params }: PageProps) {
                   {[
                     { team: match.homeTeam, label: 'Home' },
                     { team: match.awayTeam, label: 'Away' },
-                  ].map(({ team, label }) => (
-                    <div key={label}>
-                      <div className="mb-2 flex items-center gap-2">
-                        <TeamLogo teamName={team.name} logoUrl={team.logo} size="sm" />
-                        <span className="truncate text-sm font-semibold">{team.name}</span>
+                  ].map(({ team, label }) => {
+                    const teamLink = team.espnTeamId ? teamHref(team.name, team.espnTeamId) : null
+                    const TeamWrapper: React.ElementType = teamLink ? Link : 'div'
+                    const wrapperProps = teamLink ? { href: teamLink } : {}
+                    return (
+                      <div key={label}>
+                        <TeamWrapper
+                          {...(wrapperProps as Record<string, unknown>)}
+                          className={cn(
+                            'mb-2 flex items-center gap-2 rounded-lg -mx-1 px-1 py-0.5 transition-colors',
+                            teamLink && 'hover:bg-muted/50 cursor-pointer group',
+                          )}
+                        >
+                          <TeamLogo teamName={team.name} logoUrl={team.logo} size="sm" />
+                          <span className={cn(
+                            'truncate text-sm font-semibold',
+                            teamLink && 'group-hover:text-primary group-hover:underline underline-offset-2',
+                          )}>{team.name}</span>
+                          {team.record && (
+                            <span className="ml-auto text-[10px] font-mono text-muted-foreground shrink-0">{team.record}</span>
+                          )}
+                        </TeamWrapper>
+                        {team.form ? (
+                          <div className="flex flex-wrap gap-1">
+                            {team.form.split('').map((r, i) => <FormBadge key={i} result={r} />)}
+                          </div>
+                        ) : <p className="text-xs text-muted-foreground">No form data</p>}
                       </div>
-                      {team.form ? (
-                        <div className="flex flex-wrap gap-1">
-                          {team.form.split('').map((r, i) => <FormBadge key={i} result={r} />)}
-                        </div>
-                      ) : <p className="text-xs text-muted-foreground">No form data</p>}
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
               </CardContent>
             </Card>
@@ -2280,13 +2318,30 @@ function MatchInfoRail({
             {last3H2H.map((g, i) => {
               const hs = g.home.score ?? 0
               const as_ = g.away.score ?? 0
-              return (
-                <div key={i} className="flex items-center justify-between gap-2 text-xs">
+              const detail = g.matchId ? `/matches/${matchIdToSlug(g.matchId)}` : null
+              const inner = (
+                <>
                   <span className="truncate flex-1 text-right font-medium">{g.home.name}</span>
                   <span className="font-mono font-bold tabular-nums px-2 py-0.5 rounded bg-muted">
                     {hs}-{as_}
                   </span>
                   <span className="truncate flex-1 font-medium">{g.away.name}</span>
+                </>
+              )
+              if (detail) {
+                return (
+                  <Link
+                    key={i}
+                    href={detail}
+                    className="flex items-center justify-between gap-2 text-xs rounded-md px-1 py-1 -mx-1 hover:bg-muted/40 transition-colors"
+                  >
+                    {inner}
+                  </Link>
+                )
+              }
+              return (
+                <div key={i} className="flex items-center justify-between gap-2 text-xs px-1 py-1">
+                  {inner}
                 </div>
               )
             })}
@@ -2364,33 +2419,46 @@ function H2HRow({ game, timezone, homeName }: { game: H2HGame; timezone: string;
 
   return (
     <div className="rounded-xl border border-border/40 bg-muted/20 hover:bg-muted/40 transition-colors text-sm overflow-hidden">
-      <button
-        type="button"
-        onClick={() => setExpanded(v => !v)}
-        className="grid w-full grid-cols-[1fr_auto_1fr] items-center gap-2 px-3 py-2.5 text-left"
-        aria-expanded={expanded}
-      >
-        <div className="flex items-center gap-2 justify-end min-w-0">
-          <span className={cn("truncate font-medium", homeWon && "font-bold text-emerald-600")}>{game.home.name}</span>
-          <TeamLogo teamName={game.home.name} logoUrl={game.home.logo} size="sm" />
-        </div>
-        <div className="flex flex-col items-center min-w-[60px]">
-          <div className="font-mono font-bold tabular-nums">
-            <span className={cn(homeWon && "text-emerald-600")}>{game.home.score ?? '?'}</span>
-            {' — '}
-            <span className={cn(awayWon && "text-emerald-600")}>{game.away.score ?? '?'}</span>
+      <div className="grid w-full grid-cols-[1fr_auto_1fr_auto] items-center gap-2 px-3 py-2.5">
+        <button
+          type="button"
+          onClick={() => setExpanded(v => !v)}
+          className="contents text-left"
+          aria-expanded={expanded}
+          aria-label="Toggle match details"
+        >
+          <div className="flex items-center gap-2 justify-end min-w-0">
+            <span className={cn("truncate font-medium", homeWon && "font-bold text-emerald-600")}>{game.home.name}</span>
+            <TeamLogo teamName={game.home.name} logoUrl={game.home.logo} size="sm" />
           </div>
-          <div className="text-[10px] text-muted-foreground flex items-center gap-1">
-            {game.date ? formatDate(game.date, timezone, { year: true }) : ''}
-            {game.league ? ` • ${game.league}` : ''}
-            <ChevronDown className={cn("h-3 w-3 transition-transform", expanded && "rotate-180")} />
+          <div className="flex flex-col items-center min-w-[60px]">
+            <div className="font-mono font-bold tabular-nums">
+              <span className={cn(homeWon && "text-emerald-600")}>{game.home.score ?? '?'}</span>
+              {' — '}
+              <span className={cn(awayWon && "text-emerald-600")}>{game.away.score ?? '?'}</span>
+            </div>
+            <div className="text-[10px] text-muted-foreground flex items-center gap-1">
+              {game.date ? formatDate(game.date, timezone, { year: true }) : ''}
+              {game.league ? ` • ${game.league}` : ''}
+              <ChevronDown className={cn("h-3 w-3 transition-transform", expanded && "rotate-180")} />
+            </div>
           </div>
-        </div>
-        <div className="flex items-center gap-2 min-w-0">
-          <TeamLogo teamName={game.away.name} logoUrl={game.away.logo} size="sm" />
-          <span className={cn("truncate font-medium", awayWon && "font-bold text-emerald-600")}>{game.away.name}</span>
-        </div>
-      </button>
+          <div className="flex items-center gap-2 min-w-0">
+            <TeamLogo teamName={game.away.name} logoUrl={game.away.logo} size="sm" />
+            <span className={cn("truncate font-medium", awayWon && "font-bold text-emerald-600")}>{game.away.name}</span>
+          </div>
+        </button>
+        {detailHref ? (
+          <Link
+            href={detailHref}
+            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-primary/10 hover:text-primary transition-colors"
+            aria-label="Open this match's full details"
+            title="Open match details"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </Link>
+        ) : <div className="w-7" />}
+      </div>
       {expanded && (
         <div className="border-t border-border/40 bg-muted/30 px-3 py-2.5 text-[11px] text-muted-foreground space-y-1.5">
           <div className="grid grid-cols-2 gap-2">
@@ -2500,24 +2568,36 @@ function RosterCard({ side, roster, isConfirmed }: { side: string; roster: TeamR
 }
 
 function PlayerRow({ player, bench }: { player: Player; bench?: boolean }) {
+  const Wrapper: React.ElementType = player.id ? Link : 'div'
+  const wrapperProps = player.id
+    ? { href: playerHref(player.fullName || player.name, player.id) }
+    : {}
   return (
-    <div className={cn(
-      "flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm hover:bg-muted/50 transition-colors",
-      bench && "opacity-70"
-    )}>
-      <span className="w-6 text-center font-mono text-xs text-muted-foreground shrink-0">{player.jersey || '-'}</span>
-      {player.headshot ? (
-        <Image src={player.headshot} alt="" width={24} height={24} className="rounded-full ring-1 ring-border shrink-0" unoptimized />
-      ) : (
-        <div className="h-6 w-6 rounded-full bg-muted shrink-0 flex items-center justify-center text-[8px] font-bold text-muted-foreground">
-          {player.name.slice(0, 1)}
-        </div>
+    <Wrapper
+      {...(wrapperProps as Record<string, unknown>)}
+      className={cn(
+        "group flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm transition-colors",
+        player.id ? "hover:bg-primary/10 cursor-pointer" : "hover:bg-muted/50",
+        bench && "opacity-70",
       )}
-      <span className="flex-1 truncate font-medium">{player.fullName || player.name}</span>
+    >
+      <span className="w-6 text-center font-mono text-xs text-muted-foreground shrink-0">{player.jersey || '-'}</span>
+      <PlayerAvatar
+        id={player.id}
+        name={player.fullName || player.name}
+        headshot={player.headshot}
+        size="sm"
+        ring="border"
+        noLink
+      />
+      <span className={cn(
+        "flex-1 truncate font-medium",
+        player.id && "group-hover:text-primary group-hover:underline underline-offset-2",
+      )}>{player.fullName || player.name}</span>
       {player.position && (
         <Badge variant="outline" className="text-[9px] py-0 px-1.5 shrink-0">{player.position}</Badge>
       )}
-    </div>
+    </Wrapper>
   )
 }
 
