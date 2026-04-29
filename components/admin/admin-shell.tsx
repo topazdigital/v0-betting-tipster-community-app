@@ -5,8 +5,7 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { 
   LayoutDashboard, Users, Trophy, Calendar, Settings, 
-  Bell, LogOut, Menu, X, ChevronDown, Search,
-  BarChart3, Shield, MessageSquare, Newspaper, Wallet, Mail, Rss, KeyRound, Star, CreditCard, Database, FileText
+  Bell, LogOut, Menu, X, Shield, MessageSquare, Newspaper, Wallet, Mail, Rss, KeyRound, Star, CreditCard, Database, FileText, BarChart3,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { HeaderSearch } from "@/components/layout/header-search"
@@ -23,7 +22,7 @@ const adminNavItems = [
   { href: "/admin/feed", label: "Community Feed", icon: Rss },
   { href: "/admin/news", label: "News", icon: Newspaper },
   { href: "/admin/payments", label: "Payments", icon: Wallet },
-  { href: "/admin/payment-gateways", label: "Payment Gateways", icon: CreditCard },
+  { href: "/admin/payment-gateways", label: "Gateways", icon: CreditCard },
   { href: "/admin/subscribers", label: "Subscribers", icon: Mail },
   { href: "/admin/notifications", label: "Notifications", icon: Bell },
   { href: "/admin/featured", label: "Featured Tips", icon: Star },
@@ -53,103 +52,101 @@ export function AdminShell({ children, user }: AdminShellProps) {
         />
       )}
 
-      {/* Sidebar */}
+      {/* Sidebar — narrower & denser */}
       <aside className={cn(
-        "fixed inset-y-0 left-0 z-50 w-64 transform border-r border-border bg-card transition-transform lg:translate-x-0",
+        "fixed inset-y-0 left-0 z-50 flex w-56 transform flex-col border-r border-border bg-card transition-transform lg:translate-x-0",
         sidebarOpen ? "translate-x-0" : "-translate-x-full"
       )}>
-        <div className="flex h-16 items-center justify-between border-b border-border px-4">
+        <div className="flex h-12 items-center justify-between border-b border-border px-3">
           <Link href="/admin" className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-              <Shield className="h-5 w-5" />
+            <div className="flex h-7 w-7 items-center justify-center rounded-md bg-primary text-primary-foreground">
+              <Shield className="h-4 w-4" />
             </div>
-            <span className="font-bold">Admin Panel</span>
+            <span className="text-sm font-bold">Admin Panel</span>
           </Link>
           <Button 
             variant="ghost" 
             size="icon" 
-            className="lg:hidden"
+            className="h-7 w-7 lg:hidden"
             onClick={() => setSidebarOpen(false)}
           >
-            <X className="h-5 w-5" />
+            <X className="h-4 w-4" />
           </Button>
         </div>
 
-        <nav className="space-y-1 p-4">
+        <nav className="flex-1 space-y-0.5 overflow-y-auto p-2">
           {adminNavItems.map((item) => {
             const isActive = pathname === item.href
             return (
               <Link
                 key={item.href}
                 href={item.href}
+                onClick={() => setSidebarOpen(false)}
                 className={cn(
-                  "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
+                  "flex items-center gap-2 rounded-md px-2 py-1.5 text-xs font-medium transition-colors",
                   isActive 
                     ? "bg-primary text-primary-foreground" 
                     : "text-muted-foreground hover:bg-muted hover:text-foreground"
                 )}
               >
-                <item.icon className="h-5 w-5" />
-                {item.label}
+                <item.icon className="h-3.5 w-3.5 shrink-0" />
+                <span className="truncate">{item.label}</span>
               </Link>
             )
           })}
         </nav>
 
-        <div className="absolute bottom-0 left-0 right-0 border-t border-border p-4">
+        <div className="border-t border-border p-2">
           <Link 
             href="/"
-            className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            className="flex items-center gap-2 rounded-md px-2 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
           >
-            <LogOut className="h-5 w-5" />
+            <LogOut className="h-3.5 w-3.5" />
             Back to Site
           </Link>
         </div>
       </aside>
 
       {/* Main Content */}
-      <div className="lg:pl-64">
-        {/* Top Header */}
-        <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b border-border bg-card px-4">
+      <div className="lg:pl-56">
+        {/* Top Header — slimmer */}
+        <header className="sticky top-0 z-30 flex h-12 items-center gap-2 border-b border-border bg-card px-3">
           <Button 
             variant="ghost" 
             size="icon" 
-            className="lg:hidden"
+            className="h-8 w-8 lg:hidden"
             onClick={() => setSidebarOpen(true)}
           >
-            <Menu className="h-5 w-5" />
+            <Menu className="h-4 w-4" />
           </Button>
 
           <div className="flex-1 max-w-md">
-            <HeaderSearch inline placeholder="Search the public site (matches, teams, leagues, tipsters)…" />
+            <HeaderSearch inline placeholder="Search the site (matches, teams, tipsters)…" />
           </div>
 
-          <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon" className="relative">
-              <Bell className="h-5 w-5" />
-              <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] text-white">
-                5
-              </span>
+          <div className="flex items-center gap-1.5">
+            <Button variant="ghost" size="icon" className="relative h-8 w-8">
+              <Bell className="h-4 w-4" />
             </Button>
-            <div className="flex items-center gap-2 rounded-lg bg-muted px-3 py-1.5">
-              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-sm font-bold text-primary-foreground">
+            <div className="flex items-center gap-1.5 rounded-md bg-muted px-2 py-1">
+              <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground">
                 {user.displayName.charAt(0).toUpperCase()}
               </div>
-              <div className="hidden md:block">
-                <p className="text-sm font-medium">{user.displayName}</p>
-                <p className="text-xs text-muted-foreground capitalize">{user.role}</p>
+              <div className="hidden md:block leading-tight">
+                <p className="text-[11px] font-semibold">{user.displayName}</p>
+                <p className="text-[9px] uppercase tracking-wide text-muted-foreground">{user.role}</p>
               </div>
               <form action="/api/auth/logout" method="POST">
-                <button type="submit" title="Sign out" className="ml-1 text-muted-foreground hover:text-destructive">
-                  <LogOut className="h-4 w-4" />
+                <button type="submit" title="Sign out" className="ml-0.5 text-muted-foreground hover:text-destructive">
+                  <LogOut className="h-3.5 w-3.5" />
                 </button>
               </form>
             </div>
           </div>
         </header>
 
-        {/* Page Content */}
-        <main className="p-4 md:p-6 lg:p-8">
+        {/* Page Content — denser default padding */}
+        <main className="p-3 md:p-4">
           {children}
         </main>
       </div>

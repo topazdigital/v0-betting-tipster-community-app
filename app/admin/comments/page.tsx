@@ -1,176 +1,122 @@
 "use client"
 
 import { useState } from "react"
-import { Search, CheckCircle2, XCircle, Flag, MoreHorizontal, MessageSquare, AlertTriangle } from "lucide-react"
+import useSWR from "swr"
+import Link from "next/link"
+import { Search, Trash2, MessageSquare, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Badge } from "@/components/ui/badge"
 import { Card, CardContent } from "@/components/ui/card"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { format, subHours } from "date-fns"
+import { format } from "date-fns"
 
-const comments = Array.from({ length: 20 }, (_, i) => ({
-  id: i + 1,
-  user: {
-    name: `User${i + 1}`,
-    avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=user${i}`
-  },
-  content: [
-    "Great prediction! I followed this tip and it was a winner.",
-    "Not sure about this one, the odds seem too high.",
-    "Thanks for sharing your analysis, very helpful!",
-    "This tipster is consistently profitable.",
-    "I disagree with this prediction based on recent form."
-  ][i % 5],
-  match: `Team ${i * 2 + 1} vs Team ${i * 2 + 2}`,
-  status: i % 5 === 0 ? "flagged" : i % 3 === 0 ? "pending" : "approved",
-  reports: i % 5 === 0 ? Math.floor(1 + Math.random() * 5) : 0,
-  createdAt: subHours(new Date(), i * 2)
-}))
+interface Comment {
+  id: string
+  postId: string
+  userId: number
+  authorName: string
+  authorAvatar?: string | null
+  content: string
+  createdAt: string
+  postTitle?: string | null
+  postAuthor?: string | null
+}
+
+interface ApiResponse {
+  comments: Comment[]
+  stats: { total: number; today: number; week: number }
+}
+
+const fetcher = (url: string) => fetch(url).then(r => r.json())
 
 export default function AdminCommentsPage() {
+  const { data, isLoading, mutate } = useSWR<ApiResponse>('/api/admin/comments', fetcher, { refreshInterval: 30000 })
   const [searchQuery, setSearchQuery] = useState("")
-  const [statusFilter, setStatusFilter] = useState("all")
+  const [busyId, setBusyId] = useState<string | null>(null)
 
-  const filteredComments = comments.filter(comment => {
-    if (searchQuery && !comment.content.toLowerCase().includes(searchQuery.toLowerCase()) &&
-        !comment.user.name.toLowerCase().includes(searchQuery.toLowerCase())) return false
-    if (statusFilter !== "all" && comment.status !== statusFilter) return false
-    return true
+  const comments = data?.comments || []
+  const stats = data?.stats || { total: 0, today: 0, week: 0 }
+
+  const filtered = comments.filter(c => {
+    if (!searchQuery) return true
+    const q = searchQuery.toLowerCase()
+    return c.content.toLowerCase().includes(q) || c.authorName.toLowerCase().includes(q)
   })
 
-  const stats = {
-    total: comments.length,
-    pending: comments.filter(c => c.status === "pending").length,
-    flagged: comments.filter(c => c.status === "flagged").length,
-    approved: comments.filter(c => c.status === "approved").length
+  async function remove(id: string) {
+    if (!confirm("Delete this comment?")) return
+    setBusyId(id)
+    try {
+      await fetch(`/api/admin/comments?id=${encodeURIComponent(id)}`, { method: "DELETE" })
+      await mutate()
+    } finally { setBusyId(null) }
   }
 
   return (
     <div className="space-y-3">
       <div>
         <h1 className="text-lg font-bold">Comments Moderation</h1>
-        <p className="text-muted-foreground">Review and moderate user comments</p>
+        <p className="text-xs text-muted-foreground">Real comments from the community feed</p>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-4">
-        <Card>
-          <CardContent className="p-4">
-            <p className="text-sm text-muted-foreground">Total Comments</p>
-            <p className="text-lg font-bold">{stats.total}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <p className="text-sm text-muted-foreground">Pending Review</p>
-            <p className="text-lg font-bold text-amber-500">{stats.pending}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <p className="text-sm text-muted-foreground">Flagged</p>
-            <p className="text-lg font-bold text-red-500">{stats.flagged}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <p className="text-sm text-muted-foreground">Approved</p>
-            <p className="text-lg font-bold text-emerald-500">{stats.approved}</p>
-          </CardContent>
-        </Card>
+      <div className="grid gap-2 grid-cols-3">
+        <Card><CardContent className="p-2.5"><div className="text-[10px] uppercase text-muted-foreground">Total</div><div className="text-base font-bold tabular-nums">{stats.total}</div></CardContent></Card>
+        <Card><CardContent className="p-2.5"><div className="text-[10px] uppercase text-muted-foreground">Today</div><div className="text-base font-bold tabular-nums">{stats.today}</div></CardContent></Card>
+        <Card><CardContent className="p-2.5"><div className="text-[10px] uppercase text-muted-foreground">7 days</div><div className="text-base font-bold tabular-nums">{stats.week}</div></CardContent></Card>
       </div>
 
       <Card>
-        <CardContent className="p-4">
-          <div className="flex flex-col gap-4 md:flex-row md:items-center">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                placeholder="Search comments..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9"
-              />
-            </div>
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="h-10 rounded-lg border border-border bg-background px-3 text-sm"
-            >
-              <option value="all">All Status</option>
-              <option value="pending">Pending</option>
-              <option value="flagged">Flagged</option>
-              <option value="approved">Approved</option>
-            </select>
+        <CardContent className="p-3">
+          <div className="relative">
+            <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+            <Input value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Search comments…" className="h-8 pl-8 text-xs" />
           </div>
         </CardContent>
       </Card>
 
-      <div className="space-y-3">
-        {filteredComments.map((comment) => (
-          <Card key={comment.id} className={comment.status === "flagged" ? "border-red-500/50" : ""}>
-            <CardContent className="p-4">
-              <div className="flex items-start gap-4">
-                <img 
-                  src={comment.user.avatar} 
-                  alt={comment.user.name}
-                  className="h-10 w-10 rounded-full"
-                />
-                <div className="flex-1">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className="font-semibold">{comment.user.name}</span>
-                      <Badge variant={
-                        comment.status === "approved" ? "default" :
-                        comment.status === "flagged" ? "destructive" : "secondary"
-                      } className={comment.status === "approved" ? "bg-emerald-500" : ""}>
-                        {comment.status}
-                      </Badge>
-                      {comment.reports > 0 && (
-                        <Badge variant="outline" className="gap-1 border-red-500 text-red-500">
-                          <Flag className="h-3 w-3" /> {comment.reports} reports
-                        </Badge>
+      {isLoading ? (
+        <div className="flex h-32 items-center justify-center"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
+      ) : (
+        <div className="space-y-2">
+          {filtered.length === 0 && (
+            <Card><CardContent className="p-8 text-center text-xs text-muted-foreground">
+              <MessageSquare className="mx-auto h-8 w-8 mb-2 opacity-30" />
+              No comments yet — they appear here when users comment on community posts.
+            </CardContent></Card>
+          )}
+          {filtered.map(c => (
+            <Card key={c.id}>
+              <CardContent className="p-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5 text-[11px]">
+                      <span className="font-semibold">{c.authorName}</span>
+                      <span className="text-muted-foreground">·</span>
+                      <span className="text-muted-foreground">{format(new Date(c.createdAt), 'MMM d HH:mm')}</span>
+                      {c.postTitle && (
+                        <>
+                          <span className="text-muted-foreground">·</span>
+                          <Link href={`/feed#${c.postId}`} className="text-primary hover:underline truncate max-w-[200px]">
+                            {c.postTitle}
+                          </Link>
+                        </>
                       )}
                     </div>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem>
-                          <CheckCircle2 className="mr-2 h-4 w-4 text-emerald-500" /> Approve
-                        </DropdownMenuItem>
-                        <DropdownMenuItem>
-                          <AlertTriangle className="mr-2 h-4 w-4 text-amber-500" /> Flag
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem className="text-red-500">
-                          <XCircle className="mr-2 h-4 w-4" /> Delete
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                    <p className="mt-1 text-xs whitespace-pre-wrap break-words">{c.content}</p>
                   </div>
-                  <p className="mt-2 text-muted-foreground">{comment.content}</p>
-                  <div className="mt-2 flex items-center gap-4 text-xs text-muted-foreground">
-                    <span className="flex items-center gap-1">
-                      <MessageSquare className="h-3 w-3" /> on {comment.match}
-                    </span>
-                    <span>{format(comment.createdAt, "MMM d, HH:mm")}</span>
-                  </div>
+                  <Button
+                    size="icon" variant="ghost"
+                    onClick={() => remove(c.id)}
+                    disabled={busyId === c.id}
+                    className="h-7 w-7 text-destructive"
+                  >
+                    {busyId === c.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+                  </Button>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

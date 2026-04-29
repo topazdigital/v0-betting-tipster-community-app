@@ -280,6 +280,75 @@ export async function createComment(input: Omit<FeedComment, 'id' | 'createdAt'>
   return c;
 }
 
+// Aggregate every comment across every post (admin moderation view).
+export async function listAllComments(limit = 200): Promise<Array<FeedComment & { postTitle?: string | null; postAuthor?: string | null }>> {
+  if (hasDb()) {
+    try {
+      const r = await query<{
+        id: string; post_id: string; user_id: number; author_name: string;
+        author_avatar: string | null; content: string; created_at: string;
+        post_match_title: string | null; post_author_name: string | null;
+      }>(`SELECT c.id, c.post_id, c.user_id, c.author_name, c.author_avatar, c.content, c.created_at,
+                 p.match_title AS post_match_title, p.author_name AS post_author_name
+            FROM feed_comments c
+            LEFT JOIN feed_posts p ON p.id = c.post_id
+           ORDER BY c.created_at DESC LIMIT ?`, [limit]);
+      if (r.rows.length > 0) {
+        return r.rows.map(x => ({
+          id: x.id,
+          postId: x.post_id,
+          userId: x.user_id,
+          authorName: x.author_name,
+          authorAvatar: x.author_avatar,
+          content: x.content,
+          createdAt: typeof x.created_at === 'string' ? x.created_at : new Date(x.created_at).toISOString(),
+          postTitle: x.post_match_title,
+          postAuthor: x.post_author_name,
+        }));
+      }
+    } catch (e) {
+      console.warn('[feed] db listAllComments failed', e);
+    }
+  }
+  const all: Array<FeedComment & { postTitle?: string | null; postAuthor?: string | null }> = [];
+  for (const [postId, comments] of s.comments.entries()) {
+    const post = s.posts.get(postId);
+    for (const c of comments) {
+      all.push({ ...c, postTitle: post?.matchTitle ?? null, postAuthor: post?.authorName ?? null });
+    }
+  }
+  return all
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    .slice(0, limit);
+}
+
+export async function deleteComment(commentId: string): Promise<boolean> {
+  if (hasDb()) {
+    try {
+      const row = await query<{ post_id: string }>(`SELECT post_id FROM feed_comments WHERE id = ?`, [commentId]);
+      const postId = row.rows[0]?.post_id;
+      await query(`DELETE FROM feed_comments WHERE id = ?`, [commentId]);
+      if (postId) {
+        await query(`UPDATE feed_posts SET comment_count = GREATEST(comment_count - 1, 0) WHERE id = ?`, [postId]);
+      }
+    } catch (e) {
+      console.warn('[feed] db deleteComment failed', e);
+    }
+  }
+  let removed = false;
+  for (const [postId, list] of s.comments.entries()) {
+    const idx = list.findIndex(c => c.id === commentId);
+    if (idx >= 0) {
+      list.splice(idx, 1);
+      removed = true;
+      const post = s.posts.get(postId);
+      if (post) post.commentCount = list.length;
+      break;
+    }
+  }
+  return removed;
+}
+
 // ─── SEEDING (memory only, when DB is empty) ─────
 export function seedDemoPostsIfEmpty(): void {
   if (s.posts.size > 0) return;

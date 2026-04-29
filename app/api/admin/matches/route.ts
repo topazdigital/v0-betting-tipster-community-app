@@ -1,92 +1,119 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
+import { getAllMatches } from '@/lib/api/unified-sports-api';
 
 export const dynamic = 'force-dynamic';
 
+interface AdminMatchRow {
+  id: number | string;
+  home_team_name: string;
+  home_team_logo?: string | null;
+  away_team_name: string;
+  away_team_logo?: string | null;
+  league_name: string;
+  sport_name: string;
+  sport_icon: string;
+  status: string;
+  home_score: number | null;
+  away_score: number | null;
+  kickoff_time: string;
+}
+
+const hasDb = () => !!process.env.DATABASE_URL;
+
 // Get all matches for admin
 export async function GET(request: NextRequest) {
-  try {
-    const { searchParams } = new URL(request.url);
-    const page = parseInt(searchParams.get('page') || '1');
-    const limit = parseInt(searchParams.get('limit') || '50');
-    const status = searchParams.get('status');
-    const sportId = searchParams.get('sportId');
-    const search = searchParams.get('search');
-    
-    const offset = (page - 1) * limit;
-    
-    let whereClause = '1=1';
-    const params: (string | number)[] = [];
-    
-    if (status && status !== 'all') {
-      whereClause += ' AND m.status = ?';
-      params.push(status);
-    }
-    
-    if (sportId && sportId !== 'all') {
-      whereClause += ' AND l.sport_id = ?';
-      params.push(parseInt(sportId));
-    }
-    
-    if (search) {
-      whereClause += ' AND (ht.name LIKE ? OR at.name LIKE ?)';
-      params.push(`%${search}%`, `%${search}%`);
-    }
-    
-    // Get matches with team and league info
-    const result = await query(`
-      SELECT 
-        m.id,
-        m.kickoff_time,
-        m.status,
-        m.home_score,
-        m.away_score,
-        m.minute,
-        ht.name as home_team_name,
-        ht.logo_url as home_team_logo,
-        at.name as away_team_name,
-        at.logo_url as away_team_logo,
-        l.name as league_name,
-        l.country_id,
-        s.name as sport_name,
-        s.icon as sport_icon
-      FROM matches m
-      JOIN teams ht ON m.home_team_id = ht.id
-      JOIN teams at ON m.away_team_id = at.id
-      JOIN leagues l ON m.league_id = l.id
-      JOIN sports s ON l.sport_id = s.id
-      WHERE ${whereClause}
-      ORDER BY m.kickoff_time DESC
-      LIMIT ? OFFSET ?
-    `, [...params, limit, offset]);
-    
-    // Get total count
-    const countResult = await query(`
-      SELECT COUNT(*) as total
-      FROM matches m
-      JOIN leagues l ON m.league_id = l.id
-      JOIN teams ht ON m.home_team_id = ht.id
-      JOIN teams at ON m.away_team_id = at.id
-      WHERE ${whereClause}
-    `, params);
-    
-    const total = (countResult.rows as Array<{ total: number }>)[0]?.total || 0;
-    
-    return NextResponse.json({
-      matches: result.rows,
-      pagination: {
-        page,
-        limit,
-        total,
-        totalPages: Math.ceil(total / limit)
+  const { searchParams } = new URL(request.url);
+  const page = parseInt(searchParams.get('page') || '1');
+  const limit = parseInt(searchParams.get('limit') || '100');
+  const status = searchParams.get('status');
+  const sportId = searchParams.get('sportId');
+  const search = searchParams.get('search');
+
+  // Try DB first when configured.
+  if (hasDb()) {
+    try {
+      const offset = (page - 1) * limit;
+      let whereClause = '1=1';
+      const params: (string | number)[] = [];
+      if (status && status !== 'all') { whereClause += ' AND m.status = ?'; params.push(status); }
+      if (sportId && sportId !== 'all') { whereClause += ' AND l.sport_id = ?'; params.push(parseInt(sportId)); }
+      if (search) { whereClause += ' AND (ht.name LIKE ? OR at.name LIKE ?)'; params.push(`%${search}%`, `%${search}%`); }
+      const result = await query(`
+        SELECT m.id, m.kickoff_time, m.status, m.home_score, m.away_score, m.minute,
+               ht.name as home_team_name, ht.logo_url as home_team_logo,
+               at.name as away_team_name, at.logo_url as away_team_logo,
+               l.name as league_name, l.country_id,
+               s.name as sport_name, s.icon as sport_icon
+          FROM matches m
+          JOIN teams ht ON m.home_team_id = ht.id
+          JOIN teams at ON m.away_team_id = at.id
+          JOIN leagues l ON m.league_id = l.id
+          JOIN sports s ON l.sport_id = s.id
+         WHERE ${whereClause}
+         ORDER BY m.kickoff_time DESC
+         LIMIT ? OFFSET ?
+      `, [...params, limit, offset]);
+      const countResult = await query(
+        `SELECT COUNT(*) as total FROM matches m JOIN leagues l ON m.league_id = l.id JOIN teams ht ON m.home_team_id = ht.id JOIN teams at ON m.away_team_id = at.id WHERE ${whereClause}`,
+        params,
+      );
+      const total = (countResult.rows as Array<{ total: number }>)[0]?.total || 0;
+      if (result.rows && (result.rows as unknown[]).length > 0) {
+        return NextResponse.json({
+          source: 'db',
+          matches: result.rows,
+          pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
+        });
       }
+    } catch (e) {
+      console.warn('[Admin API] DB matches query failed, falling back to live feed', e);
+    }
+  }
+
+  // Fallback to live unified ESPN feed so admin always sees real matches.
+  try {
+    const all = await getAllMatches();
+    const lc = (s?: string) => (s || '').toLowerCase();
+    const filtered = all.filter(m => {
+      if (status && status !== 'all' && m.status !== status) return false;
+      if (search) {
+        const q = search.toLowerCase();
+        if (!lc(m.homeTeam.name).includes(q) && !lc(m.awayTeam.name).includes(q)) return false;
+      }
+      return true;
     });
-  } catch (error) {
-    console.error('[Admin API] Failed to get matches:', error);
-    return NextResponse.json(
-      { error: 'Failed to get matches', matches: [], pagination: { page: 1, limit: 50, total: 0, totalPages: 0 } },
-      { status: 500 }
-    );
+    filtered.sort((a, b) => new Date(b.kickoffTime).getTime() - new Date(a.kickoffTime).getTime());
+    const total = filtered.length;
+    const offset = (page - 1) * limit;
+    const slice = filtered.slice(offset, offset + limit);
+    const matches: AdminMatchRow[] = slice.map(m => ({
+      id: m.id,
+      home_team_name: m.homeTeam.name,
+      home_team_logo: m.homeTeam.logo || null,
+      away_team_name: m.awayTeam.name,
+      away_team_logo: m.awayTeam.logo || null,
+      league_name: m.league?.name || '',
+      sport_name: m.sport?.name || '',
+      sport_icon: m.sport?.icon || '⚽',
+      status: m.status,
+      home_score: m.homeScore ?? null,
+      away_score: m.awayScore ?? null,
+      kickoff_time: m.kickoffTime instanceof Date ? m.kickoffTime.toISOString() : String(m.kickoffTime),
+    }));
+    return NextResponse.json({
+      source: 'live',
+      matches,
+      pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
+    });
+  } catch (e) {
+    console.error('[Admin API] live matches feed failed', e);
+    return NextResponse.json({
+      source: 'error',
+      matches: [],
+      pagination: { page: 1, limit, total: 0, totalPages: 0 },
+      error: 'Failed to fetch matches',
+    }, { status: 200 });
   }
 }
 

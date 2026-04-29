@@ -1,216 +1,103 @@
 "use client"
 
-import { useState } from "react"
-import { Search, Download, DollarSign, TrendingUp, CreditCard, Users, CheckCircle2, Clock, XCircle } from "lucide-react"
+import useSWR from "swr"
+import Link from "next/link"
+import { Wallet, CreditCard, Settings, ExternalLink, Loader2 } from "lucide-react"
+import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Badge } from "@/components/ui/badge"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { format, subDays } from "date-fns"
 
-const transactions = Array.from({ length: 30 }, (_, i) => ({
-  id: `TXN${String(i + 1).padStart(6, '0')}`,
-  user: {
-    name: `User${i + 1}`,
-    email: `user${i + 1}@example.com`,
-    avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=user${i}`
-  },
-  type: ["subscription", "deposit", "withdrawal", "refund"][i % 4],
-  amount: (10 + Math.random() * 200).toFixed(2),
-  status: i % 5 === 0 ? "pending" : i % 7 === 0 ? "failed" : "completed",
-  method: ["Credit Card", "PayPal", "Crypto", "Bank Transfer"][i % 4],
-  date: subDays(new Date(), i)
-}))
+interface Gateway {
+  id: string
+  name: string
+  provider: string
+  enabled: boolean
+  type: string
+  countries?: string[]
+  currencies?: string[]
+}
+
+const fetcher = (url: string) => fetch(url).then(r => r.json())
 
 export default function AdminPaymentsPage() {
-  const [searchQuery, setSearchQuery] = useState("")
-  const [typeFilter, setTypeFilter] = useState("all")
-  const [statusFilter, setStatusFilter] = useState("all")
-
-  const filteredTransactions = transactions.filter(txn => {
-    if (searchQuery && !txn.id.toLowerCase().includes(searchQuery.toLowerCase()) &&
-        !txn.user.name.toLowerCase().includes(searchQuery.toLowerCase())) return false
-    if (typeFilter !== "all" && txn.type !== typeFilter) return false
-    if (statusFilter !== "all" && txn.status !== statusFilter) return false
-    return true
-  })
-
-  const stats = {
-    totalRevenue: transactions.filter(t => t.type !== "withdrawal" && t.type !== "refund" && t.status === "completed")
-      .reduce((acc, t) => acc + parseFloat(t.amount), 0),
-    subscriptions: transactions.filter(t => t.type === "subscription").length,
-    pending: transactions.filter(t => t.status === "pending").length,
-    activeUsers: 1284
-  }
+  const { data, isLoading } = useSWR<{ gateways: Gateway[] }>('/api/admin/payment-gateways', fetcher)
+  const gateways = data?.gateways || []
+  const enabled = gateways.filter(g => g.enabled)
 
   return (
     <div className="space-y-3">
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+      <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-lg font-bold">Payments & Transactions</h1>
-          <p className="text-muted-foreground">Manage payments and view transaction history</p>
+          <h1 className="text-lg font-bold">Payments</h1>
+          <p className="text-xs text-muted-foreground">Connected payment gateways and routing</p>
         </div>
-        <Button variant="outline" className="gap-2">
-          <Download className="h-4 w-4" /> Export Report
+        <Button asChild size="sm">
+          <Link href="/admin/payment-gateways" className="flex items-center gap-1.5">
+            <Settings className="h-3.5 w-3.5" /> Configure gateways
+          </Link>
         </Button>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-4">
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-500/10">
-                <DollarSign className="h-5 w-5 text-emerald-500" />
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Total Revenue</p>
-                <p className="text-lg font-bold text-emerald-500">
-                  ${stats.totalRevenue.toFixed(2)}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-500/10">
-                <CreditCard className="h-5 w-5 text-blue-500" />
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Subscriptions</p>
-                <p className="text-lg font-bold">{stats.subscriptions}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-500/10">
-                <Clock className="h-5 w-5 text-amber-500" />
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Pending</p>
-                <p className="text-lg font-bold text-amber-500">{stats.pending}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-purple-500/10">
-                <Users className="h-5 w-5 text-purple-500" />
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Active Subscribers</p>
-                <p className="text-lg font-bold">{stats.activeUsers}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+      <div className="grid gap-2 grid-cols-2 md:grid-cols-4">
+        <Card><CardContent className="p-2.5"><div className="text-[10px] uppercase text-muted-foreground">Gateways</div><div className="text-base font-bold tabular-nums">{gateways.length}</div></CardContent></Card>
+        <Card><CardContent className="p-2.5"><div className="text-[10px] uppercase text-muted-foreground">Enabled</div><div className="text-base font-bold tabular-nums text-emerald-600">{enabled.length}</div></CardContent></Card>
+        <Card><CardContent className="p-2.5"><div className="text-[10px] uppercase text-muted-foreground">Card</div><div className="text-base font-bold tabular-nums">{gateways.filter(g => g.type === 'card').length}</div></CardContent></Card>
+        <Card><CardContent className="p-2.5"><div className="text-[10px] uppercase text-muted-foreground">Mobile money</div><div className="text-base font-bold tabular-nums">{gateways.filter(g => g.type === 'mobile_money').length}</div></CardContent></Card>
       </div>
 
-      <Card>
-        <CardContent className="p-4">
-          <div className="flex flex-col gap-4 md:flex-row md:items-center">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                placeholder="Search transactions..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9"
-              />
+      {isLoading ? (
+        <div className="flex h-32 items-center justify-center"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
+      ) : (
+        <Card>
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="border-b bg-muted/40 text-left text-[11px] uppercase text-muted-foreground">
+                    <th className="p-2">Gateway</th>
+                    <th className="p-2">Provider</th>
+                    <th className="p-2">Type</th>
+                    <th className="p-2">Status</th>
+                    <th className="p-2">Currencies</th>
+                    <th className="p-2"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {gateways.length === 0 && (
+                    <tr><td colSpan={6} className="p-6 text-center text-xs text-muted-foreground">
+                      <Wallet className="mx-auto h-8 w-8 mb-2 opacity-30" />
+                      No payment gateways configured. <Link href="/admin/payment-gateways" className="text-primary hover:underline">Set one up</Link>.
+                    </td></tr>
+                  )}
+                  {gateways.map(g => (
+                    <tr key={g.id} className="border-b hover:bg-muted/30">
+                      <td className="p-2 font-semibold flex items-center gap-1.5"><CreditCard className="h-3.5 w-3.5 text-muted-foreground" />{g.name}</td>
+                      <td className="p-2 text-muted-foreground">{g.provider}</td>
+                      <td className="p-2 text-muted-foreground capitalize">{g.type.replace('_', ' ')}</td>
+                      <td className="p-2">
+                        <span className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-bold ${g.enabled ? 'bg-emerald-500/15 text-emerald-700' : 'bg-muted text-muted-foreground'}`}>
+                          {g.enabled ? 'Live' : 'Off'}
+                        </span>
+                      </td>
+                      <td className="p-2 text-[10px] text-muted-foreground truncate max-w-[180px]">{(g.currencies || []).join(', ') || '—'}</td>
+                      <td className="p-2">
+                        <Link href="/admin/payment-gateways" className="text-muted-foreground hover:text-primary">
+                          <ExternalLink className="h-3.5 w-3.5" />
+                        </Link>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
-            <div className="flex gap-2">
-              <select
-                value={typeFilter}
-                onChange={(e) => setTypeFilter(e.target.value)}
-                className="h-10 rounded-lg border border-border bg-background px-3 text-sm"
-              >
-                <option value="all">All Types</option>
-                <option value="subscription">Subscription</option>
-                <option value="deposit">Deposit</option>
-                <option value="withdrawal">Withdrawal</option>
-                <option value="refund">Refund</option>
-              </select>
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className="h-10 rounded-lg border border-border bg-background px-3 text-sm"
-              >
-                <option value="all">All Status</option>
-                <option value="completed">Completed</option>
-                <option value="pending">Pending</option>
-                <option value="failed">Failed</option>
-              </select>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
-        <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-border bg-muted/50 text-left text-sm text-muted-foreground">
-                  <th className="p-4 font-medium">Transaction ID</th>
-                  <th className="p-4 font-medium">User</th>
-                  <th className="p-4 font-medium">Type</th>
-                  <th className="p-4 font-medium">Amount</th>
-                  <th className="p-4 font-medium">Method</th>
-                  <th className="p-4 font-medium">Status</th>
-                  <th className="p-4 font-medium">Date</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredTransactions.map((txn) => (
-                  <tr key={txn.id} className="border-b border-border last:border-0 hover:bg-muted/30">
-                    <td className="p-4 font-mono text-sm">{txn.id}</td>
-                    <td className="p-4">
-                      <div className="flex items-center gap-3">
-                        <img src={txn.user.avatar} alt={txn.user.name} className="h-8 w-8 rounded-full" />
-                        <div>
-                          <p className="font-medium">{txn.user.name}</p>
-                          <p className="text-xs text-muted-foreground">{txn.user.email}</p>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="p-4">
-                      <Badge variant="outline" className="capitalize">{txn.type}</Badge>
-                    </td>
-                    <td className="p-4">
-                      <span className={
-                        txn.type === "withdrawal" || txn.type === "refund" 
-                          ? "text-red-500" 
-                          : "text-emerald-500"
-                      }>
-                        {txn.type === "withdrawal" || txn.type === "refund" ? "-" : "+"}${txn.amount}
-                      </span>
-                    </td>
-                    <td className="p-4 text-sm text-muted-foreground">{txn.method}</td>
-                    <td className="p-4">
-                      <Badge 
-                        variant={txn.status === "completed" ? "default" : txn.status === "failed" ? "destructive" : "secondary"}
-                        className={txn.status === "completed" ? "bg-emerald-500" : ""}
-                      >
-                        {txn.status === "completed" && <CheckCircle2 className="mr-1 h-3 w-3" />}
-                        {txn.status === "pending" && <Clock className="mr-1 h-3 w-3" />}
-                        {txn.status === "failed" && <XCircle className="mr-1 h-3 w-3" />}
-                        {txn.status}
-                      </Badge>
-                    </td>
-                    <td className="p-4 text-sm text-muted-foreground">
-                      {format(txn.date, "MMM d, yyyy")}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+        <CardContent className="p-3">
+          <p className="text-[11px] text-muted-foreground">
+            Detailed transaction history will appear here once your gateway webhooks are connected and processing payments.
+          </p>
         </CardContent>
       </Card>
     </div>

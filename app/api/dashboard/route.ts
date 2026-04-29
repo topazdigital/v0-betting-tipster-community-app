@@ -70,7 +70,8 @@ async function fetchTipsterData(tipsterId: number, baseUrl: string): Promise<Tip
     });
     if (!r.ok) return null;
     return (await r.json()) as TipsterApiResponse;
-  } catch {
+  } catch (e) {
+    console.warn('[dashboard] tipster fetch failed', tipsterId, e);
     return null;
   }
 }
@@ -91,8 +92,15 @@ export async function GET(req: Request) {
     listFollowedTipsters(user.userId),
   ]);
 
+  // Use the internal loopback URL so server-side self-fetch works regardless
+  // of any reverse proxy / mTLS in front of the app (otherwise on Replit dev
+  // the public hostname is unreachable from inside the container and the
+  // followed-tipster panel + upcoming/results stay empty).
   const url = new URL(req.url);
-  const baseUrl = `${url.protocol}//${url.host}`;
+  const port = process.env.PORT || '5000';
+  const baseUrl = process.env.INTERNAL_BASE_URL
+    ? process.env.INTERNAL_BASE_URL
+    : (process.env.NODE_ENV === 'production' ? `${url.protocol}//${url.host}` : `http://127.0.0.1:${port}`);
 
   // Run team + tipster data fetches in parallel.
   const [teamData, tipsterData] = await Promise.all([
@@ -127,10 +135,16 @@ export async function GET(req: Request) {
   upcomingMatches.sort((a, b) => new Date(a.date as string).getTime() - new Date(b.date as string).getTime());
   recentResults.sort((a, b) => new Date(b.date as string).getTime() - new Date(a.date as string).getTime());
 
-  // Build tipster summaries + flatten recent tips
+  // Build tipster summaries (with latest tip inline) + flatten recent tips
   const tipsterSummaries = tipsterData
     .filter((x): x is { id: number; data: TipsterApiResponse } => !!x.data?.tipster)
-    .map(({ data }) => data.tipster!);
+    .map(({ data }) => {
+      const tips = data.recentTips || [];
+      // Sort and pick the most recent pending or recent overall.
+      const sorted = [...tips].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      const latestTip = sorted[0] || null;
+      return { ...data.tipster!, latestTip };
+    });
 
   const tipsterFeed: Array<RecentTip & { tipster: { id: number; displayName: string; username: string; avatar: string | null } }> = [];
   for (const { data } of tipsterData) {
