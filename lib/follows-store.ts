@@ -1,4 +1,6 @@
 import { query } from './db';
+import fs from 'fs';
+import path from 'path';
 
 export interface FollowedTeam {
   teamId: string;
@@ -19,18 +21,65 @@ export interface FollowedTipster {
 
 interface Stores {
   teams: Map<number, Map<string, FollowedTeam>>;
-  tipsters: Map<number, Set<number>>;
+  tipsters: Map<number, Map<number, string>>;
+  loaded: boolean;
+}
+
+const FOLLOWS_FILE = path.join(process.cwd(), '.local', 'state', 'follows.json');
+
+function ensureDir(p: string) {
+  try { fs.mkdirSync(path.dirname(p), { recursive: true }); } catch {}
+}
+
+function persistToDisk() {
+  try {
+    ensureDir(FOLLOWS_FILE);
+    const teams: Record<string, FollowedTeam[]> = {};
+    for (const [uid, m] of stores.teams) teams[String(uid)] = Array.from(m.values());
+    const tipsters: Record<string, Array<{ tipsterId: number; followedAt: string }>> = {};
+    for (const [uid, m] of stores.tipsters)
+      tipsters[String(uid)] = Array.from(m.entries()).map(([tipsterId, followedAt]) => ({ tipsterId, followedAt }));
+    fs.writeFileSync(FOLLOWS_FILE, JSON.stringify({ teams, tipsters }, null, 2));
+  } catch (e) {
+    console.warn('[follows] persist failed', e);
+  }
+}
+
+function loadFromDisk() {
+  if (stores.loaded) return;
+  stores.loaded = true;
+  try {
+    if (!fs.existsSync(FOLLOWS_FILE)) return;
+    const raw = JSON.parse(fs.readFileSync(FOLLOWS_FILE, 'utf8')) as {
+      teams?: Record<string, FollowedTeam[]>;
+      tipsters?: Record<string, Array<{ tipsterId: number; followedAt: string }>>;
+    };
+    for (const [uid, arr] of Object.entries(raw.teams || {})) {
+      const m = new Map<string, FollowedTeam>();
+      for (const t of arr) m.set(t.teamId, t);
+      stores.teams.set(Number(uid), m);
+    }
+    for (const [uid, arr] of Object.entries(raw.tipsters || {})) {
+      const m = new Map<number, string>();
+      for (const t of arr) m.set(t.tipsterId, t.followedAt);
+      stores.tipsters.set(Number(uid), m);
+    }
+  } catch (e) {
+    console.warn('[follows] load failed', e);
+  }
 }
 
 const g = globalThis as { __followsStore?: Stores };
 g.__followsStore = g.__followsStore || {
   teams: new Map(),
   tipsters: new Map(),
+  loaded: false,
 };
 const stores = g.__followsStore;
+loadFromDisk();
 
 function hasDb(): boolean {
-  return !!process.env.DATABASE_URL;
+  return !!process.env.DATABASE_URL && /^mysql/.test(process.env.DATABASE_URL || '');
 }
 
 // ─── TEAMS ───────────────────────────────────────
@@ -82,6 +131,7 @@ export async function followTeam(userId: number, team: Omit<FollowedTeam, 'follo
   }
   if (!stores.teams.has(userId)) stores.teams.set(userId, new Map());
   stores.teams.get(userId)!.set(entry.teamId, entry);
+  persistToDisk();
   return entry;
 }
 
@@ -94,6 +144,7 @@ export async function unfollowTeam(userId: number, teamId: string): Promise<void
     }
   }
   stores.teams.get(userId)?.delete(teamId);
+  persistToDisk();
 }
 
 export async function isFollowingTeam(userId: number, teamId: string): Promise<boolean> {
@@ -121,8 +172,9 @@ export async function followTipster(userId: number, tipsterId: number): Promise<
       console.warn('[follows tipster] db write failed:', e);
     }
   }
-  if (!stores.tipsters.has(userId)) stores.tipsters.set(userId, new Set());
-  stores.tipsters.get(userId)!.add(tipsterId);
+  if (!stores.tipsters.has(userId)) stores.tipsters.set(userId, new Map());
+  stores.tipsters.get(userId)!.set(tipsterId, new Date().toISOString());
+  persistToDisk();
 }
 
 export async function unfollowTipster(userId: number, tipsterId: number): Promise<void> {
@@ -135,6 +187,7 @@ export async function unfollowTipster(userId: number, tipsterId: number): Promis
     } catch {}
   }
   stores.tipsters.get(userId)?.delete(tipsterId);
+  persistToDisk();
 }
 
 export async function isFollowingTipster(userId: number, tipsterId: number): Promise<boolean> {
@@ -150,6 +203,15 @@ export async function isFollowingTipster(userId: number, tipsterId: number): Pro
   return stores.tipsters.get(userId)?.has(tipsterId) ?? false;
 }
 
+// When a fake tipster catalogue id (>= 1000) was followed, the user's `follows`
+// list will store that id. The dashboard endpoint surfaces these via
+// listFollowedTipsters. This is a small helper used by other modules.
+export function getFollowedTipsterEntries(userId: number): Array<{ tipsterId: number; followedAt: string }> {
+  const m = stores.tipsters.get(userId);
+  if (!m) return [];
+  return Array.from(m.entries()).map(([tipsterId, followedAt]) => ({ tipsterId, followedAt }));
+}
+
 export async function listFollowedTipsters(userId: number): Promise<number[]> {
   if (hasDb()) {
     try {
@@ -160,7 +222,7 @@ export async function listFollowedTipsters(userId: number): Promise<number[]> {
       return r.rows.map(x => x.following_id);
     } catch {}
   }
-  return Array.from(stores.tipsters.get(userId) || []);
+  return Array.from((stores.tipsters.get(userId) || new Map()).keys());
 }
 
 // Returns follower userIds for a given tipster (reverse lookup).
@@ -175,8 +237,8 @@ export async function listFollowersOfTipster(tipsterId: number): Promise<number[
     } catch {}
   }
   const out: number[] = [];
-  for (const [uid, set] of stores.tipsters) {
-    if (set.has(tipsterId)) out.push(uid);
+  for (const [uid, m] of stores.tipsters) {
+    if (m.has(tipsterId)) out.push(uid);
   }
   return out;
 }

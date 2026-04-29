@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getCurrentUser } from '@/lib/auth';
 import { slugToMatchId } from '@/lib/utils/match-url';
+import { seedTipsForMatch, listTipsForMatch, type GeneratedTip } from '@/lib/auto-tips-store';
+import { getFakeTipsterById, getFakeTipsters } from '@/lib/fake-tipsters';
+import { getMatchById } from '@/lib/api/unified-sports-api';
 
 export const dynamic = 'force-dynamic';
 
 // ─── In-memory store of user-submitted tips, keyed by matchId ───
-// Persists for the lifetime of the dev server / serverless instance.
 interface SubmittedTip {
   id: string;
   matchId: string;
@@ -36,51 +38,48 @@ interface SubmittedTip {
     verified: boolean;
   };
 }
-const submittedTipsStore: Map<string, SubmittedTip[]> = (globalThis as { __tipsStore?: Map<string, SubmittedTip[]> }).__tipsStore
+const submittedTipsStore: Map<string, SubmittedTip[]> =
+  (globalThis as { __tipsStore?: Map<string, SubmittedTip[]> }).__tipsStore
   || new Map<string, SubmittedTip[]>();
 (globalThis as { __tipsStore?: Map<string, SubmittedTip[]> }).__tipsStore = submittedTipsStore;
 
-function seededRandom(seed: number) {
-  const x = Math.sin(seed) * 10000;
-  return x - Math.floor(x);
+function autoTipToWire(tip: GeneratedTip) {
+  const t = getFakeTipsterById(tip.tipsterId);
+  return {
+    id: tip.id,
+    matchId: tip.matchId,
+    prediction: tip.prediction,
+    market: tip.market,
+    marketKey: tip.marketKey,
+    odds: tip.odds,
+    stake: tip.stake,
+    confidence: tip.confidence,
+    analysis: tip.analysis,
+    isPremium: tip.isPremium,
+    status: tip.status,
+    likes: tip.likes,
+    dislikes: tip.dislikes,
+    comments: tip.comments,
+    createdAt: tip.createdAt,
+    tipster: {
+      id: String(tip.tipsterId),
+      displayName: t?.displayName || `Tipster ${tip.tipsterId}`,
+      username: t?.username,
+      avatar: t?.avatar,
+      totalTips: t?.totalTips ?? 0,
+      wonTips: t?.wonTips ?? 0,
+      winRate: t?.winRate ?? 0,
+      roi: t?.roi ?? 0,
+      streak: t?.streak ?? 0,
+      rank: 0,
+      isPremium: !!t?.isPro,
+      monthlyPrice: t?.subscriptionPrice ?? 0,
+      followers: t?.followersCount ?? 0,
+      verified: !!t?.isVerified,
+      isFake: true,
+    },
+  };
 }
-
-function hashCode(str: string) {
-  let hash = 0;
-  for (let i = 0; i < str.length; i++) {
-    hash = (Math.imul(31, hash) + str.charCodeAt(i)) | 0;
-  }
-  return Math.abs(hash);
-}
-
-const TIPSTERS = [
-  { id: '1', displayName: 'KingOfTips', totalTips: 342, wonTips: 234, roi: 12.4, streak: 8, rank: 1, isPremium: true, monthlyPrice: 9.99, followers: 1523, verified: true },
-  { id: '2', displayName: 'AcePredicts', totalTips: 215, wonTips: 155, roi: 15.8, streak: 12, rank: 2, isPremium: true, monthlyPrice: 14.99, followers: 982, verified: true },
-  { id: '3', displayName: 'LuckyStriker', totalTips: 178, wonTips: 108, roi: 9.2, streak: 5, rank: 3, isPremium: false, monthlyPrice: 0, followers: 678, verified: false },
-  { id: '4', displayName: 'EuroExpert', totalTips: 156, wonTips: 91, roi: 7.5, streak: 3, rank: 4, isPremium: true, monthlyPrice: 7.99, followers: 534, verified: true },
-  { id: '5', displayName: 'GoalMachine', totalTips: 421, wonTips: 245, roi: 5.3, streak: -2, rank: 8, isPremium: false, monthlyPrice: 0, followers: 312, verified: false },
-  { id: '6', displayName: 'BetWizard', totalTips: 89, wonTips: 62, roi: 18.1, streak: 15, rank: 6, isPremium: true, monthlyPrice: 19.99, followers: 1102, verified: true },
-];
-
-const PREDICTIONS = [
-  { prediction: 'Home Win', market: 'Match Result (1X2)' },
-  { prediction: 'Away Win', market: 'Match Result (1X2)' },
-  { prediction: 'Draw', market: 'Match Result (1X2)' },
-  { prediction: 'Both Teams to Score', market: 'BTTS' },
-  { prediction: 'Over 2.5 Goals', market: 'Over/Under 2.5' },
-  { prediction: 'Under 2.5 Goals', market: 'Over/Under 2.5' },
-  { prediction: 'Home or Draw (1X)', market: 'Double Chance' },
-  { prediction: 'Away or Draw (X2)', market: 'Double Chance' },
-];
-
-const ANALYSES = [
-  (home: string, away: string) => `${home} has been incredibly consistent at home this season, winning 7 of their last 9 matches. ${away} has struggled defensively away from home, conceding in every away game this month.`,
-  (home: string, away: string) => `Statistical models show ${home} has a 67% probability based on recent form. Key injuries in ${away}'s backline could prove decisive here.`,
-  (home: string, away: string) => `Both teams have scored in 8 of the last 10 H2H meetings. ${home} averages 2.1 goals at home while ${away} scores 1.4 away.`,
-  (home: string, away: string) => `${away} has been exceptional on the road lately with 4 wins from last 5. ${home} have been unconvincing defensively despite home advantage.`,
-  (home: string, away: string) => `This fixture historically produces goals — 78% of meetings since 2018 have gone over 2.5. Current form backs this trend continuing.`,
-  (home: string, away: string) => `Tactical breakdown: ${home} presses high and creates chances but ${away}'s counter-attack is lethal. Expect an entertaining, open match.`,
-];
 
 export async function GET(
   request: NextRequest,
@@ -92,68 +91,56 @@ export async function GET(
   const homeTeam = searchParams.get('home') || 'Home Team';
   const awayTeam = searchParams.get('away') || 'Away Team';
 
-  const seed = hashCode(matchId);
+  // Try to enrich with the real match (league tier, kickoff, real markets) so
+  // fake-tipster picks reference the same odds/markets the user is browsing.
+  let leagueTier = 3;
+  let leagueName: string | undefined;
+  let sportName: string | undefined;
+  let kickoff: string | undefined;
+  let markets: { key?: string; name: string; selections: { label: string; odds: number }[] }[] | undefined;
+  let realHome = homeTeam;
+  let realAway = awayTeam;
 
-  const tipCount = 3 + (seed % 4);
-  const tips = [];
+  try {
+    const match = await getMatchById(matchId);
+    if (match) {
+      leagueTier = match.league?.tier ?? 3;
+      leagueName = match.league?.name;
+      sportName = match.sport?.name;
+      kickoff = match.kickoffTime instanceof Date ? match.kickoffTime.toISOString() : String(match.kickoffTime);
+      realHome = match.homeTeam?.name || realHome;
+      realAway = match.awayTeam?.name || realAway;
+      if (match.markets && match.markets.length > 0) {
+        markets = match.markets.map(m => ({
+          key: m.key,
+          name: m.name,
+          selections: (m.outcomes || []).map(o => ({
+            label: o.name,
+            odds: typeof o.price === 'number' ? o.price : 2,
+          })),
+        })).filter(m => m.selections.length > 0);
+      }
+    }
+  } catch { /* best-effort enrichment */ }
 
-  const usedTipsterIds = new Set<string>();
+  // Generate (or return cached) auto-tips for this match.
+  seedTipsForMatch({
+    matchId,
+    homeTeam: realHome,
+    awayTeam: realAway,
+    league: leagueName,
+    sport: sportName,
+    kickoff,
+    leagueTier,
+    popularity: leagueTier <= 2 ? 1.2 : 0.8,
+    markets,
+  });
 
-  for (let i = 0; i < tipCount; i++) {
-    const tipsterIdx = Math.floor(seededRandom(seed + i * 37) * TIPSTERS.length);
-    const tipster = TIPSTERS[tipsterIdx];
-
-    if (usedTipsterIds.has(tipster.id)) continue;
-    usedTipsterIds.add(tipster.id);
-
-    const predIdx = Math.floor(seededRandom(seed + i * 53) * PREDICTIONS.length);
-    const { prediction, market } = PREDICTIONS[predIdx];
-
-    const analysisIdx = Math.floor(seededRandom(seed + i * 71) * ANALYSES.length);
-    const analysis = ANALYSES[analysisIdx](homeTeam, awayTeam);
-
-    const baseOdds = 1.4 + seededRandom(seed + i * 17) * 2.8;
-    const odds = Math.round(baseOdds * 100) / 100;
-
-    const confidence = 55 + Math.floor(seededRandom(seed + i * 43) * 40);
-    const stake = 1 + Math.floor(seededRandom(seed + i * 29) * 5);
-
-    const isPremium = tipster.isPremium && seededRandom(seed + i * 61) > 0.4;
-
-    const hoursAgo = Math.floor(seededRandom(seed + i * 13) * 8);
-    const createdAt = new Date(Date.now() - hoursAgo * 3600 * 1000).toISOString();
-
-    const likes = 8 + Math.floor(seededRandom(seed + i * 83) * 60);
-    const dislikes = Math.floor(seededRandom(seed + i * 97) * 8);
-    const comments = Math.floor(seededRandom(seed + i * 107) * 15);
-
-    tips.push({
-      id: `${matchId}-${i + 1}`,
-      matchId,
-      prediction,
-      market,
-      odds,
-      stake,
-      confidence,
-      analysis,
-      isPremium,
-      status: 'pending',
-      likes,
-      dislikes,
-      comments,
-      createdAt,
-      tipster: {
-        ...tipster,
-        winRate: Math.round((tipster.wonTips / tipster.totalTips) * 100 * 10) / 10,
-      },
-    });
-  }
-
-  // Merge in any user-submitted tips for this match
+  const autoTips = listTipsForMatch(matchId).map(autoTipToWire);
   const userTips = submittedTipsStore.get(matchId) || [];
 
-  const merged = [...userTips, ...tips];
-  merged.sort((a, b) => b.confidence - a.confidence);
+  const merged = [...userTips, ...autoTips];
+  merged.sort((a, b) => (b.confidence ?? 0) - (a.confidence ?? 0));
 
   return NextResponse.json({ tips: merged, total: merged.length });
 }
@@ -229,3 +216,6 @@ export async function POST(
 
   return NextResponse.json({ tip: newTip, ok: true });
 }
+
+// Touch import to silence unused warning when getFakeTipsters not needed elsewhere
+void getFakeTipsters;

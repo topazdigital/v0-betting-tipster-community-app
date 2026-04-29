@@ -23,6 +23,81 @@ interface PageProps {
   params: Promise<{ id: string }>
 }
 
+// Tiny dependency-free SVG sparkline for tipster ROI trend.
+function RoiSparkline({
+  data,
+  finalRoi,
+  totalTips,
+  className = "",
+  height = 140,
+}: {
+  data?: { day: number; roi: number }[]
+  finalRoi: number
+  totalTips?: number
+  className?: string
+  height?: number
+}) {
+  if (!data || data.length < 2) {
+    return (
+      <div className="h-32 flex items-center justify-center bg-muted/30 rounded-lg text-sm text-muted-foreground">
+        Not enough data yet.
+      </div>
+    )
+  }
+  const w = 600
+  const h = height
+  const pad = 12
+  const xs = data.map((_, i) => pad + (i * (w - pad * 2)) / (data.length - 1))
+  const ys = data.map(d => d.roi)
+  const minY = Math.min(...ys, 0)
+  const maxY = Math.max(...ys, 1)
+  const range = Math.max(0.5, maxY - minY)
+  const ny = (v: number) => h - pad - ((v - minY) / range) * (h - pad * 2)
+
+  const path = xs.map((x, i) => `${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${ny(ys[i]).toFixed(1)}`).join(' ')
+  const fill = `${path} L${xs[xs.length - 1].toFixed(1)},${(h - pad).toFixed(1)} L${xs[0].toFixed(1)},${(h - pad).toFixed(1)} Z`
+  const positive = finalRoi >= 0
+  const stroke = positive ? "hsl(var(--success, 142 76% 36%))" : "hsl(var(--destructive, 0 84% 60%))"
+  const fillCol = positive ? "url(#roi-grad-pos)" : "url(#roi-grad-neg)"
+  const zeroY = ny(0)
+
+  return (
+    <div className={cn("w-full", className)}>
+      <svg viewBox={`0 0 ${w} ${h}`} className="w-full h-auto" preserveAspectRatio="none">
+        <defs>
+          <linearGradient id="roi-grad-pos" x1="0" x2="0" y1="0" y2="1">
+            <stop offset="0%" stopColor="rgb(16 185 129)" stopOpacity="0.35" />
+            <stop offset="100%" stopColor="rgb(16 185 129)" stopOpacity="0" />
+          </linearGradient>
+          <linearGradient id="roi-grad-neg" x1="0" x2="0" y1="0" y2="1">
+            <stop offset="0%" stopColor="rgb(239 68 68)" stopOpacity="0.35" />
+            <stop offset="100%" stopColor="rgb(239 68 68)" stopOpacity="0" />
+          </linearGradient>
+        </defs>
+        {minY < 0 && maxY > 0 && (
+          <line x1={pad} x2={w - pad} y1={zeroY} y2={zeroY}
+            strokeDasharray="4 4" stroke="currentColor" className="text-muted-foreground/40" strokeWidth="1" />
+        )}
+        <path d={fill} fill={fillCol} />
+        <path d={path} fill="none" stroke={stroke} strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
+        {xs.map((x, i) => (
+          <circle key={i} cx={x} cy={ny(ys[i])} r={i === xs.length - 1 ? 3.5 : 2}
+            fill={stroke} />
+        ))}
+      </svg>
+      <div className="mt-3 flex items-center justify-between text-xs text-muted-foreground">
+        <span>Day 1: <span className="font-semibold text-foreground">{ys[0]}%</span></span>
+        <span className={cn("font-semibold", positive ? "text-success" : "text-destructive")}>
+          {positive ? "+" : ""}{finalRoi}% ROI
+        </span>
+        {typeof totalTips === "number" && (
+          <span>{totalTips} total tips</span>
+        )}
+      </div>
+    </div>
+  )
+}
+
 const fetcher = async (url: string) => {
   const res = await fetch(url)
   if (!res.ok) throw new Error('Failed to fetch')
@@ -63,7 +138,13 @@ export default function TipsterProfilePage({ params }: PageProps) {
     )
   }
   
-  const { tipster, recentTips, monthlyStats, sportBreakdown } = data
+  const { tipster, recentTips, monthlyStats, sportBreakdown, roiSparkline } = data as {
+    tipster: typeof data.tipster
+    recentTips?: typeof data.recentTips
+    monthlyStats?: typeof data.monthlyStats
+    sportBreakdown?: typeof data.sportBreakdown
+    roiSparkline?: { day: number; roi: number }[]
+  }
   
   return (
     <div className="flex-1 overflow-hidden">
@@ -202,6 +283,24 @@ export default function TipsterProfilePage({ params }: PageProps) {
                 <div className="text-xs text-muted-foreground">Rank</div>
               </div>
             </div>
+
+            {/* Inline ROI sparkline — quick visual of the trend */}
+            {roiSparkline && roiSparkline.length > 1 && (
+              <div className="mt-4 rounded-xl bg-card border border-border p-3">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                    ROI · last {roiSparkline.length} days
+                  </span>
+                  <span className={cn(
+                    "text-xs font-bold",
+                    tipster.roi >= 0 ? "text-success" : "text-destructive",
+                  )}>
+                    {tipster.roi >= 0 ? "+" : ""}{tipster.roi}%
+                  </span>
+                </div>
+                <RoiSparkline data={roiSparkline} finalRoi={tipster.roi} height={64} />
+              </div>
+            )}
           </div>
         </Card>
         
@@ -473,22 +572,16 @@ export default function TipsterProfilePage({ params }: PageProps) {
               </CardContent>
             </Card>
             
-            {/* Profit Chart Placeholder */}
+            {/* ROI Sparkline */}
             <Card>
               <CardHeader className="pb-3">
                 <CardTitle className="flex items-center gap-2 text-base">
                   <Activity className="h-5 w-5 text-primary" />
-                  Cumulative Profit
+                  ROI Trend (last {(roiSparkline?.length ?? 14)} days)
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="h-48 flex items-center justify-center bg-muted/30 rounded-lg">
-                  <div className="text-center text-muted-foreground">
-                    <TrendingUp className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                    <p className="text-sm">Profit chart showing +{tipster.roi}% ROI</p>
-                    <p className="text-xs">Based on {tipster.totalTips} tips</p>
-                  </div>
-                </div>
+                <RoiSparkline data={roiSparkline} finalRoi={tipster.roi} totalTips={tipster.totalTips} />
               </CardContent>
             </Card>
           </TabsContent>
