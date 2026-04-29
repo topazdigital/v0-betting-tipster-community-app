@@ -74,7 +74,7 @@ export async function POST(request: Request) {
     // Captcha gate — once the user (or attacker) has missed CAPTCHA_THRESHOLD
     // times we require a captcha solution before checking the password again.
     if (failureCount >= CAPTCHA_THRESHOLD) {
-      const provider = getCaptchaProvider();
+      const provider = await getCaptchaProvider();
       let expected: string | undefined;
       if (provider === 'math') {
         expected = (captchaId ? recallMathAnswer(captchaId) : null) ?? undefined;

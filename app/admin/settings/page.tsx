@@ -46,6 +46,13 @@ interface Settings {
   vapid_public_key: string
   vapid_private_key: string
   vapid_subject: string
+  // Captcha — wired into login/signup. Provider can be 'turnstile',
+  // 'recaptcha', 'math' (built-in), 'none' or '' (auto from env).
+  captcha_provider: string
+  turnstile_site_key: string
+  turnstile_secret_key: string
+  recaptcha_site_key: string
+  recaptcha_secret_key: string
 }
 
 interface SocialLink {
@@ -122,6 +129,11 @@ const defaultSettings: Settings = {
   vapid_public_key: "",
   vapid_private_key: "",
   vapid_subject: "",
+  captcha_provider: "",
+  turnstile_site_key: "",
+  turnstile_secret_key: "",
+  recaptcha_site_key: "",
+  recaptcha_secret_key: "",
 }
 
 interface SeoPageEntry { path: string; title?: string; description?: string; keywords?: string; ogImage?: string; noIndex?: boolean }
@@ -383,6 +395,116 @@ export default function AdminSettingsPage() {
                   checked={settings.comments_moderation === 'true'}
                   onCheckedChange={() => toggleSetting('comments_moderation')}
                 />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Captcha — protects login & signup from bots. */}
+          <Card className="mt-3">
+            <CardHeader>
+              <CardTitle>Login Captcha</CardTitle>
+              <CardDescription>
+                Choose how Betcheza challenges suspicious sign-ins. Math is built-in
+                and works out of the box. Turnstile (Cloudflare) and reCAPTCHA (Google)
+                are stronger but need keys you create in their dashboards.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="space-y-2">
+                <Label htmlFor="captchaProvider">Provider</Label>
+                <select
+                  id="captchaProvider"
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  value={settings.captcha_provider || ''}
+                  onChange={(e) => updateSetting('captcha_provider', e.target.value)}
+                >
+                  <option value="">Auto (use env vars, else math)</option>
+                  <option value="math">Math (built-in)</option>
+                  <option value="turnstile">Cloudflare Turnstile</option>
+                  <option value="recaptcha">Google reCAPTCHA</option>
+                  <option value="none">Disabled (not recommended)</option>
+                </select>
+                <p className="text-xs text-muted-foreground">
+                  Login still triggers a captcha after 3 failed attempts even if disabled here.
+                </p>
+              </div>
+
+              <div className="rounded-lg border border-border/60 bg-muted/30 p-3 space-y-3">
+                <div className="flex items-center gap-2 text-sm font-semibold">
+                  <Shield className="h-4 w-4 text-primary" />
+                  Cloudflare Turnstile
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Get free keys at{' '}
+                  <a
+                    href="https://dash.cloudflare.com/?to=/:account/turnstile"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="underline"
+                  >
+                    dash.cloudflare.com → Turnstile
+                  </a>.
+                </p>
+                <div className="grid gap-3 md:grid-cols-2">
+                  <div className="space-y-1">
+                    <Label htmlFor="turnstileSiteKey" className="text-xs">Site Key (public)</Label>
+                    <Input
+                      id="turnstileSiteKey"
+                      placeholder="0x4AAA…"
+                      value={settings.turnstile_site_key}
+                      onChange={(e) => updateSetting('turnstile_site_key', e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="turnstileSecretKey" className="text-xs">Secret Key</Label>
+                    <Input
+                      id="turnstileSecretKey"
+                      type="password"
+                      placeholder="0x4AAA…"
+                      value={settings.turnstile_secret_key}
+                      onChange={(e) => updateSetting('turnstile_secret_key', e.target.value)}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-lg border border-border/60 bg-muted/30 p-3 space-y-3">
+                <div className="flex items-center gap-2 text-sm font-semibold">
+                  <Shield className="h-4 w-4 text-primary" />
+                  Google reCAPTCHA
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Get keys at{' '}
+                  <a
+                    href="https://www.google.com/recaptcha/admin"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="underline"
+                  >
+                    google.com/recaptcha/admin
+                  </a>.
+                </p>
+                <div className="grid gap-3 md:grid-cols-2">
+                  <div className="space-y-1">
+                    <Label htmlFor="recaptchaSiteKey" className="text-xs">Site Key (public)</Label>
+                    <Input
+                      id="recaptchaSiteKey"
+                      placeholder="6Lc…"
+                      value={settings.recaptcha_site_key}
+                      onChange={(e) => updateSetting('recaptcha_site_key', e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="recaptchaSecretKey" className="text-xs">Secret Key</Label>
+                    <Input
+                      id="recaptchaSecretKey"
+                      type="password"
+                      placeholder="6Lc…"
+                      value={settings.recaptcha_secret_key}
+                      onChange={(e) => updateSetting('recaptcha_secret_key', e.target.value)}
+                    />
+                  </div>
+                </div>
               </div>
             </CardContent>
           </Card>

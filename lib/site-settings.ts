@@ -71,6 +71,13 @@ const DEFAULTS: SiteSettings = {
   cookie_banner_enabled: 'true',
   cookie_banner_message:
     'We use cookies to improve your experience, analyse site traffic and personalise content. By clicking "Accept", you consent to our use of cookies.',
+  // Captcha provider (managed via /admin/settings → Security tab):
+  // 'turnstile' | 'recaptcha' | 'math' | 'none' | '' (auto)
+  captcha_provider: '',
+  turnstile_site_key: '',
+  turnstile_secret_key: '',
+  recaptcha_site_key: '',
+  recaptcha_secret_key: '',
 };
 
 const g = globalThis as { __siteSettingsCache?: { value: SiteSettings; ts: number } };

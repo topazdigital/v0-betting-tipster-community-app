@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { generateMathChallenge, getCaptchaProvider, getPublicCaptchaConfig, rememberMathAnswer } from '@/lib/captcha'
+import { generateMathChallenge, getPublicCaptchaConfig, rememberMathAnswer } from '@/lib/captcha'
 
 export const dynamic = 'force-dynamic'
 
@@ -9,19 +9,18 @@ export const dynamic = 'force-dynamic'
 // keyed by `id`; the client posts it back as `captchaToken` + `captchaId`
 // during login/signup.
 export async function GET() {
-  const provider = getCaptchaProvider()
-  const cfg = getPublicCaptchaConfig()
-  if (provider === 'math') {
+  const cfg = await getPublicCaptchaConfig()
+  if (cfg.provider === 'math') {
     const c = generateMathChallenge()
     rememberMathAnswer(c.id, c.answer)
     return NextResponse.json({
-      provider,
+      provider: cfg.provider,
       siteKey: null,
       math: { id: c.id, question: c.question },
     })
   }
   return NextResponse.json({
-    provider,
+    provider: cfg.provider,
     siteKey: cfg.siteKey,
     math: null,
   })

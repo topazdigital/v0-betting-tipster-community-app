@@ -958,21 +958,21 @@ export default function MatchDetailPage({ params }: PageProps) {
 
   return (
     <div className="flex-1 overflow-hidden">
-      <div className="mx-auto max-w-7xl px-3 py-4 pb-28 md:px-6 md:py-6 md:pb-10">
+      <div className="mx-auto max-w-7xl px-3 py-2 pb-28 md:px-5 md:py-3 md:pb-8">
         {/* Back */}
-        <Button variant="ghost" size="sm" className="mb-4 -ml-2 text-muted-foreground hover:text-foreground" asChild>
-          <Link href="/matches"><ArrowLeft className="mr-1.5 h-4 w-4" />Matches</Link>
+        <Button variant="ghost" size="sm" className="mb-2 -ml-2 h-7 text-xs text-muted-foreground hover:text-foreground" asChild>
+          <Link href="/matches"><ArrowLeft className="mr-1 h-3.5 w-3.5" />Matches</Link>
         </Button>
 
-        <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_320px]">
           <div className="min-w-0">
 
-        {/* ─── HERO CARD ─── */}
-        <div className="mb-5 overflow-hidden rounded-2xl shadow-2xl" style={{
+        {/* ─── HERO CARD (compact, oddspedia-style) ─── */}
+        <div className="mb-3 overflow-hidden rounded-xl shadow-lg" style={{
           background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%)'
         }}>
           {/* League strip */}
-          <div className="flex items-center justify-between px-5 py-3 border-b border-white/10">
+          <div className="flex items-center justify-between px-3 py-2 border-b border-white/10">
             <div className="flex items-center gap-2 min-w-0">
               <span className="text-lg shrink-0" aria-hidden>{SPORT_EMOJI[sport] || '🏆'}</span>
               <FlagIcon countryCode={match.league.countryCode} size="sm" className="shrink-0" title={match.league.country} />
@@ -1036,30 +1036,30 @@ export default function MatchDetailPage({ params }: PageProps) {
             </div>
           </div>
 
-          {/* Teams + Score */}
-          <div className="px-5 py-7 md:py-10">
-            <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-4 md:gap-8">
+          {/* Teams + Score (compact) */}
+          <div className="px-3 py-3 md:px-5 md:py-4">
+            <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 md:gap-6">
               {/* Home */}
               <div className="flex flex-col items-center text-center">
-                <div className="mb-3">
-                  <TeamLogo teamName={match.homeTeam.name} logoUrl={match.homeTeam.logo} size="lg" />
+                <div className="mb-1.5">
+                  <TeamLogo teamName={match.homeTeam.name} logoUrl={match.homeTeam.logo} size="md" />
                 </div>
                 {match.homeTeam.espnTeamId ? (
                   <Link
                     href={teamHref(match.homeTeam.name, match.homeTeam.espnTeamId)}
-                    className="text-base md:text-lg font-bold text-white line-clamp-2 hover:text-white/80 hover:underline"
+                    className="text-sm md:text-base font-bold text-white line-clamp-2 hover:text-white/80 hover:underline"
                     onClick={e => e.stopPropagation()}
                   >
                     {match.homeTeam.name}
                   </Link>
                 ) : (
-                  <p className="text-base md:text-lg font-bold text-white line-clamp-2">{match.homeTeam.name}</p>
+                  <p className="text-sm md:text-base font-bold text-white line-clamp-2">{match.homeTeam.name}</p>
                 )}
                 {match.homeTeam.record && (
-                  <p className="mt-0.5 text-xs text-white/40">{match.homeTeam.record}</p>
+                  <p className="mt-0.5 text-[10px] text-white/40">{match.homeTeam.record}</p>
                 )}
                 {match.homeTeam.form && (
-                  <div className="mt-2 flex gap-1 justify-center">
+                  <div className="mt-1 flex gap-1 justify-center">
                     {match.homeTeam.form.split('').slice(0, 5).map((r, i) => <FormBadge key={i} result={r} />)}
                   </div>
                 )}
@@ -1069,32 +1069,32 @@ export default function MatchDetailPage({ params }: PageProps) {
               </div>
 
               {/* Score / Time */}
-              <div className="flex flex-col items-center min-w-[90px] md:min-w-[120px]">
+              <div className="flex flex-col items-center min-w-[80px] md:min-w-[110px]">
                 {(isLive || isFinished) ? (
                   <>
-                    <div className="flex items-center gap-2 md:gap-4 tabular-nums">
-                      <span className="text-5xl md:text-7xl font-black text-white leading-none">
+                    <div className="flex items-center gap-1.5 md:gap-3 tabular-nums">
+                      <span className="text-4xl md:text-5xl font-black text-white leading-none">
                         {match.homeScore ?? 0}
                       </span>
-                      <span className="text-2xl md:text-4xl font-light text-white/30">:</span>
-                      <span className="text-5xl md:text-7xl font-black text-white leading-none">
+                      <span className="text-xl md:text-3xl font-light text-white/30">:</span>
+                      <span className="text-4xl md:text-5xl font-black text-white leading-none">
                         {match.awayScore ?? 0}
                       </span>
                     </div>
                     {isLive && !isHalftime && (
-                      <div className="mt-3 flex items-center gap-1.5">
+                      <div className="mt-1.5 flex items-center gap-1.5">
                         <span className="inline-block h-1.5 w-1.5 rounded-full bg-rose-400 animate-pulse" />
-                        <span className="font-mono text-sm font-bold text-rose-400">
+                        <span className="font-mono text-xs font-bold text-rose-400">
                           {ticksByMinute ? `${liveMinute}'` : liveLabel}
                         </span>
                       </div>
                     )}
-                    {isHalftime && <p className="mt-2 text-xs font-bold text-amber-400">HALF TIME</p>}
-                    {isFinished && <p className="mt-2 text-xs text-white/40 font-medium">FULL TIME</p>}
+                    {isHalftime && <p className="mt-1 text-[11px] font-bold text-amber-400">HALF TIME</p>}
+                    {isFinished && <p className="mt-1 text-[11px] text-white/40 font-medium">FULL TIME</p>}
                   </>
                 ) : (
                   <>
-                    <p className="text-3xl md:text-5xl font-bold text-white tabular-nums">
+                    <p className="text-2xl md:text-4xl font-bold text-white tabular-nums">
                       {formatTime(match.kickoffTime, timezone)}
                     </p>
                     <p className="mt-1.5 text-xs text-white/40">

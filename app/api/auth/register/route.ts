@@ -95,7 +95,7 @@ export async function POST(request: Request) {
     // out. The provider (Turnstile / reCAPTCHA / math fallback) is decided
     // server-side in lib/captcha.ts.
     {
-      const provider = getCaptchaProvider();
+      const provider = await getCaptchaProvider();
       let expected: string | undefined;
       if (provider === 'math') {
         expected = (captchaId ? recallMathAnswer(captchaId) : null) ?? undefined;

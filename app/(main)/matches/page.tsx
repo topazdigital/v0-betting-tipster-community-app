@@ -95,6 +95,10 @@ function MatchesContent() {
     const todayKey = toLocalISODate(new Date());
     if (statusFilter !== 'live') {
       if (dateTab === 'today') {
+        // "Today" should include every match scheduled for today in the
+        // user's local timezone — finished, live, or upcoming. This lets
+        // visitors see the full daily slate (final scores + still-to-play)
+        // without bouncing between tabs.
         result = result.filter(m => toLocalISODate(new Date(m.kickoffTime)) === todayKey);
       } else if (dateTab === 'upcoming') {
         result = result.filter(m => {

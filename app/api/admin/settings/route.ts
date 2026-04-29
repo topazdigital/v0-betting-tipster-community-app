@@ -56,6 +56,12 @@ const ENV_BACKED_SETTINGS: Record<string, string> = {
   // Football-data.org is also wired up in code but not yet surfaced in the
   // admin UI — list it here anyway so future tabs pick it up automatically.
   football_data_api_key: 'FOOTBALL_DATA_API_KEY',
+  // Captcha — admin can paste these in the Security tab (preferred) but if
+  // they're already set in env vars we'll show them prefilled.
+  turnstile_site_key: 'NEXT_PUBLIC_TURNSTILE_SITE_KEY',
+  turnstile_secret_key: 'TURNSTILE_SECRET_KEY',
+  recaptcha_site_key: 'NEXT_PUBLIC_RECAPTCHA_SITE_KEY',
+  recaptcha_secret_key: 'RECAPTCHA_SECRET_KEY',
 };
 
 function fillFromEnv(settings: Record<string, string>): Record<string, string> {

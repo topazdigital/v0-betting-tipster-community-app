@@ -294,8 +294,17 @@ export async function GET(request: NextRequest) {
     } else if (status && status !== 'all') {
       matches = matches.filter(m => m.status === status);
     } else {
-      // Default behaviour: list view excludes finished — those live on /results
-      matches = matches.filter(m => m.status !== 'finished' && m.status !== 'cancelled' && m.status !== 'postponed');
+      // Default behaviour: keep today's matches even when finished (so the
+      // homepage / matches page "Today" tab shows the full daily slate
+      // including final scores), but drop finished/cancelled/postponed
+      // matches from other days — those belong on /results.
+      matches = matches.filter(m => {
+        if (m.status === 'cancelled' || m.status === 'postponed') return false;
+        if (m.status === 'finished') {
+          return getDayBucket(new Date(m.kickoffTime), tzOffsetMin) === 0;
+        }
+        return true;
+      });
     }
 
     matches = sortMatches(matches, countryCode, tzOffsetMin);

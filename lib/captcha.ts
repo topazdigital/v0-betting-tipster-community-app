@@ -4,35 +4,97 @@
 //   1. Cloudflare Turnstile (preferred — privacy-friendly, free, no PII).
 //   2. Google reCAPTCHA v2 / v3.
 //
-// Either is enabled by setting the matching site key on the public env and
-// the secret on the server env. When neither is configured we fall back to a
-// simple server-issued math captcha (`/api/captcha/challenge` + answer) so
-// the login flow still has *some* bot-mitigation even in fresh installs.
+// Provider selection (first match wins):
+//   1. Admin panel (Settings → Security → Captcha) writes its values to the
+//      `site_settings` table — these take precedence so a deploy never has
+//      to redeploy to swap providers.
+//   2. Environment variables (TURNSTILE_SECRET_KEY / RECAPTCHA_SECRET_KEY +
+//      the matching NEXT_PUBLIC_*_SITE_KEY) — used when the admin hasn't
+//      configured anything.
+//   3. Math fallback — server-issued question via /api/captcha/challenge.
+
+import { getSiteSettings } from './site-settings'
 
 const TURNSTILE_VERIFY_URL = 'https://challenges.cloudflare.com/turnstile/v0/siteverify'
 const RECAPTCHA_VERIFY_URL = 'https://www.google.com/recaptcha/api/siteverify'
 
 export type CaptchaProvider = 'turnstile' | 'recaptcha' | 'math' | 'none'
 
-export function getCaptchaProvider(): CaptchaProvider {
-  if (process.env.TURNSTILE_SECRET_KEY) return 'turnstile'
-  if (process.env.RECAPTCHA_SECRET_KEY) return 'recaptcha'
-  // Math captcha is always available — built into our challenge endpoint.
-  return 'math'
+export interface CaptchaConfig {
+  provider: CaptchaProvider
+  /** Public site key (safe to expose). */
+  siteKey: string | null
+  /** Secret used server-side. Never exposed to the browser. */
+  secretKey: string | null
 }
 
 /**
- * Public-facing captcha config — safe to expose to the browser. The auth
- * modal calls /api/captcha/config to know which widget to render.
+ * Resolve the configured captcha provider — admin panel first, then env.
+ * The admin can also explicitly disable captcha by setting provider to "none".
  */
-export function getPublicCaptchaConfig() {
-  const provider = getCaptchaProvider()
-  return {
-    provider,
-    siteKey: process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY
-      || process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY
-      || null,
+export async function getCaptchaConfig(): Promise<CaptchaConfig> {
+  let settings: Record<string, string> = {}
+  try {
+    settings = await getSiteSettings() as Record<string, string>
+  } catch {
+    // DB unreachable — fall through to env-only.
   }
+
+  const adminProvider = (settings.captcha_provider || '').trim()
+
+  // 1. Admin chose Turnstile and supplied keys → use them.
+  if (adminProvider === 'turnstile') {
+    const secret = settings.turnstile_secret_key || process.env.TURNSTILE_SECRET_KEY || ''
+    const site = settings.turnstile_site_key || process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || ''
+    if (secret) return { provider: 'turnstile', siteKey: site || null, secretKey: secret }
+  }
+  // 2. Admin chose reCAPTCHA and supplied keys.
+  if (adminProvider === 'recaptcha') {
+    const secret = settings.recaptcha_secret_key || process.env.RECAPTCHA_SECRET_KEY || ''
+    const site = settings.recaptcha_site_key || process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY || ''
+    if (secret) return { provider: 'recaptcha', siteKey: site || null, secretKey: secret }
+  }
+  // 3. Admin chose math — always works.
+  if (adminProvider === 'math') {
+    return { provider: 'math', siteKey: null, secretKey: null }
+  }
+  // 4. Admin disabled captcha entirely.
+  if (adminProvider === 'none') {
+    return { provider: 'none', siteKey: null, secretKey: null }
+  }
+
+  // No admin choice — fall back to whichever env var is set.
+  const envTurnstile = (settings.turnstile_secret_key || process.env.TURNSTILE_SECRET_KEY || '').trim()
+  if (envTurnstile) {
+    return {
+      provider: 'turnstile',
+      siteKey: settings.turnstile_site_key || process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || null,
+      secretKey: envTurnstile,
+    }
+  }
+  const envRecaptcha = (settings.recaptcha_secret_key || process.env.RECAPTCHA_SECRET_KEY || '').trim()
+  if (envRecaptcha) {
+    return {
+      provider: 'recaptcha',
+      siteKey: settings.recaptcha_site_key || process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY || null,
+      secretKey: envRecaptcha,
+    }
+  }
+
+  // 5. Default: built-in math captcha — always available.
+  return { provider: 'math', siteKey: null, secretKey: null }
+}
+
+export async function getCaptchaProvider(): Promise<CaptchaProvider> {
+  return (await getCaptchaConfig()).provider
+}
+
+/**
+ * Public-facing captcha config — safe to expose to the browser.
+ */
+export async function getPublicCaptchaConfig(): Promise<{ provider: CaptchaProvider; siteKey: string | null }> {
+  const cfg = await getCaptchaConfig()
+  return { provider: cfg.provider, siteKey: cfg.siteKey }
 }
 
 /**
@@ -48,14 +110,15 @@ export async function verifyCaptcha(opts: {
   /** Only used for the 'math' provider. */
   expected?: string
 }): Promise<{ ok: boolean; error?: string }> {
-  const provider = getCaptchaProvider()
+  const cfg = await getCaptchaConfig()
   const token = (opts.token || '').trim()
+  if (cfg.provider === 'none') return { ok: true }
   if (!token) return { ok: false, error: 'Captcha required' }
 
-  if (provider === 'turnstile') {
+  if (cfg.provider === 'turnstile') {
     try {
       const body = new URLSearchParams({
-        secret: process.env.TURNSTILE_SECRET_KEY || '',
+        secret: cfg.secretKey || '',
         response: token,
       })
       if (opts.remoteIp) body.set('remoteip', opts.remoteIp)
@@ -68,10 +131,10 @@ export async function verifyCaptcha(opts: {
     }
   }
 
-  if (provider === 'recaptcha') {
+  if (cfg.provider === 'recaptcha') {
     try {
       const body = new URLSearchParams({
-        secret: process.env.RECAPTCHA_SECRET_KEY || '',
+        secret: cfg.secretKey || '',
         response: token,
       })
       if (opts.remoteIp) body.set('remoteip', opts.remoteIp)
@@ -86,7 +149,7 @@ export async function verifyCaptcha(opts: {
 
   // Math captcha — token is the user-typed answer, expected is the answer we
   // signed and gave them. Compare in constant time.
-  if (provider === 'math') {
+  if (cfg.provider === 'math') {
     const exp = (opts.expected || '').trim()
     if (!exp) return { ok: false, error: 'Captcha expired' }
     if (token.length === exp.length && safeEqual(token, exp)) return { ok: true }

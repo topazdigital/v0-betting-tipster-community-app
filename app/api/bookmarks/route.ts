@@ -1,65 +1,117 @@
-import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/auth";
-import { execute, query, getPool } from "@/lib/db";
+import { NextRequest, NextResponse } from 'next/server';
+import { query, execute, getPool } from '@/lib/db';
+import { getCurrentUser } from '@/lib/auth';
 
-async function ensureTable(): Promise<boolean> {
-  if (!getPool()) return false;
+export const dynamic = 'force-dynamic';
+
+// In-memory fallback so bookmarks "work" even when the DB isn't reachable.
+// Keyed by `${userId}:${entityType}:${entityId}`.
+const g = globalThis as { __bookmarkMem?: Map<string, { entity_type: string; entity_id: string; created_at: string }> };
+const mem = g.__bookmarkMem ?? (g.__bookmarkMem = new Map());
+
+async function getUserId(): Promise<string | null> {
   try {
-    await execute(`
-      CREATE TABLE IF NOT EXISTS bookmarks (
-        user_id INT NOT NULL,
-        match_id VARCHAR(191) NOT NULL,
-        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        PRIMARY KEY (user_id, match_id),
-        INDEX idx_user_created (user_id, created_at)
-      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-    `);
-    return true;
+    const u = await getCurrentUser();
+    return u && (u as { userId?: string | number }).userId
+      ? String((u as { userId: string | number }).userId)
+      : null;
   } catch {
-    return false;
+    return null;
   }
 }
 
-export async function GET() {
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ bookmarks: [] }, { status: 401 });
-  const ok = await ensureTable();
-  if (!ok) return NextResponse.json({ bookmarks: [] });
-  const result = await query<{ match_id: string }>(
-    "SELECT match_id FROM bookmarks WHERE user_id = ? ORDER BY created_at DESC LIMIT 200",
-    [user.userId]
-  );
-  return NextResponse.json({
-    bookmarks: (result.rows || []).map(r => r.match_id),
-  });
+function memKey(userId: string, type: string, id: string) {
+  return `${userId}:${type}:${id}`;
 }
 
+interface BookmarkBody {
+  matchId?: string;
+  entityType?: string;
+  entityId?: string;
+}
+
+function resolveEntity(body: BookmarkBody): { type: string; id: string } | null {
+  if (body.matchId) return { type: 'match', id: String(body.matchId) };
+  if (body.entityType && body.entityId) return { type: String(body.entityType), id: String(body.entityId) };
+  return null;
+}
+
+// GET /api/bookmarks?type=match — list current user's bookmarks (optionally
+// filtered by entity type).
+export async function GET(req: NextRequest) {
+  const userId = await getUserId();
+  if (!userId) return NextResponse.json({ bookmarks: [] }, { status: 200 });
+
+  const type = req.nextUrl.searchParams.get('type');
+  const pool = getPool();
+  if (!pool) {
+    const list = Array.from(mem.entries())
+      .filter(([k]) => k.startsWith(`${userId}:`))
+      .filter(([, v]) => !type || v.entity_type === type)
+      .map(([, v]) => v);
+    return NextResponse.json({ bookmarks: list });
+  }
+  try {
+    const sql = type
+      ? 'SELECT entity_type, entity_id, created_at FROM user_bookmarks WHERE user_id = $1 AND entity_type = $2 ORDER BY created_at DESC'
+      : 'SELECT entity_type, entity_id, created_at FROM user_bookmarks WHERE user_id = $1 ORDER BY created_at DESC';
+    const params = type ? [userId, type] : [userId];
+    const r = await query(sql, params);
+    return NextResponse.json({ bookmarks: r.rows });
+  } catch {
+    return NextResponse.json({ bookmarks: [] });
+  }
+}
+
+// POST /api/bookmarks { matchId } — save bookmark.
 export async function POST(req: NextRequest) {
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  const body = await req.json().catch(() => ({}));
-  const matchId = String(body?.matchId || "").slice(0, 190);
-  if (!matchId) return NextResponse.json({ error: "matchId required" }, { status: 400 });
-  const ok = await ensureTable();
-  if (!ok) return NextResponse.json({ ok: true, persisted: false });
-  await execute(
-    "INSERT IGNORE INTO bookmarks (user_id, match_id) VALUES (?, ?)",
-    [user.userId, matchId]
-  );
-  return NextResponse.json({ ok: true, persisted: true });
+  const userId = await getUserId();
+  if (!userId) return NextResponse.json({ error: 'Sign in to save bookmarks' }, { status: 401 });
+  const body = await req.json().catch(() => ({})) as BookmarkBody;
+  const ent = resolveEntity(body);
+  if (!ent) return NextResponse.json({ error: 'Missing entity' }, { status: 400 });
+
+  const pool = getPool();
+  if (!pool) {
+    mem.set(memKey(userId, ent.type, ent.id), {
+      entity_type: ent.type, entity_id: ent.id, created_at: new Date().toISOString(),
+    });
+    return NextResponse.json({ ok: true, source: 'memory' });
+  }
+  try {
+    await execute(
+      `INSERT INTO user_bookmarks (user_id, entity_type, entity_id, created_at)
+       VALUES ($1, $2, $3, NOW())
+       ON CONFLICT (user_id, entity_type, entity_id) DO NOTHING`,
+      [userId, ent.type, ent.id],
+    );
+    return NextResponse.json({ ok: true });
+  } catch (err) {
+    // Best-effort fallback so the UI keeps working.
+    mem.set(memKey(userId, ent.type, ent.id), {
+      entity_type: ent.type, entity_id: ent.id, created_at: new Date().toISOString(),
+    });
+    return NextResponse.json({ ok: true, source: 'memory', warning: String(err) });
+  }
 }
 
+// DELETE /api/bookmarks { matchId } — remove bookmark.
 export async function DELETE(req: NextRequest) {
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  const body = await req.json().catch(() => ({}));
-  const matchId = String(body?.matchId || "").slice(0, 190);
-  if (!matchId) return NextResponse.json({ error: "matchId required" }, { status: 400 });
-  const ok = await ensureTable();
-  if (!ok) return NextResponse.json({ ok: true, persisted: false });
-  await execute(
-    "DELETE FROM bookmarks WHERE user_id = ? AND match_id = ?",
-    [user.userId, matchId]
-  );
-  return NextResponse.json({ ok: true, persisted: true });
+  const userId = await getUserId();
+  if (!userId) return NextResponse.json({ error: 'Sign in to manage bookmarks' }, { status: 401 });
+  const body = await req.json().catch(() => ({})) as BookmarkBody;
+  const ent = resolveEntity(body);
+  if (!ent) return NextResponse.json({ error: 'Missing entity' }, { status: 400 });
+
+  const pool = getPool();
+  if (pool) {
+    try {
+      await execute(
+        'DELETE FROM user_bookmarks WHERE user_id = $1 AND entity_type = $2 AND entity_id = $3',
+        [userId, ent.type, ent.id],
+      );
+    } catch { /* fall through to memory cleanup */ }
+  }
+  mem.delete(memKey(userId, ent.type, ent.id));
+  return NextResponse.json({ ok: true });
 }
