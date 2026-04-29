@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Eye, EyeOff, Loader2, CheckCircle2 } from 'lucide-react';
+import { CaptchaChallenge, type CaptchaChallengeHandle } from '@/components/auth/captcha-challenge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -211,15 +212,34 @@ function LoginPanel() {
   } | null>(null);
   const [otpCode, setOtpCode] = useState('');
   const [resendNote, setResendNote] = useState('');
+  // Captcha is hidden by default — we surface it once the server flags
+  // captchaRequired (typically after 3 failed attempts) so legitimate users
+  // never have to solve one on the first try.
+  const [captchaRequired, setCaptchaRequired] = useState(false);
+  const captchaRef = useRef<CaptchaChallengeHandle>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    let captcha: { token: string; id?: string } | undefined;
+    if (captchaRequired) {
+      const r = captchaRef.current?.getResult();
+      if (!r) {
+        setError('Please complete the security check.');
+        return;
+      }
+      captcha = r;
+    }
     setIsLoading(true);
-    const result = await login(email, password);
+    const result = await login(email, password, captcha);
     setIsLoading(false);
     if (!result.success) {
       setError(result.error || 'Login failed');
+      if (result.captchaRequired) {
+        setCaptchaRequired(true);
+        // Refresh the challenge so the user gets a fresh one after a failure.
+        await captchaRef.current?.refresh();
+      }
       return;
     }
     if (result.requiresTwoFactor && result.challengeId) {
@@ -357,6 +377,8 @@ function LoginPanel() {
           </div>
         </div>
 
+        <CaptchaChallenge ref={captchaRef} visible={captchaRequired} />
+
         <Button type="submit" className="w-full" disabled={isLoading}>
           {isLoading ? (
             <>
@@ -391,6 +413,9 @@ function RegisterPanel() {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  // Captcha is mandatory on signup — show it immediately so the user has time
+  // to solve it while filling the rest of the form.
+  const captchaRef = useRef<CaptchaChallengeHandle>(null);
 
   const selectedCountry = countries.find((c) => c.code === formData.countryCode);
 
@@ -411,6 +436,12 @@ function RegisterPanel() {
       return;
     }
 
+    const captcha = captchaRef.current?.getResult();
+    if (!captcha) {
+      setError('Please complete the security check.');
+      return;
+    }
+
     setIsLoading(true);
     const result = await register({
       email: formData.email,
@@ -419,6 +450,8 @@ function RegisterPanel() {
       displayName: formData.displayName,
       phone: formData.phone ? `${selectedCountry?.dialCode}${formData.phone}` : undefined,
       countryCode: formData.countryCode,
+      captchaToken: captcha.token,
+      captchaId: captcha.id,
     });
     setIsLoading(false);
 
@@ -426,6 +459,8 @@ function RegisterPanel() {
       close();
     } else {
       setError(result.error || 'Registration failed');
+      // Refresh the captcha so a stale answer can't be re-submitted.
+      await captchaRef.current?.refresh();
     }
   };
 
@@ -551,6 +586,8 @@ function RegisterPanel() {
             disabled={isLoading}
           />
         </div>
+
+        <CaptchaChallenge ref={captchaRef} visible />
 
         <Button type="submit" className="w-full" disabled={isLoading}>
           {isLoading ? (

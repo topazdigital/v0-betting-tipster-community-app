@@ -2024,12 +2024,12 @@ async function getESPNMatches(config: ESPNLeagueConfig): Promise<UnifiedMatch[]>
   const start = new Date(now);
   start.setUTCDate(start.getUTCDate() - 1);
   const end = new Date(now);
-  // Priority leagues get a 21-day window so the next 3 weeks of fixtures are
-  // always visible (was 14 — too tight when an international break or cup gap
-  // pushed the next round outside the window). Smaller / less-frequent leagues
-  // get a 45-day window so even a monthly fixture still surfaces well in
-  // advance (matches oddspedia-style "weeks ahead" calendars).
-  end.setUTCDate(end.getUTCDate() + (isPriority ? 21 : 45));
+  // Priority leagues get a 28-day window so the next ~4 weeks of fixtures are
+  // always visible (was 21 — bumped to match oddspedia/freesupertips, which
+  // typically show "next 4 weeks" of league action without paging). Smaller
+  // / less-frequent leagues get a 60-day window so even a sparsely-played
+  // cup competition still surfaces fixtures well in advance.
+  end.setUTCDate(end.getUTCDate() + (isPriority ? 28 : 60));
   const range = `${formatYYYYMMDD(start)}-${formatYYYYMMDD(end)}`;
   data = await fetchESPN(config.sport, config.league, 'scoreboard', range);
   // Fall back to the default endpoint if range request fails or returns nothing.

@@ -195,8 +195,12 @@ function TieCard({ tie }: { tie: Tie }) {
 }
 
 function TeamRow({ team, winner, loser }: { team: { id: string; name: string; logo?: string }; winner: boolean; loser: boolean }) {
-  return (
-    <div className="flex items-center gap-2">
+  // Build a /teams/<slug>-<id> link so users can jump from a knockout-bracket
+  // tile straight to either club's profile page. Falls back to a plain row
+  // when the upstream feed didn't include a team id (rare).
+  const href = team.id ? `/teams/${slugify(team.name)}-${team.id}` : null
+  const inner = (
+    <>
       <TeamLogo teamName={team.name} logoUrl={team.logo} size="xs" />
       <span
         className={cn(
@@ -207,6 +211,29 @@ function TeamRow({ team, winner, loser }: { team: { id: string; name: string; lo
       >
         {team.name}
       </span>
-    </div>
+    </>
   )
+  if (!href) {
+    return <div className="flex items-center gap-2">{inner}</div>
+  }
+  return (
+    <Link
+      href={href}
+      className="flex items-center gap-2 rounded-md -mx-1 px-1 py-0.5 hover:bg-muted/60 hover:text-primary transition-colors"
+      title={`Open ${team.name}'s page`}
+    >
+      {inner}
+    </Link>
+  )
+}
+
+function slugify(s: string): string {
+  return s
+    .toLowerCase()
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9\s-]+/g, ' ')
+    .trim()
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
 }

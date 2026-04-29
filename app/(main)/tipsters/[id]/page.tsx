@@ -242,19 +242,29 @@ export default function TipsterProfilePage({ params }: PageProps) {
                   confidence: number;
                   likes: number;
                   createdAt: string;
-                }) => (
-                  <div 
-                    key={tip.id} 
+                }) => {
+                  // Wrap the tip card in a Link to the match detail page when
+                  // the API surfaced a usable match id (skip mock placeholder ids).
+                  const rawId = (tip.match as { id?: string }).id ?? null
+                  const isReal = !!rawId && !rawId.startsWith('match_')
+                  const matchHref = isReal ? `/matches/${rawId}` : null
+                  const Wrapper: React.ElementType = matchHref ? Link : 'div'
+                  const wrapperProps = matchHref ? { href: matchHref } : {}
+                  return (
+                  <Wrapper
+                    key={tip.id}
+                    {...(wrapperProps as Record<string, unknown>)}
                     className={cn(
-                      "rounded-lg border p-4 transition-colors",
+                      "block rounded-lg border p-4 transition-colors",
                       tip.status === 'won' && "border-success/30 bg-success/5",
                       tip.status === 'lost' && "border-destructive/30 bg-destructive/5",
-                      tip.status === 'pending' && "border-warning/30 bg-warning/5"
+                      tip.status === 'pending' && "border-warning/30 bg-warning/5",
+                      matchHref && "hover:border-primary/40 hover:shadow-sm cursor-pointer",
                     )}
                   >
                     <div className="flex items-start justify-between gap-2 mb-2">
                       <div>
-                        <div className="font-semibold text-sm">
+                        <div className={cn("font-semibold text-sm", matchHref && "group-hover:text-primary")}>
                           {tip.match.homeTeam} vs {tip.match.awayTeam}
                         </div>
                         <div className="text-xs text-muted-foreground">
@@ -285,9 +295,15 @@ export default function TipsterProfilePage({ params }: PageProps) {
                       {tip.status !== 'pending' && tip.match.homeScore !== null && (
                         <span>Result: {tip.match.homeScore} - {tip.match.awayScore}</span>
                       )}
+                      {matchHref && (
+                        <span className="ml-auto inline-flex items-center gap-0.5 text-primary group-hover:underline">
+                          Open match <ChevronRight className="h-3 w-3" />
+                        </span>
+                      )}
                     </div>
-                  </div>
-                ))}
+                  </Wrapper>
+                  )
+                })}
               </CardContent>
             </Card>
           </TabsContent>

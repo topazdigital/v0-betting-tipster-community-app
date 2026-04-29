@@ -17,7 +17,7 @@ interface AuthContextType {
   user: AuthUser | null;
   isLoading: boolean;
   isAuthenticated: boolean;
-  login: (email: string, password: string) => Promise<{
+  login: (email: string, password: string, captcha?: { token: string; id?: string }) => Promise<{
     success: boolean;
     error?: string;
     requiresTwoFactor?: boolean;
@@ -25,6 +25,7 @@ interface AuthContextType {
     channel?: string;
     deliveredTo?: string;
     warning?: string;
+    captchaRequired?: boolean;
   }>;
   completeTwoFactor: (challengeId: string, code: string) => Promise<{ success: boolean; error?: string }>;
   resendTwoFactor: (email: string) => Promise<{ success: boolean; error?: string; challengeId?: string; deliveredTo?: string; channel?: string }>;
@@ -40,6 +41,8 @@ interface RegisterData {
   displayName: string;
   phone?: string;
   countryCode?: string;
+  captchaToken?: string;
+  captchaId?: string;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -69,7 +72,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const login = async (email: string, password: string) => {
+  const login = async (email: string, password: string, captcha?: { token: string; id?: string }) => {
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 15000);
@@ -77,7 +80,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({
+          email,
+          password,
+          captchaToken: captcha?.token,
+          captchaId: captcha?.id,
+        }),
         signal: controller.signal,
       });
       
@@ -85,7 +93,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({}));
-        return { success: false, error: errorData.error || `Server error: ${res.status}` };
+        return {
+          success: false,
+          error: errorData.error || `Server error: ${res.status}`,
+          captchaRequired: !!errorData.captchaRequired,
+        };
       }
 
       const data = await res.json();

@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { hashPassword, setAuthCookie } from '@/lib/auth';
 import { mockUsers } from '@/lib/mock-data';
 import { sendMail } from '@/lib/mailer';
+import { ipKeyFromHeaders, rateLimit } from '@/lib/rate-limit';
+import { getCaptchaProvider, recallMathAnswer, verifyCaptcha } from '@/lib/captcha';
 
 export const dynamic = 'force-dynamic';
 
@@ -66,6 +68,17 @@ Bet smart. Bet small. — Team Betcheza`;
 
 export async function POST(request: Request) {
   try {
+    const ip = ipKeyFromHeaders(request.headers);
+    // Tighter rate-limit on signup — 5 accounts per IP per hour stops spam
+    // signup waves without affecting normal users.
+    const ipLimit = rateLimit(`register:ip:${ip}`, 5, 60 * 60_000);
+    if (!ipLimit.ok) {
+      return NextResponse.json(
+        { success: false, error: `Too many signups from this network. Try again in ${ipLimit.retryAfter}s.` },
+        { status: 429, headers: { 'Retry-After': String(ipLimit.retryAfter ?? 60) } },
+      );
+    }
+
     let body;
     try {
       body = await request.json();
@@ -75,8 +88,26 @@ export async function POST(request: Request) {
         { status: 400 }
       );
     }
-    
-    const { email, password, username, displayName, phone, countryCode } = body;
+
+    const { email, password, username, displayName, phone, countryCode, captchaToken, captchaId } = body;
+
+    // Captcha is required for every signup to keep automated account creation
+    // out. The provider (Turnstile / reCAPTCHA / math fallback) is decided
+    // server-side in lib/captcha.ts.
+    {
+      const provider = getCaptchaProvider();
+      let expected: string | undefined;
+      if (provider === 'math') {
+        expected = (captchaId ? recallMathAnswer(captchaId) : null) ?? undefined;
+      }
+      const v = await verifyCaptcha({ token: captchaToken, remoteIp: ip, expected });
+      if (!v.ok) {
+        return NextResponse.json(
+          { success: false, error: v.error || 'Captcha required', captchaRequired: true },
+          { status: 400 },
+        );
+      }
+    }
 
     // Validation
     if (!email || !password || !username || !displayName) {

@@ -806,4 +806,50 @@ CREATE TABLE IF NOT EXISTS feed_post_likes (
   PRIMARY KEY (post_id, user_id)
 );
 
+-- ─── Auth Security: rate limiting, captcha, audit ───
+CREATE TABLE IF NOT EXISTS login_attempts (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  email VARCHAR(255) NOT NULL,
+  ip_address VARCHAR(64) NOT NULL,
+  user_agent VARCHAR(255),
+  succeeded BOOLEAN NOT NULL DEFAULT FALSE,
+  failure_reason VARCHAR(120),
+  attempted_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_login_attempts_email_time (email, attempted_at),
+  INDEX idx_login_attempts_ip_time (ip_address, attempted_at)
+);
+
+CREATE TABLE IF NOT EXISTS account_lockouts (
+  email VARCHAR(255) NOT NULL,
+  ip_address VARCHAR(64) NOT NULL,
+  failure_count INT NOT NULL DEFAULT 0,
+  locked_until TIMESTAMP NULL,
+  captcha_required BOOLEAN NOT NULL DEFAULT FALSE,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (email, ip_address)
+);
+
+CREATE TABLE IF NOT EXISTS captcha_challenges (
+  id VARCHAR(64) PRIMARY KEY,
+  provider ENUM('turnstile','recaptcha','math') NOT NULL,
+  expected_answer VARCHAR(120),
+  ip_address VARCHAR(64),
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  expires_at TIMESTAMP NOT NULL,
+  consumed_at TIMESTAMP NULL,
+  INDEX idx_captcha_expires (expires_at)
+);
+
+-- ─── Bookmarks: matches & teams a user wants to follow ───
+CREATE TABLE IF NOT EXISTS user_bookmarks (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  user_id INT NOT NULL,
+  entity_type ENUM('match','team','league','tipster','player') NOT NULL,
+  entity_id VARCHAR(80) NOT NULL,
+  metadata JSON,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uniq_user_entity (user_id, entity_type, entity_id),
+  INDEX idx_bookmarks_user (user_id, entity_type)
+);
+
 -- End of schema

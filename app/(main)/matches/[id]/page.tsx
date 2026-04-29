@@ -594,43 +594,43 @@ function VerticalPitch({ home, away }: { home: PitchData | null; away: PitchData
   )
 }
 
-function PitchPlayer({ player, color }: { player: Player; color: string }) {
-  const [imgError, setImgError] = useState(false)
-  const showHeadshot = player.headshot && !imgError
-  return (
+function PitchPlayer({ player, color: _color }: { player: Player; color: string }) {
+  // Wrap whole tile in a Link to /players/{id} when we have an ESPN id.
+  // Use the shared PlayerAvatar so the headshot fallback chain (player headshot →
+  // ESPN /full/<id>.png → ESPN /default/<id>.png → coloured initials) is consistent
+  // with the rest of the site instead of falling back to the jersey number when
+  // ESPN's full headshot 404s.
+  const inner = (
     <div className="flex flex-col items-center gap-0.5 w-12">
-      <div className={cn(
-        "relative flex h-9 w-9 items-center justify-center rounded-full text-white text-[11px] font-bold shadow-lg border-2 border-white/50 overflow-hidden",
-        !showHeadshot && color
-      )}>
-        {showHeadshot ? (
-          <Image
-            src={player.headshot!}
-            alt={player.name}
-            fill
-            sizes="36px"
-            className="object-cover"
-            onError={() => setImgError(true)}
-            unoptimized
-          />
-        ) : (
-          <span>{player.jersey || player.name.slice(0, 2).toUpperCase()}</span>
-        )}
-        {/* jersey number chip on top of headshot */}
-        {showHeadshot && player.jersey && (
-          <span className={cn(
-            "absolute -bottom-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full text-[8px] font-black text-white border border-white/70",
-            color
-          )}>
-            {player.jersey}
-          </span>
-        )}
+      <div className="relative">
+        <PlayerAvatar
+          id={player.id}
+          name={player.name}
+          headshot={player.headshot}
+          jersey={player.jersey}
+          size="md"
+          ring="none"
+          noLink
+          imgClassName="border-2 border-white/50 shadow-lg"
+        />
       </div>
       <span className="text-[9px] text-white/90 text-center leading-tight line-clamp-1 w-full text-center px-1">
         {player.name.split(' ').pop() || player.name}
       </span>
     </div>
   )
+  if (player.id) {
+    return (
+      <Link
+        href={playerHref(player.name, player.id)}
+        title={player.name}
+        className="transition-transform hover:scale-110"
+      >
+        {inner}
+      </Link>
+    )
+  }
+  return inner
 }
 
 // ---- Match Events Timeline ----
@@ -1618,6 +1618,8 @@ export default function MatchDetailPage({ params }: PageProps) {
               awayName={match.awayTeam.name}
               homeLogo={match.homeTeam.logo}
               awayLogo={match.awayTeam.logo}
+              homeTeamId={match.homeTeam.espnTeamId}
+              awayTeamId={match.awayTeam.espnTeamId}
               isLive={isLive}
               isFinished={isFinished}
             />
@@ -2288,16 +2290,28 @@ function MatchInfoRail({
                 Table →
               </button>
             </div>
-            {[homeStanding, awayStanding].filter(Boolean).map((t, i) => (
-              <div key={i} className="flex items-center justify-between gap-2 rounded-lg bg-muted/30 px-2.5 py-1.5">
-                <div className="flex items-center gap-2 min-w-0">
-                  <span className="font-mono text-xs text-muted-foreground w-5 text-right">{t!.position ?? '-'}</span>
-                  <TeamLogo teamName={t!.teamName ?? ''} logoUrl={t!.teamLogo} size="sm" />
-                  <span className="font-medium text-xs truncate">{t!.teamName}</span>
-                </div>
-                <span className="font-bold text-xs tabular-nums">{t!.points} pts</span>
-              </div>
-            ))}
+            {[homeStanding, awayStanding].filter(Boolean).map((t, i) => {
+              const tHref = t!.teamId ? teamHref(t!.teamName, t!.teamId) : null
+              const Wrap: React.ElementType = tHref ? Link : 'div'
+              const wProps = tHref ? { href: tHref } : {}
+              return (
+                <Wrap
+                  key={i}
+                  {...(wProps as Record<string, unknown>)}
+                  className={cn(
+                    'flex items-center justify-between gap-2 rounded-lg bg-muted/30 px-2.5 py-1.5 transition-colors',
+                    tHref && 'hover:bg-muted/60 cursor-pointer group',
+                  )}
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="font-mono text-xs text-muted-foreground w-5 text-right">{t!.position ?? '-'}</span>
+                    <TeamLogo teamName={t!.teamName ?? ''} logoUrl={t!.teamLogo} size="sm" />
+                    <span className={cn('font-medium text-xs truncate', tHref && 'group-hover:text-primary group-hover:underline')}>{t!.teamName}</span>
+                  </div>
+                  <span className="font-bold text-xs tabular-nums">{t!.points} pts</span>
+                </Wrap>
+              )
+            })}
           </CardContent>
         </Card>
       )}
@@ -2639,13 +2653,15 @@ function NewsRow({ item }: { item: NewsItem }) {
 // ===== TipCard Component =====
 // ─── Team Stats tab (live + finished) ───────────────────────────────────────
 function TeamStatsTab({
-  teamStats, homeName, awayName, homeLogo, awayLogo, isLive, isFinished,
+  teamStats, homeName, awayName, homeLogo, awayLogo, homeTeamId, awayTeamId, isLive, isFinished,
 }: {
   teamStats: TeamStatsBlock | null
   homeName: string
   awayName: string
   homeLogo?: string
   awayLogo?: string
+  homeTeamId?: string
+  awayTeamId?: string
   isLive: boolean
   isFinished: boolean
 }) {
@@ -2695,15 +2711,35 @@ function TeamStatsTab({
       </div>
       <CardContent className="p-4">
         <div className="mb-4 grid grid-cols-3 items-center gap-2 text-xs font-semibold">
-          <div className="flex items-center gap-2 justify-end text-right">
-            <span className="truncate">{homeName}</span>
-            <TeamLogo teamName={homeName} logoUrl={homeLogo} size="xs" />
-          </div>
+          {homeTeamId ? (
+            <Link
+              href={teamHref(homeName, homeTeamId)}
+              className="group flex items-center gap-2 justify-end text-right hover:text-primary"
+            >
+              <span className="truncate group-hover:underline">{homeName}</span>
+              <TeamLogo teamName={homeName} logoUrl={homeLogo} size="xs" />
+            </Link>
+          ) : (
+            <div className="flex items-center gap-2 justify-end text-right">
+              <span className="truncate">{homeName}</span>
+              <TeamLogo teamName={homeName} logoUrl={homeLogo} size="xs" />
+            </div>
+          )}
           <div className="text-center text-[10px] uppercase tracking-wider text-muted-foreground">vs</div>
-          <div className="flex items-center gap-2">
-            <TeamLogo teamName={awayName} logoUrl={awayLogo} size="xs" />
-            <span className="truncate">{awayName}</span>
-          </div>
+          {awayTeamId ? (
+            <Link
+              href={teamHref(awayName, awayTeamId)}
+              className="group flex items-center gap-2 hover:text-primary"
+            >
+              <TeamLogo teamName={awayName} logoUrl={awayLogo} size="xs" />
+              <span className="truncate group-hover:underline">{awayName}</span>
+            </Link>
+          ) : (
+            <div className="flex items-center gap-2">
+              <TeamLogo teamName={awayName} logoUrl={awayLogo} size="xs" />
+              <span className="truncate">{awayName}</span>
+            </div>
+          )}
         </div>
         <div className="space-y-3">
           {rows.map((row, i) => <StatComparisonRow key={i} {...row} />)}
