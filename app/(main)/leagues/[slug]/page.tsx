@@ -129,14 +129,23 @@ export default function LeaguePage({ params }: PageProps) {
   const normalisedSlug = resolveLeagueSlug(slug) || slug
   const knownLeague = ALL_LEAGUES.find(l => l.slug === normalisedSlug)
 
-  // Live matches feed — when we don't have a known league id, fetch ALL
-  // matches and filter client-side by slugified league name.
+  // Live matches feed — ALWAYS pass leagueId for known leagues so we never
+  // accidentally swap to "all matches across all leagues" when a different
+  // season is picked. Live/upcoming match data is current-season only; past
+  // seasons only affect standings, scorers, and outright markets (which use
+  // their own season query). This fixes the bug where selecting 2024/25 on
+  // Champions League rendered random Thai-league matches.
   const { matches: allMatches, isLoading: matchesLoading } = useMatches(
-    knownLeague && !selectedSeason ? { leagueId: knownLeague.id } : undefined
+    knownLeague ? { leagueId: knownLeague.id } : undefined
   )
 
   // Filter matches when no known league: match by slug derived from name.
-  const matches = knownLeague
+  // For past seasons we hide the matches list entirely (data isn't available
+  // from the live scoreboard) — the UI shows a clear notice instead.
+  const isPastSeason = selectedSeason !== null
+  const matches = isPastSeason
+    ? []
+    : knownLeague
     ? allMatches
     : allMatches.filter(m => {
         const ms = (m.league?.slug || slugify(m.league?.name || '')).toLowerCase()
@@ -375,7 +384,22 @@ export default function LeaguePage({ params }: PageProps) {
                   )}
 
                   {liveMatches.length + upcomingMatches.length + finishedMatches.length === 0 && (
-                    <EmptyState icon={Calendar} title="No matches scheduled" hint="Check back when the new round begins." />
+                    isPastSeason ? (
+                      <Card className="border-dashed">
+                        <CardContent className="flex flex-col items-center gap-2 p-8 text-center">
+                          <Calendar className="h-8 w-8 text-muted-foreground/60" />
+                          <p className="font-semibold">Viewing the {SEASONS.find(s => s.year === selectedSeason)?.label} archive</p>
+                          <p className="max-w-md text-sm text-muted-foreground">
+                            Live and upcoming match data is only available for the current season. The standings, top scorers and outright markets below reflect your selected season.
+                          </p>
+                          <Button size="sm" variant="outline" className="mt-2" onClick={() => setSelectedSeason(null)}>
+                            Back to current season
+                          </Button>
+                        </CardContent>
+                      </Card>
+                    ) : (
+                      <EmptyState icon={Calendar} title="No matches scheduled" hint="Check back when the new round begins." />
+                    )
                   )}
                 </>
               )}

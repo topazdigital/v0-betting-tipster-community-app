@@ -1,371 +1,344 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import Link from 'next/link';
-import { Search, Filter, Trophy, TrendingUp, Flame, Users, Star, ChevronRight, Check } from 'lucide-react';
+import useSWR from 'swr';
+import {
+  Search, Filter, Trophy, TrendingUp, Flame, Users, Star, Check,
+  GitCompare, ChevronLeft, ChevronRight,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import { SidebarNew } from '@/components/layout/sidebar-new';
 import { FollowTipsterButton } from '@/components/tipsters/follow-tipster-button';
+import { Spinner } from '@/components/ui/spinner';
 import { cn } from '@/lib/utils';
 
-// Mock tipsters data
-const tipsters = [
-  {
-    id: 1,
-    username: 'KingOfTips',
-    displayName: 'King of Tips',
-    avatar: 'K',
-    bio: 'Professional tipster with 5+ years experience. Specializing in Premier League and La Liga.',
-    winRate: 68.5,
-    roi: 12.4,
-    totalTips: 342,
-    wonTips: 234,
-    streak: 8,
-    rank: 1,
-    followers: 1523,
-    isPro: true,
-    subscriptionPrice: 500,
-    specialties: ['Football', 'Over/Under'],
-    verified: true,
-  },
-  {
-    id: 2,
-    username: 'AcePredicts',
-    displayName: 'Ace Predicts',
-    avatar: 'A',
-    bio: 'Data-driven predictions. Over 2.5 goals specialist with consistent returns.',
-    winRate: 72.1,
-    roi: 15.8,
-    totalTips: 215,
-    wonTips: 155,
-    streak: 12,
-    rank: 2,
-    followers: 982,
-    isPro: true,
-    subscriptionPrice: 400,
-    specialties: ['Football', 'BTTS'],
-    verified: true,
-  },
-  {
-    id: 3,
-    username: 'LuckyStriker',
-    displayName: 'Lucky Striker',
-    avatar: 'L',
-    bio: 'African football expert. KPL and CAF specialist with local insights.',
-    winRate: 65.3,
-    roi: 9.2,
-    totalTips: 178,
-    wonTips: 116,
-    streak: 5,
-    rank: 3,
-    followers: 654,
-    isPro: false,
-    subscriptionPrice: null,
-    specialties: ['African Football', '1X2'],
-    verified: true,
-  },
-  {
-    id: 4,
-    username: 'EuroExpert',
-    displayName: 'Euro Expert',
-    avatar: 'E',
-    bio: 'European leagues analyst. Bundesliga and Serie A focus with detailed match analysis.',
-    winRate: 61.8,
-    roi: 7.5,
-    totalTips: 156,
-    wonTips: 96,
-    streak: 3,
-    rank: 4,
-    followers: 421,
-    isPro: false,
-    subscriptionPrice: null,
-    specialties: ['Bundesliga', 'Serie A'],
-    verified: false,
-  },
-  {
-    id: 5,
-    username: 'BasketKing',
-    displayName: 'Basket King',
-    avatar: 'B',
-    bio: 'NBA and EuroLeague specialist. Point spreads and totals expert.',
-    winRate: 64.2,
-    roi: 11.3,
-    totalTips: 289,
-    wonTips: 185,
-    streak: 6,
-    rank: 5,
-    followers: 876,
-    isPro: true,
-    subscriptionPrice: 350,
-    specialties: ['Basketball', 'NBA'],
-    verified: true,
-  },
-  {
-    id: 6,
-    username: 'TennisPro',
-    displayName: 'Tennis Pro',
-    avatar: 'T',
-    bio: 'Former tennis coach turned tipster. ATP and WTA tours covered.',
-    winRate: 67.8,
-    roi: 14.1,
-    totalTips: 198,
-    wonTips: 134,
-    streak: 4,
-    rank: 6,
-    followers: 543,
-    isPro: true,
-    subscriptionPrice: 300,
-    specialties: ['Tennis', 'ATP'],
-    verified: true,
-  },
-];
+// ───────────────────── types & helpers ─────────────────────
+interface Tipster {
+  id: number;
+  username: string;
+  displayName: string;
+  avatar: string | null;
+  bio: string | null;
+  winRate: number;
+  roi: number;
+  totalTips: number;
+  wonTips: number;
+  streak: number;
+  rank: number;
+  followers: number;
+  isPro: boolean;
+  subscriptionPrice: number | null;
+  verified: boolean;
+  countryCode: string | null;
+}
 
 const sortOptions = [
-  { value: 'rank', label: 'Rank' },
-  { value: 'winRate', label: 'Win Rate' },
+  { value: 'rank', label: 'Top ranked' },
+  { value: 'winRate', label: 'Win rate' },
   { value: 'roi', label: 'ROI' },
   { value: 'followers', label: 'Followers' },
-  { value: 'streak', label: 'Hot Streak' },
+  { value: 'streak', label: 'Hot streak' },
+  { value: 'totalTips', label: 'Most tips' },
 ];
 
 const filterOptions = [
-  { value: 'all', label: 'All Tipsters' },
-  { value: 'pro', label: 'Pro Only' },
-  { value: 'free', label: 'Free Only' },
+  { value: 'all', label: 'All tipsters' },
+  { value: 'pro', label: 'Pro only' },
+  { value: 'free', label: 'Free only' },
   { value: 'verified', label: 'Verified' },
 ];
+
+const PAGE_SIZE = 24;
+const fetcher = (url: string) => fetch(url).then(r => r.json());
+
+function flagFor(code: string | null) {
+  if (!code) return '';
+  return code.toUpperCase().replace(/./g, c =>
+    String.fromCodePoint(127397 + c.charCodeAt(0)),
+  );
+}
 
 export default function TipstersPage() {
   const [search, setSearch] = useState('');
   const [sortBy, setSortBy] = useState('rank');
   const [filterBy, setFilterBy] = useState('all');
+  const [page, setPage] = useState(0);
+  const [compareIds, setCompareIds] = useState<number[]>([]);
 
-  const filteredTipsters = tipsters
-    .filter(t => {
-      if (search) {
-        const searchLower = search.toLowerCase();
-        return t.username.toLowerCase().includes(searchLower) || 
-               t.displayName.toLowerCase().includes(searchLower);
-      }
-      return true;
-    })
-    .filter(t => {
-      if (filterBy === 'pro') return t.isPro;
-      if (filterBy === 'free') return !t.isPro;
-      if (filterBy === 'verified') return t.verified;
-      return true;
-    })
-    .sort((a, b) => {
-      switch (sortBy) {
-        case 'winRate': return b.winRate - a.winRate;
-        case 'roi': return b.roi - a.roi;
-        case 'followers': return b.followers - a.followers;
-        case 'streak': return b.streak - a.streak;
-        default: return a.rank - b.rank;
-      }
-    });
+  const params = new URLSearchParams({
+    sortBy,
+    filter: filterBy === 'all' ? '' : filterBy,
+    search,
+    limit: '500',
+  });
+  const { data, isLoading } = useSWR<{
+    tipsters: Tipster[];
+    stats: { totalTipsters: number; proTipsters: number; avgWinRate: number; totalTips: number };
+  }>(`/api/tipsters?${params.toString()}`, fetcher);
+
+  const allTipsters = data?.tipsters ?? [];
+  const stats = data?.stats ?? { totalTipsters: 0, proTipsters: 0, avgWinRate: 0, totalTips: 0 };
+
+  const visible = useMemo(
+    () => allTipsters.slice(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE),
+    [allTipsters, page],
+  );
+  const totalPages = Math.max(1, Math.ceil(allTipsters.length / PAGE_SIZE));
+
+  function toggleCompare(id: number) {
+    setCompareIds(prev =>
+      prev.includes(id) ? prev.filter(x => x !== id) : prev.length >= 4 ? prev : [...prev, id],
+    );
+  }
+  const compareHref = compareIds.length >= 2
+    ? `/tipsters/compare?ids=${compareIds.join(',')}`
+    : null;
 
   return (
     <div className="flex">
       <SidebarNew />
       <div className="flex-1 overflow-hidden">
-        <div className="mx-auto max-w-5xl px-4 py-3">
+        <div className="mx-auto max-w-6xl px-4 py-3 pb-32">
           {/* Header */}
-          <div className="mb-6">
-            <h1 className="text-lg font-bold text-foreground">Tipsters</h1>
-            <p className="text-sm text-muted-foreground">
-              Follow expert tipsters and get winning predictions
-            </p>
+          <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <h1 className="text-xl font-bold text-foreground">Tipsters</h1>
+              <p className="text-sm text-muted-foreground">
+                Browse and follow expert tipsters from across Africa
+              </p>
+            </div>
+            <Button variant="outline" size="sm" asChild>
+              <Link href="/tipsters/compare">
+                <GitCompare className="mr-2 h-4 w-4" />
+                Compare tipsters
+              </Link>
+            </Button>
           </div>
 
-          {/* Stats Cards */}
-          <div className="mb-3 grid grid-cols-2 gap-4 sm:grid-cols-4">
-            <div className="rounded-xl border border-border bg-card p-4 text-center">
-              <Users className="mx-auto h-5 w-5 text-primary" />
-              <div className="mt-2 text-2xl font-bold">{tipsters.length}</div>
-              <div className="text-xs text-muted-foreground">Active Tipsters</div>
+          {/* Stats */}
+          <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <div className="rounded-xl border border-border bg-card p-3 text-center">
+              <Users className="mx-auto h-4 w-4 text-primary" />
+              <div className="mt-1 text-xl font-bold">{stats.totalTipsters}</div>
+              <div className="text-[11px] text-muted-foreground">Active tipsters</div>
             </div>
-            <div className="rounded-xl border border-border bg-card p-4 text-center">
-              <Trophy className="mx-auto h-5 w-5 text-warning" />
-              <div className="mt-2 text-2xl font-bold">{tipsters.filter(t => t.isPro).length}</div>
-              <div className="text-xs text-muted-foreground">Pro Tipsters</div>
+            <div className="rounded-xl border border-border bg-card p-3 text-center">
+              <Trophy className="mx-auto h-4 w-4 text-warning" />
+              <div className="mt-1 text-xl font-bold">{stats.proTipsters}</div>
+              <div className="text-[11px] text-muted-foreground">Pro tipsters</div>
             </div>
-            <div className="rounded-xl border border-border bg-card p-4 text-center">
-              <TrendingUp className="mx-auto h-5 w-5 text-success" />
-              <div className="mt-2 text-2xl font-bold">
-                {Math.round(tipsters.reduce((sum, t) => sum + t.winRate, 0) / tipsters.length)}%
-              </div>
-              <div className="text-xs text-muted-foreground">Avg Win Rate</div>
+            <div className="rounded-xl border border-border bg-card p-3 text-center">
+              <TrendingUp className="mx-auto h-4 w-4 text-success" />
+              <div className="mt-1 text-xl font-bold">{stats.avgWinRate}%</div>
+              <div className="text-[11px] text-muted-foreground">Avg win rate</div>
             </div>
-            <div className="rounded-xl border border-border bg-card p-4 text-center">
-              <Flame className="mx-auto h-5 w-5 text-live" />
-              <div className="mt-2 text-2xl font-bold">
-                {tipsters.reduce((sum, t) => sum + t.totalTips, 0)}
-              </div>
-              <div className="text-xs text-muted-foreground">Total Tips</div>
+            <div className="rounded-xl border border-border bg-card p-3 text-center">
+              <Flame className="mx-auto h-4 w-4 text-live" />
+              <div className="mt-1 text-xl font-bold">{stats.totalTips.toLocaleString()}</div>
+              <div className="text-[11px] text-muted-foreground">Total tips</div>
             </div>
           </div>
 
           {/* Filters */}
-          <div className="mb-3 flex flex-wrap items-center gap-3">
-            <div className="relative flex-1 sm:max-w-xs">
+          <div className="mb-4 flex flex-wrap items-center gap-2">
+            <div className="relative min-w-[180px] flex-1">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
-                placeholder="Search tipsters..."
+                placeholder="Search by name or @handle..."
                 value={search}
-                onChange={(e) => setSearch(e.target.value)}
+                onChange={(e) => { setSearch(e.target.value); setPage(0); }}
                 className="pl-9"
               />
             </div>
-
-            <Select value={filterBy} onValueChange={setFilterBy}>
+            <Select value={filterBy} onValueChange={(v) => { setFilterBy(v); setPage(0); }}>
               <SelectTrigger className="w-36">
                 <Filter className="mr-2 h-4 w-4" />
-                <SelectValue placeholder="Filter" />
+                <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {filterOptions.map(option => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.label}
-                  </SelectItem>
-                ))}
+                {filterOptions.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
               </SelectContent>
             </Select>
-
             <Select value={sortBy} onValueChange={setSortBy}>
-              <SelectTrigger className="w-36">
-                <SelectValue placeholder="Sort by" />
-              </SelectTrigger>
+              <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
               <SelectContent>
-                {sortOptions.map(option => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.label}
-                  </SelectItem>
-                ))}
+                {sortOptions.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
 
-          {/* Results count */}
-          <div className="mb-4 text-sm text-muted-foreground">
-            {filteredTipsters.length} tipster{filteredTipsters.length !== 1 ? 's' : ''} found
+          {/* Result count + pager */}
+          <div className="mb-3 flex items-center justify-between text-xs text-muted-foreground">
+            <span>{allTipsters.length} tipster{allTipsters.length !== 1 ? 's' : ''} found</span>
+            <span>Page {page + 1} of {totalPages}</span>
           </div>
 
-          {/* Tipsters Grid */}
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {filteredTipsters.map((tipster, index) => (
-              <Link
-                key={tipster.id}
-                href={`/tipsters/${tipster.id}`}
-                className="group rounded-xl border border-border bg-card p-5 transition-all hover:border-primary/50 hover:shadow-lg"
-              >
-                {/* Header */}
-                <div className="mb-4 flex items-start justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="relative">
-                      <div className="flex h-14 w-14 items-center justify-center rounded-full bg-primary text-xl font-bold text-primary-foreground">
-                        {tipster.avatar}
-                      </div>
-                      {tipster.rank <= 3 && (
-                        <div className={cn(
-                          'absolute -bottom-1 -right-1 flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold',
-                          tipster.rank === 1 && 'bg-yellow-500 text-yellow-950',
-                          tipster.rank === 2 && 'bg-gray-300 text-gray-700',
-                          tipster.rank === 3 && 'bg-amber-700 text-amber-100'
-                        )}>
-                          #{tipster.rank}
-                        </div>
+          {/* List / loader */}
+          {isLoading ? (
+            <div className="flex h-64 items-center justify-center">
+              <Spinner className="h-8 w-8" />
+            </div>
+          ) : visible.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-border bg-card p-10 text-center text-sm text-muted-foreground">
+              No tipsters match those filters yet.
+            </div>
+          ) : (
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {visible.map((tipster, idx) => {
+                const checked = compareIds.includes(tipster.id);
+                const globalRank = page * PAGE_SIZE + idx + 1;
+                return (
+                  <div
+                    key={tipster.id}
+                    className={cn(
+                      'group relative rounded-xl border bg-card p-4 transition-all hover:shadow-lg',
+                      checked ? 'border-primary ring-2 ring-primary/30' : 'border-border hover:border-primary/40',
+                    )}
+                  >
+                    {/* Compare checkbox */}
+                    <button
+                      type="button"
+                      onClick={(e) => { e.preventDefault(); toggleCompare(tipster.id); }}
+                      className={cn(
+                        'absolute right-3 top-3 flex h-6 w-6 items-center justify-center rounded-md border text-xs',
+                        checked
+                          ? 'border-primary bg-primary text-primary-foreground'
+                          : 'border-border bg-background text-muted-foreground hover:border-primary',
                       )}
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-1.5">
-                        <span className="font-semibold text-foreground group-hover:text-primary">
-                          {tipster.displayName}
-                        </span>
-                        {tipster.verified && (
-                          <Check className="h-4 w-4 rounded-full bg-primary p-0.5 text-primary-foreground" />
-                        )}
+                      title={checked ? 'Remove from compare' : 'Add to compare'}
+                    >
+                      <GitCompare className="h-3 w-3" />
+                    </button>
+
+                    <Link href={`/tipsters/${tipster.id}`} className="block">
+                      <div className="flex items-start gap-3 pr-7">
+                        <div className="relative shrink-0">
+                          {tipster.avatar ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={tipster.avatar} alt="" className="h-12 w-12 rounded-full bg-muted object-cover" />
+                          ) : (
+                            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary text-base font-bold text-primary-foreground">
+                              {tipster.displayName.charAt(0)}
+                            </div>
+                          )}
+                          {globalRank <= 3 && (
+                            <div className={cn(
+                              'absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold',
+                              globalRank === 1 && 'bg-yellow-500 text-yellow-950',
+                              globalRank === 2 && 'bg-gray-300 text-gray-700',
+                              globalRank === 3 && 'bg-amber-700 text-amber-100',
+                            )}>{globalRank}</div>
+                          )}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-1.5">
+                            <span className="truncate text-sm font-semibold group-hover:text-primary">
+                              {tipster.displayName}
+                            </span>
+                            {tipster.verified && (
+                              <Check className="h-3.5 w-3.5 shrink-0 rounded-full bg-primary p-0.5 text-primary-foreground" />
+                            )}
+                            {tipster.isPro && (
+                              <Badge className="ml-auto h-4 bg-gradient-to-r from-primary to-primary/80 px-1.5 text-[9px]">
+                                <Star className="mr-0.5 h-2.5 w-2.5" />PRO
+                              </Badge>
+                            )}
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            <span className="mr-1">{flagFor(tipster.countryCode)}</span>
+                            @{tipster.username}
+                          </div>
+                          <p className="mt-1 line-clamp-2 text-xs text-muted-foreground/80">
+                            {tipster.bio}
+                          </p>
+                        </div>
                       </div>
-                      <div className="text-xs text-muted-foreground">@{tipster.username}</div>
+
+                      {/* Stats row */}
+                      <div className="mt-3 grid grid-cols-4 gap-1.5 text-center">
+                        <div className="rounded-md bg-success/10 px-1 py-1.5">
+                          <div className="text-sm font-bold text-success">{tipster.winRate}%</div>
+                          <div className="text-[9px] text-muted-foreground">Win</div>
+                        </div>
+                        <div className="rounded-md bg-primary/10 px-1 py-1.5">
+                          <div className="text-sm font-bold text-primary">+{tipster.roi}%</div>
+                          <div className="text-[9px] text-muted-foreground">ROI</div>
+                        </div>
+                        <div className="rounded-md bg-warning/10 px-1 py-1.5">
+                          <div className="flex items-center justify-center gap-0.5 text-sm font-bold text-warning">
+                            {tipster.streak > 2 && <Flame className="h-3 w-3" />}
+                            {tipster.streak}
+                          </div>
+                          <div className="text-[9px] text-muted-foreground">Streak</div>
+                        </div>
+                        <div className="rounded-md bg-muted px-1 py-1.5">
+                          <div className="text-sm font-bold">{tipster.totalTips}</div>
+                          <div className="text-[9px] text-muted-foreground">Tips</div>
+                        </div>
+                      </div>
+                    </Link>
+
+                    <div className="mt-3 flex items-center justify-between gap-2 border-t border-border pt-2">
+                      <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
+                        <Users className="h-3 w-3" />
+                        {tipster.followers.toLocaleString()}
+                      </span>
+                      <FollowTipsterButton
+                        tipsterId={tipster.id}
+                        tipsterName={tipster.displayName}
+                        size="sm"
+                        className="h-7 px-2 text-xs"
+                      />
                     </div>
                   </div>
-                  {tipster.isPro && (
-                    <Badge variant="default" className="bg-gradient-to-r from-primary to-primary/80">
-                      <Star className="mr-1 h-3 w-3" />
-                      PRO
-                    </Badge>
-                  )}
-                </div>
+                );
+              })}
+            </div>
+          )}
 
-                {/* Bio */}
-                <p className="mb-4 line-clamp-2 text-sm text-muted-foreground">
-                  {tipster.bio}
-                </p>
-
-                {/* Specialties */}
-                <div className="mb-4 flex flex-wrap gap-1">
-                  {tipster.specialties.map(spec => (
-                    <Badge key={spec} variant="secondary" className="text-xs">
-                      {spec}
-                    </Badge>
-                  ))}
-                </div>
-
-                {/* Stats */}
-                <div className="grid grid-cols-3 gap-2 text-center">
-                  <div className="rounded-lg bg-success/10 px-2 py-2">
-                    <div className="text-lg font-bold text-success">{tipster.winRate}%</div>
-                    <div className="text-[10px] text-muted-foreground">Win Rate</div>
-                  </div>
-                  <div className="rounded-lg bg-primary/10 px-2 py-2">
-                    <div className="text-lg font-bold text-primary">+{tipster.roi}%</div>
-                    <div className="text-[10px] text-muted-foreground">ROI</div>
-                  </div>
-                  <div className="rounded-lg bg-warning/10 px-2 py-2">
-                    <div className="flex items-center justify-center gap-0.5 text-lg font-bold text-warning">
-                      {tipster.streak > 0 && <Flame className="h-4 w-4" />}
-                      {tipster.streak}
-                    </div>
-                    <div className="text-[10px] text-muted-foreground">Streak</div>
-                  </div>
-                </div>
-
-                {/* Footer */}
-                <div className="mt-4 flex items-center justify-between border-t border-border pt-4 text-xs text-muted-foreground">
-                  <div className="flex items-center gap-1">
-                    <Users className="h-3 w-3" />
-                    {tipster.followers.toLocaleString()} followers
-                  </div>
-                  <div>{tipster.totalTips} tips</div>
-                </div>
-
-                {/* CTA */}
-                <div className="mt-3 flex gap-2">
-                  <FollowTipsterButton
-                    tipsterId={tipster.id}
-                    tipsterName={tipster.displayName}
-                    size="sm"
-                    className="flex-1 justify-center"
-                  />
-                  {tipster.isPro && tipster.subscriptionPrice && (
-                    <Button size="sm" variant="outline" className="flex-1" onClick={(e) => e.preventDefault()}>
-                      Sub KES {tipster.subscriptionPrice}
-                    </Button>
-                  )}
-                </div>
-              </Link>
-            ))}
-          </div>
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="mt-6 flex items-center justify-center gap-2">
+              <Button
+                variant="outline" size="sm"
+                disabled={page === 0}
+                onClick={() => setPage(p => Math.max(0, p - 1))}
+              >
+                <ChevronLeft className="h-4 w-4" /> Prev
+              </Button>
+              <span className="text-sm text-muted-foreground">
+                {page + 1} / {totalPages}
+              </span>
+              <Button
+                variant="outline" size="sm"
+                disabled={page >= totalPages - 1}
+                onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
+              >
+                Next <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          )}
         </div>
+
+        {/* Compare floating bar */}
+        {compareIds.length > 0 && (
+          <div className="fixed bottom-20 left-1/2 z-30 flex -translate-x-1/2 items-center gap-3 rounded-full border border-border bg-card px-4 py-2 shadow-lg md:bottom-6">
+            <span className="text-sm font-medium">{compareIds.length} selected</span>
+            <Button size="sm" variant="ghost" onClick={() => setCompareIds([])} className="h-7 px-2 text-xs">
+              Clear
+            </Button>
+            <Button size="sm" disabled={!compareHref} asChild={!!compareHref}>
+              {compareHref ? <Link href={compareHref}><GitCompare className="mr-1 h-3 w-3" />Compare</Link>
+                           : <span><GitCompare className="mr-1 h-3 w-3" />Pick 2+</span>}
+            </Button>
+          </div>
+        )}
       </div>
     </div>
   );

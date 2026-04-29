@@ -17,6 +17,8 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent } from "@/components/ui/card"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
+import { useAuthModal } from "@/contexts/auth-modal-context"
 import { Spinner } from "@/components/ui/spinner"
 import { TeamLogo } from "@/components/ui/team-logo"
 import { PlayerAvatar } from "@/components/ui/player-avatar"
@@ -839,10 +841,15 @@ export default function MatchDetailPage({ params }: PageProps) {
   const { id } = use(params)
   const timezone = getBrowserTimezone()
   const { user, isAuthenticated, isLoading: authLoading } = useAuth()
+  const { open: openAuthModal } = useAuthModal()
   const [savedMatch, setSavedMatch] = useState(false)
   const [activeTab, setActiveTab] = useState('overview')
   const [tipSubmitted, setTipSubmitted] = useState<null | { label: string; odds: number }>(null)
   const [shareToast, setShareToast] = useState<string | null>(null)
+  // Add-Tip modal — auth-aware: signed-out users see a friendly sign-in prompt
+  // INSIDE the modal so they never miss it (the old inline form pushed the
+  // CTA below the fold).
+  const [tipModalOpen, setTipModalOpen] = useState(false)
 
   // Hydrate the bookmark state from localStorage on mount so the icon
   // reflects whether THIS match is already saved. We persist locally
@@ -1213,7 +1220,7 @@ export default function MatchDetailPage({ params }: PageProps) {
           <Button
             size="sm"
             className="h-8 gap-1.5 bg-amber-500 text-amber-950 hover:bg-amber-400 font-bold shadow-sm"
-            onClick={() => setActiveTab('tips')}
+            onClick={() => setTipModalOpen(true)}
           >
             <Star className="h-3.5 w-3.5" />
             Add a Tip
@@ -1521,6 +1528,24 @@ export default function MatchDetailPage({ params }: PageProps) {
 
           {/* ══ TIPS ══ */}
           <TabsContent value="tips" className="mt-0 space-y-4">
+            {/* Top "Add a Tip" CTA inside the Tips tab */}
+            <div className="flex items-center justify-between gap-3 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
+              <div className="min-w-0">
+                <p className="text-sm font-bold leading-tight">Got a strong read on this game?</p>
+                <p className="text-[11px] text-muted-foreground leading-tight mt-0.5">
+                  Pick a market, post your prediction with the real odds, share with the community.
+                </p>
+              </div>
+              <Button
+                size="sm"
+                className="h-8 gap-1.5 bg-amber-500 text-amber-950 hover:bg-amber-400 font-bold shrink-0"
+                onClick={() => setTipModalOpen(true)}
+              >
+                <Star className="h-3.5 w-3.5" />
+                Add Tip
+              </Button>
+            </div>
+
             {/* Tips Header Stats */}
             {tips.length > 0 && (
               <div className="grid grid-cols-3 gap-3">
@@ -1567,64 +1592,18 @@ export default function MatchDetailPage({ params }: PageProps) {
               </Card>
             )}
 
-            {/* Inline Add Tip — auth-aware */}
-            {tipSubmitted ? (
+            {/* Recently posted toast */}
+            {tipSubmitted && (
               <Card className="border-emerald-500/40 bg-emerald-500/5">
-                <CardContent className="p-5 flex items-center gap-3">
-                  <CheckCircle2 className="h-6 w-6 text-emerald-500 shrink-0" />
+                <CardContent className="p-4 flex items-center gap-3">
+                  <CheckCircle2 className="h-5 w-5 text-emerald-500 shrink-0" />
                   <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-foreground">Tip posted!</p>
-                    <p className="text-sm text-muted-foreground">
+                    <p className="font-semibold text-foreground text-sm">Tip posted!</p>
+                    <p className="text-xs text-muted-foreground">
                       {tipSubmitted.label} @ <span className="font-mono font-bold text-emerald-500">{tipSubmitted.odds.toFixed(2)}</span>
                     </p>
                   </div>
-                  <Button size="sm" variant="ghost" onClick={() => setTipSubmitted(null)}>Add another</Button>
-                </CardContent>
-              </Card>
-            ) : isAuthenticated && user ? (
-              <AddTipForm
-                matchId={match.id}
-                homeTeam={match.homeTeam.name}
-                awayTeam={match.awayTeam.name}
-                odds={match.odds}
-                markets={match.markets}
-                isPremiumUser={user.role === 'admin' || user.role === 'tipster'}
-                onSubmit={async (formData) => {
-                  try {
-                    const res = await fetch(`/api/matches/${encodeURIComponent(match.id)}/tips`, {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({
-                        ...formData,
-                        homeTeam: match.homeTeam.name,
-                        awayTeam: match.awayTeam.name,
-                      }),
-                    })
-                    if (res.ok) {
-                      setTipSubmitted({ label: formData.predictionLabel, odds: formData.odds })
-                    }
-                  } catch (err) {
-                    console.error('Failed to post tip', err)
-                  }
-                }}
-              />
-            ) : authLoading ? null : (
-              <Card className="border-dashed border-2 border-primary/20 bg-primary/3">
-                <CardContent className="p-5 flex flex-col sm:flex-row items-center gap-4">
-                  <div className="flex-1 min-w-0">
-                    <p className="font-semibold">Share your prediction</p>
-                    <p className="text-sm text-muted-foreground mt-0.5">
-                      Sign in or create an account to post a tip on this match. Your odds will auto-fill from real bookmaker prices.
-                    </p>
-                  </div>
-                  <div className="flex gap-2 shrink-0">
-                    <Button asChild variant="outline" size="sm">
-                      <Link href={`/login?redirect=/matches/${encodeURIComponent(id)}`}>Sign in</Link>
-                    </Button>
-                    <Button asChild size="sm">
-                      <Link href={`/register?redirect=/matches/${encodeURIComponent(id)}`}>Sign up</Link>
-                    </Button>
-                  </div>
+                  <Button size="sm" variant="ghost" onClick={() => { setTipSubmitted(null); setTipModalOpen(true) }}>Add another</Button>
                 </CardContent>
               </Card>
             )}
@@ -2132,6 +2111,71 @@ export default function MatchDetailPage({ params }: PageProps) {
             </div>
           </aside>
         </div>
+
+        {/* ─── Add-Tip MODAL — opened from any "Add a Tip" button on this page.
+            Sign-in prompt is at the TOP so logged-out users never miss it. ─── */}
+        <Dialog open={tipModalOpen} onOpenChange={setTipModalOpen}>
+          <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
+                Add your tip
+              </DialogTitle>
+              <DialogDescription className="text-xs">
+                {match.homeTeam.name} vs {match.awayTeam.name} — pick a market and post your prediction.
+              </DialogDescription>
+            </DialogHeader>
+
+            {!isAuthenticated ? (
+              <div className="space-y-3">
+                <div className="rounded-lg border-2 border-dashed border-amber-500/40 bg-amber-500/5 p-4 text-center">
+                  <Star className="mx-auto h-8 w-8 fill-amber-400/30 text-amber-400 mb-2" />
+                  <p className="font-bold text-sm">Sign in to share your tip</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Track your record, build a following, climb the leaderboard.
+                  </p>
+                  <div className="mt-3 flex gap-2 justify-center">
+                    <Button size="sm" variant="outline" onClick={() => { setTipModalOpen(false); openAuthModal('login') }}>
+                      Sign in
+                    </Button>
+                    <Button size="sm" onClick={() => { setTipModalOpen(false); openAuthModal('register') }}>
+                      Create account
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <AddTipForm
+                matchId={match.id}
+                homeTeam={match.homeTeam.name}
+                awayTeam={match.awayTeam.name}
+                odds={match.odds}
+                markets={match.markets}
+                isPremiumUser={user?.role === 'admin' || user?.role === 'tipster'}
+                onSubmit={async (formData) => {
+                  try {
+                    const res = await fetch(`/api/matches/${encodeURIComponent(match.id)}/tips`, {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        ...formData,
+                        homeTeam: match.homeTeam.name,
+                        awayTeam: match.awayTeam.name,
+                      }),
+                    })
+                    if (res.ok) {
+                      setTipSubmitted({ label: formData.predictionLabel, odds: formData.odds })
+                      setTipModalOpen(false)
+                      setActiveTab('tips')
+                    }
+                  } catch (err) {
+                    console.error('Failed to post tip', err)
+                  }
+                }}
+              />
+            )}
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   )

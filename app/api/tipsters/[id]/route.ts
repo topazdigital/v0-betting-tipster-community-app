@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { listFollowersOfTipster, listFollowedTipsters } from '@/lib/follows-store';
+import { getFakeTipsterById, getFakeTipsterByUsername } from '@/lib/fake-tipsters';
 
 export const dynamic = 'force-dynamic';
 
@@ -393,7 +394,44 @@ function generateSportBreakdown(specialties: string[]) {
 export async function GET(request: NextRequest, context: RouteContext) {
   const { id } = await context.params;
 
-  const baseTipster = TIPSTERS[id];
+  let baseTipster = TIPSTERS[id];
+
+  // Fall back to the fake-tipster catalogue. The list page links by numeric
+  // id (1000+) for fake tipsters; we also accept @username slugs so the
+  // future-friendly URLs already work.
+  if (!baseTipster) {
+    const fake = getFakeTipsterById(id) || getFakeTipsterByUsername(id);
+    if (fake) {
+      baseTipster = {
+        id: fake.id,
+        username: fake.username,
+        displayName: fake.displayName,
+        avatar: fake.avatar,
+        bio: fake.bio,
+        winRate: fake.winRate,
+        roi: fake.roi,
+        totalTips: fake.totalTips,
+        wonTips: fake.wonTips,
+        lostTips: fake.lostTips,
+        pendingTips: fake.pendingTips,
+        avgOdds: fake.avgOdds,
+        streak: fake.streak,
+        rank: 0,
+        followers: fake.followersCount,
+        following: 0,
+        isPro: fake.isPro,
+        subscriptionPrice: fake.subscriptionPrice,
+        currency: 'KES',
+        specialties: fake.specialties,
+        verified: fake.isVerified,
+        country: fake.country,
+        countryCode: fake.countryCode,
+        joinedAt: fake.joinedAt,
+        lastActive: new Date().toISOString(),
+        socials: {},
+      };
+    }
+  }
 
   if (!baseTipster) {
     return NextResponse.json(

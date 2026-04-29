@@ -1,8 +1,36 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
+import { getFakeTipsters, type FakeTipster } from '@/lib/fake-tipsters';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
+
+// Fallback used when the DB has no tipsters yet (or no DB at all). The
+// `is_fake` flag is stripped here — public consumers never see it.
+function fakeAsPublic(t: FakeTipster) {
+  return {
+    id: t.id,
+    username: t.username,
+    displayName: t.displayName,
+    avatar: t.avatar,
+    bio: t.bio,
+    winRate: t.winRate,
+    roi: t.roi,
+    totalTips: t.totalTips,
+    wonTips: t.wonTips,
+    lostTips: t.lostTips,
+    pendingTips: t.pendingTips,
+    avgOdds: t.avgOdds,
+    streak: t.streak,
+    rank: 0,
+    followers: t.followersCount,
+    isPro: t.isPro,
+    subscriptionPrice: t.subscriptionPrice,
+    verified: t.isVerified,
+    countryCode: t.countryCode,
+    joinedAt: t.joinedAt,
+  };
+}
 
 interface DbTipster {
   user_id: number;
@@ -135,7 +163,41 @@ export async function GET(request: NextRequest) {
     total = 0;
   }
 
-  const tipsters = rows.map(shape);
+  let tipsters = rows.map(shape);
+
+  // ── Fallback: when the DB returns nothing (no DB connection, fresh
+  // install, or empty tipster_profiles table) drop in the catalogue of
+  // ~100 fake tipsters so the site never looks empty. The is_fake flag
+  // is stripped — admins still see the real/fake split via the admin API.
+  if (tipsters.length === 0) {
+    let fake = getFakeTipsters().map(fakeAsPublic);
+
+    if (search) {
+      const q = search.toLowerCase();
+      fake = fake.filter(t =>
+        t.username.toLowerCase().includes(q) ||
+        (t.displayName || '').toLowerCase().includes(q),
+      );
+    }
+    if (filter === 'pro') fake = fake.filter(t => t.isPro);
+    else if (filter === 'free') fake = fake.filter(t => !t.isPro);
+    else if (filter === 'verified') fake = fake.filter(t => t.verified);
+
+    fake.sort((a, b) => {
+      switch (sortBy) {
+        case 'winRate': return b.winRate - a.winRate;
+        case 'roi': return b.roi - a.roi;
+        case 'followers': return b.followers - a.followers;
+        case 'streak': return b.streak - a.streak;
+        case 'totalTips': return b.totalTips - a.totalTips;
+        default: return b.winRate - a.winRate; // sensible default for "rank"
+      }
+    });
+    fake = fake.map((t, i) => ({ ...t, rank: i + 1 }));
+
+    total = fake.length;
+    tipsters = fake.slice(offset, offset + limit);
+  }
 
   return NextResponse.json({
     tipsters,

@@ -54,6 +54,9 @@ Key architectural decisions include:
 - **Sport-specific UI**: Lineup graphics adapt to the sport (e.g., football pitch for soccer, roster cards for others).
 - **Internal News Reader**: News articles open within the platform, with an option to read on ESPN.
 - **Clickable H2H Meetings**: Past head-to-head fixtures link to their respective match detail pages.
+- **Tipster Catalogue & Compare**: 100 deterministic seeded tipsters (Africa-themed names, hidden `is_fake` flag) populate the public feed when the DB is empty. New `/tipsters/compare` page lets users pick up to 4 tipsters for a side-by-side stats comparison with per-metric "best" highlighting. Tipsters list redesigned with paging, search, sort, multi-select, and a floating compare bar.
+- **Role & Permission System** (`lib/permissions.ts`): Five roles — `admin`, `moderator`, `editor`, `tipster`, `user` — each with a fine-grained permission map (`hasPermission`/`canAccessAdmin`). Admin layout gates entry on `admin.access`; admin Users page uses an inline role selector with colour-coded badges; `/api/admin/users PATCH` writes role overrides.
+- **Auto-tip Cron**: `GET /api/cron/auto-tips` (with `?dry=1` for preview) picks fake tipsters per upcoming match weighted by league tier, posts plausible tips using only the real bookmaker odds attached to the match (never invented numbers). Reusable from the admin "Plan auto-tips" button.
 
 ## External Dependencies
 

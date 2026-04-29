@@ -489,26 +489,38 @@ function RegisterPanel() {
 
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="space-y-1.5">
-            <Label htmlFor="modal-reg-username">Username</Label>
+            <Label htmlFor="modal-reg-username">
+              Username <span className="text-destructive">*</span>
+            </Label>
             <Input
               id="modal-reg-username"
-              placeholder="username"
+              placeholder="e.g. tipsking254"
               value={formData.username}
               onChange={(e) => setFormData({ ...formData, username: e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, '') })}
               required
               disabled={isLoading}
+              maxLength={20}
             />
+            <p className="text-[10px] text-muted-foreground leading-tight">
+              Your @handle — lowercase, letters, numbers, underscore. Used in your profile URL.
+            </p>
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="modal-reg-display">Display name</Label>
+            <Label htmlFor="modal-reg-display">
+              Display name <span className="text-destructive">*</span>
+            </Label>
             <Input
               id="modal-reg-display"
-              placeholder="Your Name"
+              placeholder="e.g. Tips King"
               value={formData.displayName}
               onChange={(e) => setFormData({ ...formData, displayName: e.target.value })}
               required
               disabled={isLoading}
+              maxLength={40}
             />
+            <p className="text-[10px] text-muted-foreground leading-tight">
+              The name shown on your tips and posts. Spaces and capitals are allowed.
+            </p>
           </div>
         </div>
 
