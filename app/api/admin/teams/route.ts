@@ -94,12 +94,13 @@ export async function POST(request: NextRequest) {
     // Generate slug from name
     const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
     
-    const result = await query(`
+    const result = await query<{ id: number }>(`
       INSERT INTO teams (name, slug, sport_id, country_id, logo_url)
       VALUES (?, ?, ?, ?, ?)
+      RETURNING id
     `, [name, slug, sportId, countryId, logoUrl || null]);
     
-    const teamId = (result as { insertId?: number }).insertId;
+    const teamId = result.rows[0]?.id;
     
     return NextResponse.json({
       success: true,

@@ -113,12 +113,13 @@ export async function POST(request: NextRequest) {
     }
     
     // Insert match
-    const result = await query(`
+    const result = await query<{ id: number }>(`
       INSERT INTO matches (league_id, home_team_id, away_team_id, kickoff_time, status)
       VALUES (?, ?, ?, ?, 'scheduled')
+      RETURNING id
     `, [leagueId, homeTeamId, awayTeamId, kickoffTime]);
     
-    const matchId = (result as { insertId?: number }).insertId;
+    const matchId = result.rows[0]?.id;
     
     // If odds provided, insert them
     if (homeOdds && awayOdds) {

@@ -211,9 +211,9 @@ async function ensureTable() {
       CREATE TABLE IF NOT EXISTS static_pages (
         slug VARCHAR(64) PRIMARY KEY,
         title VARCHAR(255) NOT NULL,
-        body LONGTEXT NOT NULL,
+        body TEXT NOT NULL,
         meta_description TEXT,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
     tableEnsured = true;
@@ -282,7 +282,7 @@ export async function saveStaticPage(p: StaticPage): Promise<StaticPage> {
       await execute(
         `INSERT INTO static_pages (slug, title, body, meta_description)
          VALUES (?, ?, ?, ?)
-         ON DUPLICATE KEY UPDATE title = VALUES(title), body = VALUES(body), meta_description = VALUES(meta_description)`,
+         ON CONFLICT (slug) DO UPDATE SET title = EXCLUDED.title, body = EXCLUDED.body, meta_description = EXCLUDED.meta_description`,
         [p.slug, p.title, p.body, p.meta_description ?? null],
       );
     } catch (e) {

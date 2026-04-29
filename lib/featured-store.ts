@@ -56,9 +56,9 @@ async function ensureTable(): Promise<void> {
     await query(`
       CREATE TABLE IF NOT EXISTS featured_config (
         id INT PRIMARY KEY DEFAULT 1,
-        config_json LONGTEXT NOT NULL,
-        updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-      ) ENGINE=InnoDB
+        config_json TEXT NOT NULL,
+        updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )
     `);
   } catch (e) {
     console.warn('[featured-store] ensureTable failed:', e);
@@ -104,7 +104,7 @@ export async function saveFeaturedConfig(patch: Partial<FeaturedConfig>): Promis
     try {
       await query(
         `INSERT INTO featured_config (id, config_json) VALUES (1, ?)
-         ON DUPLICATE KEY UPDATE config_json = VALUES(config_json)`,
+         ON CONFLICT (id) DO UPDATE SET config_json = EXCLUDED.config_json`,
         [JSON.stringify(next)]
       );
     } catch (e) {

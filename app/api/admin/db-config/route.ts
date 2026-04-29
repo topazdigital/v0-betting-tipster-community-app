@@ -138,10 +138,11 @@ export async function POST(req: NextRequest) {
       }
 
       try {
-        const mysql = await import('mysql2/promise')
-        const conn = await mysql.createConnection(connectionUrl)
-        await conn.query('SELECT 1')
-        await conn.end()
+        const { Client } = await import('pg')
+        const client = new Client({ connectionString: connectionUrl })
+        await client.connect()
+        await client.query('SELECT 1')
+        await client.end()
         return NextResponse.json({ success: true, message: 'Connection successful!' })
       } catch (err) {
         const msg = err instanceof Error ? err.message : 'Unknown error'
