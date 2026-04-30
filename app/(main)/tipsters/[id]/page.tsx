@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { matchIdToSlug } from "@/lib/utils/match-url"
 import { Progress } from "@/components/ui/progress"
 import { Spinner } from "@/components/ui/spinner"
 import { cn } from "@/lib/utils"
@@ -348,7 +349,7 @@ export default function TipsterProfilePage({ params }: PageProps) {
                   // the API surfaced a usable match id (skip mock placeholder ids).
                   const rawId = (tip.match as { id?: string }).id ?? null
                   const isReal = !!rawId && !rawId.startsWith('match_')
-                  const matchHref = isReal ? `/matches/${rawId}` : null
+                  const matchHref = isReal ? `/matches/${matchIdToSlug(rawId!)}` : null
                   const Wrapper: React.ElementType = matchHref ? Link : 'div'
                   const wrapperProps = matchHref ? { href: matchHref } : {}
                   return (

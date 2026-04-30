@@ -31,6 +31,7 @@ import { BestBetsPanel } from '@/components/home/best-bets-panel';
 import { FavoritedTipsPanel, FavoritedTipMarqueeCard, useFavoritedTips, type FeaturedItem } from '@/components/home/favorited-tips-panel';
 import { useAuthModal } from '@/contexts/auth-modal-context';
 import { matchIdToSlug } from '@/lib/utils/match-url';
+import { tipsterHref } from '@/lib/utils/slug';
 import { NewsletterSection } from '@/components/sections/newsletter';
 
 interface ApiTipster {
@@ -321,7 +322,7 @@ export default function HomePage() {
                       return (
                         <Link
                           key={tipster.id}
-                          href={`/tipsters/${tipster.id}`}
+                          href={tipsterHref(tipster.username || tipster.displayName, tipster.username || tipster.id)}
                           className="group rounded-xl border border-border bg-card p-3 transition-all hover:border-primary/50 hover:shadow-lg"
                         >
                           <div className="mb-2.5 flex items-center gap-2.5">

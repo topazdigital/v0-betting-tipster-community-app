@@ -17,6 +17,7 @@ import { SidebarNew } from '@/components/layout/sidebar-new';
 import { FollowTipsterButton } from '@/components/tipsters/follow-tipster-button';
 import { Spinner } from '@/components/ui/spinner';
 import { cn } from '@/lib/utils';
+import { tipsterHref } from '@/lib/utils/slug';
 
 // ───────────────────── types & helpers ─────────────────────
 interface Tipster {
@@ -216,7 +217,7 @@ export default function TipstersPage() {
                       <GitCompare className="h-3 w-3" />
                     </button>
 
-                    <Link href={`/tipsters/${tipster.id}`} className="block">
+                    <Link href={tipsterHref(tipster.username || tipster.displayName, tipster.username || tipster.id)} className="block">
                       <div className="flex items-start gap-2.5 pr-6">
                         <div className="relative shrink-0">
                           {tipster.avatar ? (

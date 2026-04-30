@@ -16,6 +16,7 @@ import {
   ChevronRight
 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { tipsterHref } from "@/lib/utils/slug"
 import type { Tip, Tipster } from "@/lib/types"
 import { useAuthModal } from "@/contexts/auth-modal-context"
 
@@ -147,7 +148,7 @@ function TipCard({ tip, isAuthenticated }: { tip: typeof mockTips[0], isAuthenti
     <div className="rounded-lg border bg-card p-4">
       {/* Tipster Info */}
       <div className="flex items-start justify-between">
-        <Link href={`/tipsters/${tip.tipster.id}`} className="flex items-center gap-3 hover:opacity-80">
+        <Link href={tipsterHref(tip.tipster.displayName, tip.tipster.id)} className="flex items-center gap-3 hover:opacity-80">
           <Avatar className="h-10 w-10 border-2 border-primary/20">
             <AvatarImage src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${tip.tipster.displayName}`} />
             <AvatarFallback>{tip.tipster.displayName.slice(0, 2).toUpperCase()}</AvatarFallback>

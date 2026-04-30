@@ -3,6 +3,7 @@ import { listFollowedTeams } from '@/lib/follows-store';
 import { dispatchNotification } from '@/lib/notification-dispatcher';
 import { query } from '@/lib/db';
 import { getAllMatches } from '@/lib/api/unified-sports-api';
+import { matchIdToSlug } from '@/lib/utils/match-url';
 
 export const dynamic = 'force-dynamic';
 
@@ -106,7 +107,7 @@ export async function GET(_req: NextRequest) {
           type: 'team_match_starting',
           title: `${followedName} kicks off in 1 hour`,
           content: `${followedName} vs ${opponent}${leagueName ? ` — ${leagueName}` : ''}. Don't miss kickoff!`,
-          link: `/matches/${m.id}`,
+          link: `/matches/${matchIdToSlug(m.id)}`,
         });
         sent++;
       } catch (e) {

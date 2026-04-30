@@ -19,6 +19,7 @@ import {
 } from '@/components/ui/dialog';
 import { Spinner } from '@/components/ui/spinner';
 import Link from 'next/link';
+import { tipsterHref } from '@/lib/utils/slug';
 import { cn } from '@/lib/utils';
 
 interface AdminTipster {
@@ -239,7 +240,7 @@ export default function AdminTipstersPage() {
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
                             <DropdownMenuItem asChild className="text-xs">
-                              <Link href={`/tipsters/${t.id}`} target="_blank"><Eye className="mr-2 h-3.5 w-3.5" />View profile</Link>
+                              <Link href={tipsterHref(t.username || t.displayName, t.username || t.id)} target="_blank"><Eye className="mr-2 h-3.5 w-3.5" />View profile</Link>
                             </DropdownMenuItem>
                             <DropdownMenuItem className="text-xs"><CheckCircle2 className="mr-2 h-3.5 w-3.5" />{t.isVerified ? 'Remove verification' : 'Verify'}</DropdownMenuItem>
                             <DropdownMenuSeparator />

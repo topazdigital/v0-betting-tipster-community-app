@@ -7,6 +7,7 @@ import { LiveIndicator } from '@/components/matches/live-indicator';
 import { Spinner } from '@/components/ui/spinner';
 import { Button } from '@/components/ui/button';
 import { useLiveMatches, useUpcomingMatches } from '@/lib/hooks/use-matches';
+import { matchIdToSlug } from '@/lib/utils/match-url';
 
 /**
  * Live Now is meant to be ALWAYS visible on the homepage. When there are no
@@ -82,7 +83,7 @@ export function LiveMatchesSection() {
                 return (
                   <Link
                     key={m.id}
-                    href={`/matches/${m.id}`}
+                    href={`/matches/${matchIdToSlug(m.id)}`}
                     className="group flex items-center justify-between gap-2 rounded-lg border border-border bg-card px-3 py-2 transition-colors hover:border-primary/50"
                   >
                     <div className="min-w-0">

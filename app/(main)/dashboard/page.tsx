@@ -16,7 +16,7 @@ import { useAuthModal } from '@/contexts/auth-modal-context';
 import { formatDate, formatTime, getBrowserTimezone } from '@/lib/utils/timezone';
 import { cn } from '@/lib/utils';
 import { matchIdToSlug } from '@/lib/utils/match-url';
-import { teamHref } from '@/lib/utils/slug';
+import { teamHref, tipsterHref } from '@/lib/utils/slug';
 
 interface FollowedTeam {
   teamId: string;
@@ -414,7 +414,7 @@ function TipsterCardWithTip({ t, tz }: { t: FollowedTipster; tz: string }) {
   return (
     <div className="rounded-lg border border-border bg-card p-2 transition-colors hover:border-primary/40">
       {/* Tipster header — clickable */}
-      <Link href={`/tipsters/${t.id}`} className="group flex items-center gap-2">
+      <Link href={tipsterHref(t.username || t.displayName, t.username || t.id)} className="group flex items-center gap-2">
         {t.avatar ? (
           <Image src={t.avatar} alt={t.displayName} width={32} height={32} className="h-8 w-8 rounded-full object-cover ring-1 ring-background" unoptimized />
         ) : (
@@ -503,7 +503,7 @@ function FeedTipCard({ t, tz }: { t: FeedTip; tz: string }) {
   return (
     <div className="rounded-lg border border-border bg-card p-2 transition-colors hover:border-primary/40">
       <div className="flex items-center gap-1.5">
-        <Link href={`/tipsters/${t.tipster.id}`} className="flex items-center gap-1.5 group">
+        <Link href={tipsterHref(t.tipster.username || t.tipster.displayName, t.tipster.username || t.tipster.id)} className="flex items-center gap-1.5 group">
           {t.tipster.avatar ? (
             <Image src={t.tipster.avatar} alt={t.tipster.displayName} width={20} height={20} className="h-5 w-5 rounded-full object-cover" unoptimized />
           ) : (

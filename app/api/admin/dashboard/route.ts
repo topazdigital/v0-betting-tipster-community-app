@@ -9,6 +9,7 @@ import {
   settleStaleAutoTips,
 } from '@/lib/auto-tips-store';
 import { getAllMatches } from '@/lib/api/unified-sports-api';
+import { matchIdToSlug } from '@/lib/utils/match-url';
 
 export const dynamic = 'force-dynamic';
 
@@ -138,7 +139,7 @@ export async function GET(_req: NextRequest) {
       tipster: tipster?.displayName || `Tipster ${t.tipsterId}`,
       tipsterId: t.tipsterId,
       match: `${t.homeTeam} vs ${t.awayTeam}`,
-      matchId: t.matchId,
+      matchId: matchIdToSlug(t.matchId),
       prediction: t.prediction,
       odds: t.odds.toFixed(2),
       status: t.status,

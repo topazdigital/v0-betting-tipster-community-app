@@ -75,6 +75,31 @@ export function playerHref(name: string | undefined | null, id: string | number 
   return slug ? `/players/${slug}-${numeric}` : `/players/${numeric}`;
 }
 
+// ---------- Tipsters ----------
+
+// Build the SEO URL for a tipster profile.
+// Prefer username (already URL-friendly) then fall back to slugifying display name + id.
+// The /api/tipsters/[id] endpoint accepts both numeric id AND username, so this is safe.
+export function tipsterHref(
+  displayNameOrUsername: string | undefined | null,
+  usernameOrId: string | number | undefined | null,
+): string {
+  // If caller passed a username string with no display name, use it directly.
+  const fallback = usernameOrId == null ? '' : String(usernameOrId);
+  if (!displayNameOrUsername && fallback) {
+    return `/tipsters/${encodeURIComponent(fallback)}`;
+  }
+  const candidate = displayNameOrUsername || '';
+  // If the candidate looks like a clean username already (no spaces, allowed chars), use as-is.
+  if (/^[a-z0-9._-]+$/i.test(candidate)) {
+    return `/tipsters/${encodeURIComponent(candidate.toLowerCase())}`;
+  }
+  // Otherwise, slugify the name.
+  const slug = slugify(candidate);
+  if (slug) return `/tipsters/${slug}`;
+  return fallback ? `/tipsters/${encodeURIComponent(fallback)}` : '#';
+}
+
 export function extractNumericPlayerId(raw: string): string | null {
   if (!raw) return null;
   const s = String(raw);

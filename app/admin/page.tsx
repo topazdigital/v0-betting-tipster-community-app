@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button"
 import { Spinner } from "@/components/ui/spinner"
 import { cn } from "@/lib/utils"
 import Link from "next/link"
+import { tipsterHref } from "@/lib/utils/slug"
 
 const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   users: Users,
@@ -287,7 +288,7 @@ export default function AdminDashboard() {
                         </div>
                       </td>
                       <td className="py-1.5">
-                        <Link href={`/tipsters/${tipster.id}`} className="flex items-center gap-2 hover:text-primary">
+                        <Link href={tipsterHref(tipster.username || tipster.name, tipster.username || tipster.id)} className="flex items-center gap-2 hover:text-primary">
                           <img src={tipster.avatar} alt={tipster.name} className="h-6 w-6 rounded-full bg-muted" />
                           <span className="font-medium truncate max-w-[120px]">{tipster.name}</span>
                         </Link>

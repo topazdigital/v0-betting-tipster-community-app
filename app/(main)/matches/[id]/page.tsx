@@ -23,7 +23,7 @@ import { Spinner } from "@/components/ui/spinner"
 import { TeamLogo } from "@/components/ui/team-logo"
 import { PlayerAvatar } from "@/components/ui/player-avatar"
 import { cn } from "@/lib/utils"
-import { teamHref, playerHref } from "@/lib/utils/slug"
+import { teamHref, playerHref, tipsterHref } from "@/lib/utils/slug"
 import { formatTime, formatDate, getBrowserTimezone, getDayLabel } from "@/lib/utils/timezone"
 import { FlagIcon } from "@/components/ui/flag-icon"
 import { liveStatusLabel } from "@/lib/utils/live-status"
@@ -188,6 +188,8 @@ interface TeamStatsBlock {
 
 interface TipsterInfo {
   id: string
+  username?: string
+  avatar?: string
   displayName: string
   totalTips: number
   wonTips: number
@@ -212,10 +214,18 @@ interface MatchTip {
   isPremium: boolean
   status: string
   likes: number
+  liked?: boolean
   dislikes: number
   comments: number
   createdAt: string
   tipster: TipsterInfo
+}
+
+interface TipCommentDto {
+  id: string
+  authorName: string
+  content: string
+  createdAt: string
 }
 interface TipsData { tips: MatchTip[]; total: number }
 
@@ -2851,12 +2861,68 @@ function StatComparisonRow({ label, home, away }: { label: string; home: string;
 }
 
 function TipCard({ tip }: { tip: MatchTip }) {
-  const [likes, setLikes] = useState(tip.likes)
-  const [userVote, setUserVote] = useState<'like' | 'dislike' | null>(null)
+  const { isAuthenticated } = useAuth()
+  const { open: openAuthModal } = useAuthModal()
+  const [likes, setLikes] = useState<number>(tip.likes)
+  const [liked, setLiked] = useState<boolean>(!!tip.liked)
+  const [commentCount, setCommentCount] = useState<number>(tip.comments)
+  const [showComments, setShowComments] = useState<boolean>(false)
+  const [comments, setComments] = useState<TipCommentDto[]>([])
+  const [commentsLoaded, setCommentsLoaded] = useState<boolean>(false)
+  const [draft, setDraft] = useState<string>('')
+  const [posting, setPosting] = useState<boolean>(false)
 
-  const handleLike = () => {
-    if (userVote === 'like') { setLikes(l => l - 1); setUserVote(null) }
-    else { setLikes(l => userVote === 'dislike' ? l + 1 : l + 1); setUserVote('like') }
+  const tipsterUrl = tipsterHref(
+    tip.tipster.username || tip.tipster.displayName,
+    tip.tipster.username || tip.tipster.id,
+  )
+
+  const handleLike = async () => {
+    if (!isAuthenticated) { openAuthModal('login'); return }
+    const prevLiked = liked, prevLikes = likes
+    setLiked(!prevLiked)
+    setLikes(l => l + (prevLiked ? -1 : 1))
+    try {
+      const res = await fetch(`/api/tips/${tip.id}/like`, { method: prevLiked ? 'DELETE' : 'POST' })
+      if (!res.ok) throw new Error('failed')
+      const data = await res.json()
+      setLikes(data.count)
+      setLiked(data.liked)
+    } catch {
+      setLiked(prevLiked); setLikes(prevLikes)
+    }
+  }
+
+  const loadComments = async () => {
+    setShowComments(s => !s)
+    if (commentsLoaded) return
+    try {
+      const r = await fetch(`/api/tips/${tip.id}/comments`)
+      if (r.ok) {
+        const j = await r.json()
+        setComments(j.comments || [])
+      }
+    } finally { setCommentsLoaded(true) }
+  }
+
+  const submitComment = async () => {
+    const text = draft.trim()
+    if (!text) return
+    if (!isAuthenticated) { openAuthModal('login'); return }
+    setPosting(true)
+    try {
+      const r = await fetch(`/api/tips/${tip.id}/comments`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: text }),
+      })
+      if (r.ok) {
+        const j = await r.json()
+        setComments(c => [...c, j.comment])
+        setCommentCount(c => c + 1)
+        setDraft('')
+      }
+    } finally { setPosting(false) }
   }
 
   const confidenceColor =
@@ -2866,112 +2932,142 @@ function TipCard({ tip }: { tip: MatchTip }) {
 
   return (
     <Card className={cn(
-      "overflow-hidden transition-all hover:shadow-md",
+      "overflow-hidden transition-all hover:shadow-sm",
       tip.tipster.isPremium && tip.isPremium && "border-amber-500/20"
     )}>
-      {/* Header */}
+      {/* Compact single-row header */}
       <div className={cn(
-        "flex items-start justify-between gap-3 px-4 pt-4 pb-3 border-b border-border/40",
+        "flex items-center justify-between gap-2 px-3 py-2",
         tip.tipster.isPremium && tip.isPremium && "bg-gradient-to-r from-amber-500/5 to-transparent"
       )}>
-        <Link href={`/tipsters/${tip.tipster.id}`} className="flex items-center gap-3 hover:opacity-80 min-w-0 flex-1">
-          <Avatar className="h-10 w-10 shrink-0 border-2 border-primary/20">
-            <AvatarFallback className="text-xs font-bold bg-primary/10 text-primary">
+        <Link href={tipsterUrl} className="flex items-center gap-2 hover:opacity-80 min-w-0 flex-1">
+          <Avatar className="h-7 w-7 shrink-0 border border-primary/20">
+            <AvatarFallback className="text-[10px] font-bold bg-primary/10 text-primary">
               {tip.tipster.displayName.slice(0, 2).toUpperCase()}
             </AvatarFallback>
           </Avatar>
-          <div className="min-w-0">
-            <div className="flex items-center gap-1.5 flex-wrap">
-              <span className="font-bold text-sm truncate">{tip.tipster.displayName}</span>
+          <div className="min-w-0 leading-tight">
+            <div className="flex items-center gap-1 flex-wrap">
+              <span className="font-semibold text-xs truncate">{tip.tipster.displayName}</span>
               {tip.tipster.isPremium && (
-                <Badge className="h-4 shrink-0 gap-0.5 bg-amber-500/15 text-amber-600 border-amber-500/30 text-[9px]">
-                  <Star className="h-2.5 w-2.5 fill-current" />PRO
+                <Badge className="h-3.5 shrink-0 gap-0.5 bg-amber-500/15 text-amber-600 border-amber-500/30 text-[8px] px-1">
+                  <Star className="h-2 w-2 fill-current" />PRO
                 </Badge>
               )}
               {tip.tipster.verified && (
-                <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-primary" />
+                <CheckCircle2 className="h-3 w-3 shrink-0 text-primary" />
               )}
             </div>
-            <div className="flex items-center gap-2 mt-0.5 text-[11px] text-muted-foreground flex-wrap">
-              <span className="text-emerald-500 font-semibold">{tip.tipster.winRate}% win rate</span>
-              <span>•</span>
+            <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+              <span className="text-emerald-500 font-semibold">{tip.tipster.winRate}%</span>
               <span className={cn(tip.tipster.roi > 0 ? "text-emerald-500" : "text-rose-500", "font-semibold")}>
                 {tip.tipster.roi > 0 ? '+' : ''}{tip.tipster.roi}% ROI
               </span>
-              <span>•</span>
-              <span>Rank #{tip.tipster.rank}</span>
+              <span>·</span>
+              <span>{tip.tipster.followers.toLocaleString()} followers</span>
             </div>
           </div>
         </Link>
-        <div className="text-right shrink-0">
-          <div className="text-xs text-muted-foreground">Stake</div>
-          <div className="flex items-center gap-0.5 mt-0.5">
-            {Array.from({ length: 5 }).map((_, i) => (
-              <div key={i} className={cn(
-                "h-2.5 w-2.5 rounded-sm",
-                i < tip.stake ? "bg-primary" : "bg-muted"
-              )} />
-            ))}
-          </div>
-          <div className="text-[10px] text-muted-foreground mt-0.5">{tip.stake}/5</div>
+        {/* Compact stake dots inline */}
+        <div className="flex items-center gap-0.5 shrink-0" title={`Stake ${tip.stake}/5`}>
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className={cn("h-1.5 w-1.5 rounded-sm", i < tip.stake ? "bg-primary" : "bg-muted")} />
+          ))}
         </div>
       </div>
 
-      {/* Prediction */}
-      <div className="px-4 py-3">
-        <div className="flex items-stretch gap-3">
-          <div className="flex-1 rounded-xl bg-primary/6 border border-primary/15 p-3">
-            <div className="text-[10px] uppercase tracking-widest text-muted-foreground font-medium">{tip.market}</div>
-            <div className="mt-1 text-lg font-black text-primary leading-tight">{tip.prediction}</div>
+      {/* Pick row: market + pick + odds + conf in one strip */}
+      <div className="px-3 pb-2">
+        <div className="flex items-center gap-2">
+          <div className="flex-1 min-w-0 rounded-lg bg-primary/5 border border-primary/15 px-2.5 py-1.5">
+            <div className="text-[9px] uppercase tracking-wide text-muted-foreground font-medium">{tip.market}</div>
+            <div className="text-sm font-bold text-primary leading-tight truncate">{tip.prediction}</div>
           </div>
-          <div className="rounded-xl bg-emerald-500/8 border border-emerald-500/20 p-3 text-center min-w-[70px]">
-            <div className="text-[10px] uppercase tracking-widest text-muted-foreground font-medium">Odds</div>
-            <div className="mt-1 text-lg font-black text-emerald-500">{tip.odds.toFixed(2)}</div>
+          <div className="rounded-lg bg-emerald-500/8 border border-emerald-500/20 px-2 py-1.5 text-center min-w-[52px]">
+            <div className="text-[9px] uppercase tracking-wide text-muted-foreground font-medium">Odds</div>
+            <div className="text-sm font-bold text-emerald-500">{tip.odds.toFixed(2)}</div>
           </div>
-          <div className="rounded-xl bg-muted/50 p-3 text-center min-w-[60px]">
-            <div className="text-[10px] uppercase tracking-widest text-muted-foreground font-medium">Conf.</div>
-            <div className={cn("mt-1 text-lg font-black", confidenceColor)}>{tip.confidence}%</div>
+          <div className="rounded-lg bg-muted/50 px-2 py-1.5 text-center min-w-[46px]">
+            <div className="text-[9px] uppercase tracking-wide text-muted-foreground font-medium">Conf.</div>
+            <div className={cn("text-sm font-bold", confidenceColor)}>{tip.confidence}%</div>
           </div>
         </div>
 
-        {/* Analysis */}
-        <div className="mt-3">
-          {tip.isPremium && tip.tipster.isPremium ? (
-            <div className="flex items-center justify-between gap-3 rounded-xl bg-amber-500/8 border border-amber-500/20 px-4 py-3">
-              <div className="flex items-center gap-2 text-amber-600 text-sm">
-                <Lock className="h-4 w-4 shrink-0" />
-                <span>Premium analysis — Subscribe to unlock</span>
-              </div>
-              <Button size="sm" variant="outline" className="shrink-0 border-amber-500/40 text-amber-600 hover:bg-amber-500/10 text-xs h-7">
-                Unlock
-              </Button>
+        {/* Analysis (compact) */}
+        {tip.isPremium && tip.tipster.isPremium ? (
+          <div className="mt-2 flex items-center justify-between gap-2 rounded-lg bg-amber-500/8 border border-amber-500/20 px-2.5 py-1.5">
+            <div className="flex items-center gap-1.5 text-amber-600 text-xs">
+              <Lock className="h-3 w-3 shrink-0" />
+              <span>Premium analysis — Subscribe to unlock</span>
             </div>
-          ) : (
-            <p className="text-sm text-muted-foreground leading-relaxed">{tip.analysis}</p>
-          )}
-        </div>
+            <Button size="sm" variant="outline" className="h-6 shrink-0 border-amber-500/40 text-amber-600 hover:bg-amber-500/10 text-[10px] px-2">
+              Unlock
+            </Button>
+          </div>
+        ) : (
+          <p className="mt-1.5 text-xs text-muted-foreground leading-snug line-clamp-2">{tip.analysis}</p>
+        )}
       </div>
 
-      {/* Footer */}
-      <div className="flex items-center justify-between gap-3 border-t border-border/40 px-4 py-2.5">
-        <div className="flex items-center gap-1">
+      {/* Footer with real likes + comments toggle */}
+      <div className="flex items-center justify-between gap-2 border-t border-border/40 px-2 py-1">
+        <div className="flex items-center gap-0.5">
           <Button
             variant="ghost" size="sm"
-            className={cn("h-7 gap-1 px-2 text-xs", userVote === 'like' && "text-emerald-500")}
+            className={cn("h-6 gap-1 px-1.5 text-[11px]", liked && "text-emerald-500")}
             onClick={handleLike}
           >
-            <ThumbsUp className="h-3.5 w-3.5" />{likes}
+            <ThumbsUp className={cn("h-3 w-3", liked && "fill-current")} />{likes}
           </Button>
-          <Button variant="ghost" size="sm" className="h-7 gap-1 px-2 text-xs">
-            <MessageCircle className="h-3.5 w-3.5" />{tip.comments}
+          <Button
+            variant="ghost" size="sm"
+            className={cn("h-6 gap-1 px-1.5 text-[11px]", showComments && "text-primary")}
+            onClick={loadComments}
+          >
+            <MessageCircle className="h-3 w-3" />{commentCount}
           </Button>
         </div>
-        <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
-          <span>{new Date(tip.createdAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</span>
-          <span>•</span>
-          <span>{tip.tipster.followers.toLocaleString()} followers</span>
-        </div>
+        <span className="text-[10px] text-muted-foreground">
+          {new Date(tip.createdAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+        </span>
       </div>
+
+      {/* Comment thread */}
+      {showComments && (
+        <div className="border-t border-border/40 px-3 py-2 space-y-2 bg-muted/20">
+          {comments.length === 0 ? (
+            <p className="text-[11px] text-muted-foreground text-center py-1">No comments yet — be the first.</p>
+          ) : (
+            <ul className="space-y-1.5 max-h-60 overflow-auto">
+              {comments.map(c => (
+                <li key={c.id} className="text-xs">
+                  <div className="flex items-baseline gap-1.5">
+                    <span className="font-semibold text-foreground">{c.authorName}</span>
+                    <span className="text-[10px] text-muted-foreground">
+                      {new Date(c.createdAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                  </div>
+                  <p className="text-muted-foreground leading-snug">{c.content}</p>
+                </li>
+              ))}
+            </ul>
+          )}
+          <div className="flex items-end gap-1.5">
+            <textarea
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submitComment() } }}
+              placeholder={isAuthenticated ? 'Add a comment...' : 'Sign in to comment'}
+              disabled={!isAuthenticated || posting}
+              rows={1}
+              className="flex-1 resize-none rounded-md border border-border bg-background px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-primary"
+            />
+            <Button size="sm" className="h-7 px-2 text-[11px]" onClick={submitComment} disabled={!draft.trim() || posting}>
+              Post
+            </Button>
+          </div>
+        </div>
+      )}
     </Card>
   )
 }

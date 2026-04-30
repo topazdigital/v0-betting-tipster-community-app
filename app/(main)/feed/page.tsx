@@ -13,6 +13,7 @@ import {
   Crown, Trophy, Star, BarChart3, Activity, Zap,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { tipsterHref } from '@/lib/utils/slug';
 
 const fetcher = (url: string) => fetch(url).then(r => r.json());
 const POSTS_KEY = '/api/feed/posts';
@@ -360,7 +361,7 @@ function RecommendedTipstersRail() {
             </div>
           ) : tipsters.map(t => (
             <div key={t.id} className="group flex items-center gap-2 rounded-lg p-1.5 transition-colors hover:bg-muted/50">
-              <Link href={`/tipsters/${t.id}`} className="shrink-0">
+              <Link href={tipsterHref(t.username || t.displayName, t.username || t.id)} className="shrink-0">
                 <div className={cn('relative flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br text-[11px] font-bold text-white', gradientFor(t.displayName))}>
                   {avatarInitials(t.displayName)}
                   {t.isPro && (
@@ -368,7 +369,7 @@ function RecommendedTipstersRail() {
                   )}
                 </div>
               </Link>
-              <Link href={`/tipsters/${t.id}`} className="min-w-0 flex-1">
+              <Link href={tipsterHref(t.username || t.displayName, t.username || t.id)} className="min-w-0 flex-1">
                 <div className="flex items-center gap-1">
                   <span className="truncate text-xs font-semibold group-hover:text-primary">{t.displayName}</span>
                 </div>

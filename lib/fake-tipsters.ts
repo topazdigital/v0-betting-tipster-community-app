@@ -208,6 +208,26 @@ export function getFakeTipsterByUsername(username: string): FakeTipster | undefi
   return FAKE_TIPSTERS.find(t => t.username.toLowerCase() === u);
 }
 
+/**
+ * Resolve a fake tipster from a URL slug. Tries:
+ *  • exact username match
+ *  • slugified display name match (e.g. "brian-otieno" → "Brian Otieno")
+ *  • slugified username match (legacy)
+ */
+export function getFakeTipsterBySlug(slug: string): FakeTipster | undefined {
+  if (!slug) return undefined;
+  const s = decodeURIComponent(slug).toLowerCase();
+  // username exact
+  const byUser = FAKE_TIPSTERS.find(t => t.username.toLowerCase() === s);
+  if (byUser) return byUser;
+  // slugified display name
+  const slugify = (str: string) =>
+    str.toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9\s-]+/g, ' ').trim().replace(/\s+/g, '-').replace(/-+/g, '-');
+  return FAKE_TIPSTERS.find(t => slugify(t.displayName) === s)
+      || FAKE_TIPSTERS.find(t => slugify(t.username) === s);
+}
+
 export function regenerateFakeTipsters(count = 100, seed?: number): FakeTipster[] {
   const s = seed ?? Math.floor(Math.random() * 1_000_000);
   FAKE_TIPSTERS = generateFakeTipsters(count, s, 1000);

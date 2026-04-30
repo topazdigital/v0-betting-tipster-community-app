@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { listFollowersOfTipster, listFollowedTipsters } from '@/lib/follows-store';
-import { getFakeTipsterById, getFakeTipsterByUsername, type FakeTipster } from '@/lib/fake-tipsters';
+import { getFakeTipsterById, getFakeTipsterByUsername, getFakeTipsterBySlug, type FakeTipster } from '@/lib/fake-tipsters';
 import {
   listTipsForTipster,
   seedTipsForMatch,
@@ -217,7 +217,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
   const { id } = await context.params;
 
   // Resolve tipster from the fake-tipster catalogue (id 1000+) or @username.
-  const fake = getFakeTipsterById(id) || getFakeTipsterByUsername(id);
+  const fake = getFakeTipsterById(id) || getFakeTipsterByUsername(id) || getFakeTipsterBySlug(id);
   if (!fake) {
     return NextResponse.json({ error: 'Tipster not found' }, { status: 404 });
   }

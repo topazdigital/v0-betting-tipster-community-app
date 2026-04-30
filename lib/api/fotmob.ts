@@ -155,7 +155,7 @@ async function fetchDay(dateStr: string): Promise<UnifiedMatch[]> {
     for (const lg of data.leagues || []) {
       // Cap matches per league so a 200-game day doesn't blow up the page.
       const matches = lg.matches || [];
-      for (let i = 0; i < Math.min(matches.length, 30); i++) {
+      for (let i = 0; i < Math.min(matches.length, 80); i++) {
         const u = mapEvent(matches[i], lg);
         if (u) out.push(u);
       }
@@ -176,7 +176,7 @@ export async function fetchFotMobMatches(): Promise<UnifiedMatch[]> {
   if (process.env.DISABLE_FOTMOB === 'true') return [];
   const days: string[] = [];
   const now = new Date();
-  for (let i = 0; i < 3; i++) {
+  for (let i = 0; i < 7; i++) {
     const d = new Date(now);
     d.setUTCDate(now.getUTCDate() + i);
     days.push(`${d.getUTCFullYear()}${String(d.getUTCMonth() + 1).padStart(2, '0')}${String(d.getUTCDate()).padStart(2, '0')}`);

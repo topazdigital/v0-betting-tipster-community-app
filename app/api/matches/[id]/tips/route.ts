@@ -4,6 +4,7 @@ import { slugToMatchId } from '@/lib/utils/match-url';
 import { seedTipsForMatch, listTipsForMatch, type GeneratedTip } from '@/lib/auto-tips-store';
 import { getFakeTipsterById, getFakeTipsters } from '@/lib/fake-tipsters';
 import { getMatchById } from '@/lib/api/unified-sports-api';
+import { setBaselineLikes, getLikeCount, getCommentCount } from '@/lib/tip-engagement-store';
 
 export const dynamic = 'force-dynamic';
 
@@ -136,13 +137,29 @@ export async function GET(
     markets,
   });
 
-  const autoTips = listTipsForMatch(matchId).map(autoTipToWire);
+  const autoTipsRaw = listTipsForMatch(matchId);
+  // Lock in the auto-generated like counts as the baseline so any subsequent
+  // real likes are added on top.
+  for (const t of autoTipsRaw) setBaselineLikes(t.id, t.likes);
+  const autoTips = autoTipsRaw.map(autoTipToWire);
   const userTips = submittedTipsStore.get(matchId) || [];
 
   const merged = [...userTips, ...autoTips];
   merged.sort((a, b) => (b.confidence ?? 0) - (a.confidence ?? 0));
 
-  return NextResponse.json({ tips: merged, total: merged.length });
+  // Hydrate live likes + comment counts (best-effort).
+  const viewer = await getCurrentUser().catch(() => null);
+  const hydrated = await Promise.all(merged.map(async (tip) => {
+    try {
+      const [like, commentCount] = await Promise.all([
+        getLikeCount(tip.id, viewer?.userId ?? null),
+        getCommentCount(tip.id),
+      ]);
+      return { ...tip, likes: like.count, liked: like.liked, comments: commentCount + (tip.comments || 0) };
+    } catch { return tip; }
+  }));
+
+  return NextResponse.json({ tips: hydrated, total: hydrated.length });
 }
 
 // ─── POST: tipsters submit a new tip on this match ───

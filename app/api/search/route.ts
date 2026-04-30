@@ -3,6 +3,7 @@ import { ALL_LEAGUES, ALL_SPORTS } from '@/lib/sports-data';
 import { getAllMatches, type UnifiedMatch } from '@/lib/api/unified-sports-api';
 import { query } from '@/lib/db';
 import { teamHref } from '@/lib/utils/slug';
+import { matchIdToSlug } from '@/lib/utils/match-url';
 import { SENIOR_FOOTBALL_TEAMS, type CatalogTeam } from '@/lib/data/team-catalog';
 
 // Unified search endpoint backing the header typeahead.
@@ -352,7 +353,7 @@ export async function GET(request: NextRequest) {
           id: m.id,
           title: `${m.homeTeam.name} vs ${m.awayTeam.name}`,
           subtitle: `${m.league.name}${m.status === 'live' ? ' • LIVE' : ''}`,
-          href: `/matches/${m.id}`,
+          href: `/matches/${matchIdToSlug(m.id)}`,
           status: m.status,
           kickoffIso: m.kickoffTime instanceof Date ? m.kickoffTime.toISOString() : new Date(m.kickoffTime).toISOString(),
         });
@@ -406,7 +407,7 @@ export async function GET(request: NextRequest) {
       id: String(r.user_id),
       title: r.display_name || r.username,
       subtitle: `@${r.username}${r.is_pro ? ' • PRO' : ''}`,
-      href: `/tipsters/${r.user_id}`,
+      href: `/tipsters/${r.username}`,
       avatar: r.avatar_url,
       verified: !!r.is_verified,
     }));

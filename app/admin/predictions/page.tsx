@@ -11,6 +11,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { format } from "date-fns"
 import { matchIdToSlug } from "@/lib/utils/match-url"
 import { cn } from "@/lib/utils"
+import { tipsterHref } from "@/lib/utils/slug"
 
 interface Prediction {
   id: string
@@ -129,7 +130,7 @@ export default function AdminPredictionsPage() {
                 {filtered.map((p) => (
                   <tr key={p.id} className="border-b hover:bg-muted/30">
                     <td className="p-2">
-                      <Link href={`/tipsters/${p.tipster.id}`} className="flex items-center gap-1.5 hover:text-primary">
+                      <Link href={tipsterHref(p.tipster.username || p.tipster.name, p.tipster.username || p.tipster.id)} className="flex items-center gap-1.5 hover:text-primary">
                         {p.tipster.avatar ? (
                           <Image src={p.tipster.avatar} alt={p.tipster.name} width={20} height={20} className="h-5 w-5 rounded-full" unoptimized />
                         ) : (

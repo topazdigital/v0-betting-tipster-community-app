@@ -12,6 +12,7 @@ import { Input } from '@/components/ui/input';
 import { Spinner } from '@/components/ui/spinner';
 import { SidebarNew } from '@/components/layout/sidebar-new';
 import { cn } from '@/lib/utils';
+import { tipsterHref } from '@/lib/utils/slug';
 
 interface Tipster {
   id: number;
@@ -127,7 +128,7 @@ function ComparePageInner() {
                           className="absolute right-1.5 top-1.5 rounded-md p-1 text-muted-foreground hover:bg-muted">
                           <X className="h-3.5 w-3.5" />
                         </button>
-                        <Link href={`/tipsters/${t.id}`} className="flex flex-col items-center text-center">
+                        <Link href={tipsterHref(t.username || t.displayName, t.username || t.id)} className="flex flex-col items-center text-center">
                           {t.avatar ? (
                             // eslint-disable-next-line @next/next/no-img-element
                             <img src={t.avatar} alt="" className="h-10 w-10 rounded-full bg-muted" />

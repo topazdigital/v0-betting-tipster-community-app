@@ -5,6 +5,7 @@
 import { query } from './db';
 import { dispatchNotification, dispatchToMany } from './notification-dispatcher';
 import { listFollowersOfTipster } from './follows-store';
+import { getFakeTipsters } from './fake-tipsters';
 
 export interface FeedPost {
   id: string;
@@ -350,65 +351,58 @@ export async function deleteComment(commentId: string): Promise<boolean> {
 }
 
 // ─── SEEDING (memory only, when DB is empty) ─────
+//
+// We seed the community feed with posts authored by the fake-tipster
+// catalogue so the feed never feels empty. Each post is deterministic
+// (seeded by tipster id) so reloads don't shuffle content.
+
+const POST_TEMPLATES: Array<{ content: string; pick?: string; odds?: number; matchTitle?: string | null }> = [
+  { content: '🔥 Loading up on Arsenal -1 vs Brighton today. Their press has been ruthless, expect 2+ goals.', pick: 'Arsenal -1.0', odds: 1.95, matchTitle: 'Arsenal vs Brighton' },
+  { content: 'Real Madrid look untouchable at the Bernabéu this season. ML and BTTS combo is the move tonight.', pick: 'Madrid + BTTS', odds: 2.85, matchTitle: 'Real Madrid vs Sevilla' },
+  { content: 'Over 2.5 in Bayern matches has hit 9/10 of the last 10. Easy money on the Klassiker tonight 📈', pick: 'Over 2.5', odds: 1.75, matchTitle: 'Bayern vs Dortmund' },
+  { content: 'Man City attacking xG is off the charts. Anyone fading them is brave. Stick with the champions.', pick: 'Man City -1.5', odds: 2.10, matchTitle: 'Man City vs Brentford' },
+  { content: '4-fold weekend acca: Man City, Real Madrid, Inter, PSG — all home wins. ~7.50 odds. Who is in?', pick: '4-fold ACCA', odds: 7.50, matchTitle: null },
+  { content: 'Tennis pick of the day — Sinner is rolling on hard court. Straight sets value at 1.55.', pick: 'Sinner 2-0', odds: 1.55, matchTitle: 'Sinner vs Rune' },
+  { content: 'Both teams to score yes is printing money in Serie A this gameweek. Riding it again.', pick: 'BTTS Yes', odds: 1.72, matchTitle: 'Roma vs Lazio' },
+  { content: 'Premier League over 2.5 has been brutal lately. Pivoting to Asian handicaps + corner markets.', pick: 'Over 9.5 corners', odds: 1.85, matchTitle: 'Liverpool vs Chelsea' },
+  { content: 'NBA take: Celtics ATS at home vs anyone outside the top 5 is automatic. Tail Boston tonight.', pick: 'Celtics -6.5', odds: 1.90, matchTitle: 'Celtics vs Hawks' },
+  { content: 'Tracking my staking plan — up 12u this week with patience. Quality over quantity always wins.', pick: undefined, odds: undefined, matchTitle: null },
+  { content: 'Friendly reminder: discipline > picks. Bankroll management is what separates pros from punters.', pick: undefined, odds: undefined, matchTitle: null },
+  { content: 'Gor Mahia at home is a different beast. KPL is criminally underrated by the bookies. Daily analysis here 🇰🇪', pick: 'Gor Mahia DNB', odds: 1.65, matchTitle: null },
+  { content: 'PSG away record is shaky. Backing the underdog +1 handicap, value all over this line.', pick: 'Underdog +1', odds: 1.95, matchTitle: 'Marseille vs PSG' },
+  { content: 'My MLS model is hitting 64% on overs. Sharing 3 plays today — DM me for the full slate.', pick: 'Over 3.5', odds: 2.10, matchTitle: null },
+  { content: 'Champions League knockouts coming — already locking in my outright value picks. Big underdogs to advance.', pick: 'Outright', odds: 4.50, matchTitle: null },
+];
+
 export function seedDemoPostsIfEmpty(): void {
   if (s.posts.size > 0) return;
+  const fakes = getFakeTipsters();
+  if (fakes.length === 0) return;
   const now = Date.now();
-  const seeds: Array<Omit<FeedPost, 'id' | 'likes' | 'commentCount' | 'createdAt'>> = [
-    {
-      userId: 1001,
-      authorName: 'Kev_BetMaster',
-      authorAvatar: null,
-      content: '🔥 Loading up on Arsenal -1 vs Brighton today. Their press has been ruthless, expect 2+ goals. Anyone else in?',
-      pick: 'Arsenal -1.0',
-      odds: 1.95,
-      matchId: null,
-      matchTitle: 'Arsenal vs Brighton',
-      imageUrl: null,
-    },
-    {
-      userId: 1002,
-      authorName: 'NairobiTipsKE',
-      authorAvatar: null,
-      content: 'Gor Mahia at home is a different beast. KPL is criminally underrated by the bookies. Daily analysis here 🇰🇪',
-      pick: 'Gor Mahia DNB',
-      odds: 1.65,
-      matchId: null,
-      matchTitle: null,
-      imageUrl: null,
-    },
-    {
-      userId: 1003,
-      authorName: 'StatsByMo',
-      authorAvatar: null,
-      content: 'Over 2.5 in Bayern matches has hit 9/10 of the last 10. Easy money on the Klassiker tonight 📈',
-      pick: 'Over 2.5',
-      odds: 1.75,
-      matchId: null,
-      matchTitle: 'Bayern vs Dortmund',
-      imageUrl: null,
-    },
-    {
-      userId: 1004,
-      authorName: 'AccaQueen',
-      authorAvatar: null,
-      content: '4-fold weekend acca: Man City, Real Madrid, Inter, PSG — all home wins. ~7.50 odds. Who wants in?',
-      pick: '4-fold ACCA',
-      odds: 7.50,
-      matchId: null,
-      matchTitle: null,
-      imageUrl: null,
-    },
-  ];
-  for (const seed of seeds) {
+  // Pick the first 18 fake tipsters as authors (deterministic)
+  const authors = fakes.slice(0, 18);
+  authors.forEach((t, i) => {
+    const tpl = POST_TEMPLATES[i % POST_TEMPLATES.length];
     const id = makeId('post');
+    // deterministic likes from tipster popularity
+    const likes = Math.max(3, Math.min(120, Math.round(t.followersCount / 25 + (i * 3))));
     s.posts.set(id, {
       id,
-      ...seed,
-      likes: Math.floor(Math.random() * 40) + 5,
+      userId: t.id,
+      authorName: t.displayName,
+      authorAvatar: t.avatar,
+      content: tpl.content,
+      pick: tpl.pick ?? null,
+      odds: tpl.odds ?? null,
+      matchId: null,
+      matchTitle: tpl.matchTitle ?? null,
+      imageUrl: null,
+      likes,
       commentCount: 0,
-      createdAt: new Date(now - Math.random() * 6 * 60 * 60 * 1000).toISOString(),
+      // Spread posts across the last ~30 hours (deterministic by index)
+      createdAt: new Date(now - (i * 105 + 17) * 60 * 1000).toISOString(),
     });
     s.comments.set(id, []);
     s.likes.set(id, new Set());
-  }
+  });
 }
