@@ -106,6 +106,9 @@ export default async function CompetitionDetailPage({ params }: PageParams) {
                 slug={comp.slug}
                 isFull={comp.participants.length >= comp.maxParticipants}
                 isCompleted={comp.status === 'completed'}
+                entryFee={comp.entryFee}
+                currency={comp.currency}
+                competitionName={comp.name}
               />
             </div>
           </div>

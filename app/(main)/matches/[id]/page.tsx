@@ -2275,7 +2275,7 @@ function MatchInfoRail({
   const allRows = standings.flatMap(g => g.rows)
   const homeStanding = allRows.find(r => r.teamName === match.homeTeam.name)
   const awayStanding = allRows.find(r => r.teamName === match.awayTeam.name)
-  const last3H2H = h2h.slice(0, 3)
+  const last3H2H = Array.isArray(h2h) ? h2h.slice(0, 3) : []
 
   return (
     <>

@@ -4,7 +4,9 @@ import { useEffect, useState } from 'react';
 import useSWR from 'swr';
 import { Button } from '@/components/ui/button';
 import { useAuthModal } from '@/contexts/auth-modal-context';
+import { useAuth } from '@/contexts/auth-context';
 import { Check, ChevronRight, Loader2 } from 'lucide-react';
+import { CompetitionPaymentModal } from './competition-payment-modal';
 
 const fetcher = (url: string) => fetch(url).then(r => r.json());
 
@@ -12,46 +14,71 @@ interface Props {
   slug: string;
   isFull?: boolean;
   isCompleted?: boolean;
+  entryFee?: number;
+  currency?: string;
+  competitionName?: string;
 }
 
-export function JoinCompetitionButton({ slug, isFull, isCompleted }: Props) {
+export function JoinCompetitionButton({ slug, isFull, isCompleted, entryFee = 0, currency = 'KES', competitionName }: Props) {
   const { open: openAuthModal } = useAuthModal();
-  const { data: meRes } = useSWR<{ user?: { id: number } | null }>('/api/auth/me', fetcher);
+  const { user, isLoading: authLoading } = useAuth();
   const { data: joinRes, mutate } = useSWR<{ joined: boolean }>(
     `/api/competitions/${slug}/join`,
     fetcher,
-    { revalidateOnFocus: false },
+    { revalidateOnFocus: true },
   );
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [justJoined, setJustJoined] = useState(false);
+  const [showPayment, setShowPayment] = useState(false);
 
   useEffect(() => {
     if (joinRes?.joined) setJustJoined(true);
   }, [joinRes?.joined]);
 
-  const handleJoin = async () => {
+  // When auth state changes (e.g. user just logged in via the modal), re-check join status.
+  useEffect(() => {
+    if (user) mutate();
+  }, [user?.id, mutate]);
+
+  const performJoin = async (paymentRef?: string) => {
     setError(null);
-    if (!meRes?.user) {
-      openAuthModal('login');
-      return;
-    }
     setSubmitting(true);
     try {
-      const r = await fetch(`/api/competitions/${slug}/join`, { method: 'POST' });
+      const r = await fetch(`/api/competitions/${slug}/join`, {
+        method: 'POST',
+        headers: paymentRef ? { 'Content-Type': 'application/json' } : undefined,
+        body: paymentRef ? JSON.stringify({ paymentRef }) : undefined,
+      });
       const data = await r.json().catch(() => ({}));
       if (!r.ok || !data.success) {
         setError(data.error || 'Could not join competition.');
-        return;
+        return false;
       }
       setJustJoined(true);
       mutate();
-    } catch (e) {
+      return true;
+    } catch {
       setError('Network error. Try again.');
+      return false;
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const handleJoin = async () => {
+    setError(null);
+    if (authLoading) return;
+    if (!user) {
+      openAuthModal('login');
+      return;
+    }
+    if (entryFee > 0) {
+      setShowPayment(true);
+      return;
+    }
+    await performJoin();
   };
 
   if (isCompleted) {
@@ -77,15 +104,32 @@ export function JoinCompetitionButton({ slug, isFull, isCompleted }: Props) {
   }
 
   return (
-    <div className="flex flex-col items-end gap-1">
-      <Button size="sm" className="h-7 text-xs" onClick={handleJoin} disabled={submitting}>
-        {submitting ? (
-          <><Loader2 className="mr-1 h-3 w-3 animate-spin" />Joining…</>
-        ) : (
-          <>Join Competition<ChevronRight className="ml-1 h-3 w-3" /></>
-        )}
-      </Button>
-      {error && <p className="text-[10px] text-rose-500">{error}</p>}
-    </div>
+    <>
+      <div className="flex flex-col items-end gap-1">
+        <Button size="sm" className="h-7 text-xs" onClick={handleJoin} disabled={submitting || authLoading}>
+          {submitting ? (
+            <><Loader2 className="mr-1 h-3 w-3 animate-spin" />Joining…</>
+          ) : entryFee > 0 ? (
+            <>Pay {currency} {entryFee} & Join<ChevronRight className="ml-1 h-3 w-3" /></>
+          ) : (
+            <>Join Competition<ChevronRight className="ml-1 h-3 w-3" /></>
+          )}
+        </Button>
+        {error && <p className="text-[10px] text-rose-500">{error}</p>}
+      </div>
+      {showPayment && (
+        <CompetitionPaymentModal
+          open={showPayment}
+          onClose={() => setShowPayment(false)}
+          competitionName={competitionName || slug}
+          amount={entryFee}
+          currency={currency}
+          onSuccess={async (ref) => {
+            const ok = await performJoin(ref);
+            if (ok) setShowPayment(false);
+          }}
+        />
+      )}
+    </>
   );
 }

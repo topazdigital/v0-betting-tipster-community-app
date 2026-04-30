@@ -73,7 +73,9 @@ Key architectural decisions include:
 - **Real-data leaderboard** (`app/(main)/leaderboard/page.tsx`): Fetches `/api/tipsters` and ranks tipsters by deterministic per-period scaling (daily/weekly/monthly/all-time) with avatars, podium and full table.
 - **Enriched /predictor**: AI Match Predictor page now has a 4-tile stat strip (accuracy, markets, AI calls, response time), a Recent Predictions sample grid and an FAQ accordion for SEO long-tail.
 - **SEO metadata**: `generateMetadata` layouts cover `/predictor`, `/feed`, `/bookmarks`, `/leaderboard`, `/tipsters`, `/matches`, `/competitions`, and per-competition pages. Titles/descriptions pull from site_settings where available.
-- **Expanded match coverage**: ESPN per-league + ESPN global + football-data.org + OpenLigaDB + TheSportsDB + FotMob (7-day window, 80 matches/league cap). Total ~2.6k matches/day.
+- **Expanded match coverage**: ESPN per-league + ESPN global + football-data.org + OpenLigaDB + TheSportsDB + FotMob (7-day window, 80 matches/league cap). Total ~2.6k matches/day. Note: Sofascore / livescore.com / scorebat all block server-to-server fetches with 403 from Replit IPs, so they cannot be added without a paid proxy or commercial feed; daily counts are bounded by what free unblocked sources actually publish.
+- **Paid competition entry**: `JoinCompetitionButton` reads `useAuth()` (was using stale SWR `/api/auth/me`, which caused login-loop). For competitions with `entryFee > 0` it opens `CompetitionPaymentModal` (M-Pesa STK / Card / Wallet tabs); the modal posts to `POST /api/payments/competition-entry` (returns `{ success, reference }`) and on success calls the join API with `{ paymentRef }`. `POST /api/competitions/[slug]/join` now returns 402 if a paid competition is joined without a `paymentRef`.
+- **Bug fixes (Apr 30 2026)**: Hardened all `h2h.slice(...)` calls against `null` from cold caches: `components/matches/match-facts.tsx` and `app/(main)/matches/[id]/page.tsx` now wrap with `Array.isArray(h2h) ? h2h : []` before slicing.
 
 ## External Dependencies
 

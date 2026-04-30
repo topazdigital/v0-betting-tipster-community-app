@@ -71,8 +71,9 @@ function teamFacts(
     })
   }
 
-  // Goals trends from H2H
-  const recent = h2h.slice(0, 5).filter(
+  // Goals trends from H2H — guard against null/non-array (the API may return null when no H2H data is found)
+  const safeH2h = Array.isArray(h2h) ? h2h : []
+  const recent = safeH2h.slice(0, 5).filter(
     (g) =>
       typeof g.homeScore === "number" &&
       typeof g.awayScore === "number" &&
