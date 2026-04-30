@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { SidebarNew } from '@/components/layout/sidebar-new';
 import { FlagIcon } from '@/components/ui/flag-icon';
+import { JoinCompetitionButton } from '@/components/competitions/join-competition-button';
 import { getCompetitionBySlug } from '@/lib/competitions-store';
 import { tipsterHref } from '@/lib/utils/slug';
 import { cn } from '@/lib/utils';
@@ -18,10 +19,10 @@ interface PageParams { params: Promise<{ slug: string }> }
 export async function generateMetadata({ params }: PageParams): Promise<Metadata> {
   const { slug } = await params;
   const comp = getCompetitionBySlug(slug);
-  if (!comp) return { title: 'Competition not found · BetTips Pro' };
+  if (!comp) return { title: 'Competition not found · Betcheza' };
   const desc = `${comp.description} Prize pool ${comp.currency} ${comp.prizePool.toLocaleString()}, ${comp.participants.length} tipsters competing.`;
   return {
-    title: `${comp.name} · BetTips Pro`,
+    title: `${comp.name} · Betcheza`,
     description: desc,
     openGraph: { title: comp.name, description: desc, type: 'article' },
   };
@@ -101,7 +102,11 @@ export default async function CompetitionDetailPage({ params }: PageParams) {
                   {comp.entryFee === 0 ? 'Free' : `${comp.currency} ${comp.entryFee}`}
                 </span>
               </div>
-              <Button size="sm" className="h-7 text-xs">Join Competition<ChevronRight className="ml-1 h-3 w-3" /></Button>
+              <JoinCompetitionButton
+                slug={comp.slug}
+                isFull={comp.participants.length >= comp.maxParticipants}
+                isCompleted={comp.status === 'completed'}
+              />
             </div>
           </div>
 

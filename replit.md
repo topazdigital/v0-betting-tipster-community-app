@@ -1,8 +1,8 @@
-# BetTips Pro
+# Betcheza
 
 ## Overview
 
-BetTips Pro is a sports betting tipster community platform providing real-time sports data, AI-powered predictions, and a social environment for tip sharing and tracking. It aims to empower users with tools for informed betting decisions, foster community competition through leaderboards, and offer a robust platform for sports enthusiasts. The project focuses on leveraging modern web technologies for a fast, responsive, and data-rich user experience, targeting the online sports betting and tipster community markets.
+Betcheza is a sports betting tipster community platform providing real-time sports data, AI-powered predictions, and a social environment for tip sharing and tracking. It aims to empower users with tools for informed betting decisions, foster community competition through leaderboards, and offer a robust platform for sports enthusiasts. The project focuses on leveraging modern web technologies for a fast, responsive, and data-rich user experience, targeting the online sports betting and tipster community markets.
 
 ## User Preferences
 
@@ -16,7 +16,7 @@ BetTips Pro is a sports betting tipster community platform providing real-time s
 
 ## System Architecture
 
-The BetTips Pro platform is built with Next.js 16 (App Router) and React 19, using TypeScript. Styling is managed with Tailwind CSS v4, shadcn/ui, and Radix UI for a modern, responsive UI/UX, including dynamic flag icons and clear visual hierarchies.
+The Betcheza platform is built with Next.js 16 (App Router) and React 19, using TypeScript. Styling is managed with Tailwind CSS v4, shadcn/ui, and Radix UI for a modern, responsive UI/UX, including dynamic flag icons and clear visual hierarchies.
 
 State management and data fetching are handled by SWR. Authentication uses a custom JWT implementation with `jose` and `bcryptjs`, securing user sessions via HTTP-only cookies.
 
@@ -67,7 +67,9 @@ Key architectural decisions include:
 - **Clean match URLs** (`lib/utils/match-url.ts` → `matchIdToSlug`): Every component links to matches via the league-prefixed slug (`/matches/eng-737421`), never the raw `espn_*` id. Adopted across the homepage, search, live-matches, teams, tipster profiles, knockout brackets, admin dashboard, and the match-reminder cron.
 - **Real comments + likes per tip** (`lib/tip-engagement-store.ts`, `app/api/tips/[id]/like`, `app/api/tips/[id]/comments`): Likes and comments persist per tip; the match-detail TipCard renders them inline with collapsible threads.
 - **Competitions with real participants** (`lib/competitions-store.ts`, `app/api/competitions`, `app/(main)/competitions/[slug]/page.tsx`, `app/admin/competitions/page.tsx`): Five seeded competitions with deterministic leaderboards drawn from the fake-tipster catalogue (composite ROI/win-rate score). Per-competition detail page with `generateMetadata` for SEO; admin list view in compact table.
-- **Community feed seeding** (`lib/feed-store.ts → seedDemoPostsIfEmpty`): When the DB is empty, the community feed is seeded with 18 deterministic posts authored by the fake-tipster catalogue using a rotating template library so the feed never feels empty and links resolve to real profile slugs.
+- **Joinable competitions + admin CRUD** (`lib/competitions-store.ts` mutations, `app/api/competitions/[slug]/join`, `app/api/admin/competitions`, `components/competitions/join-competition-button.tsx`): The "Join Competition" CTA on the public detail page is now a real client-side action that posts to `/api/competitions/[slug]/join`, opens the auth modal for guests, and shows "Joined" once successful. Admin Competitions page has a Create form (POST) and per-row Delete (DELETE) — built-in seeded competitions are protected. New competitions and join state are persisted to `.local/state/competitions.json` so they survive restarts and surface immediately on the public page.
+- **Community feed seeded from real matches** (`lib/feed-store.ts → seedDemoPostsFromRealMatches`): The community feed is seeded asynchronously by pulling real upcoming matches from `getUpcomingMatches()` and authoring posts with the actual home/away/league names plus the real `matchId` set, so every seeded post deep-links to the correct `/matches/[slug]` page (no more mock teams).
+- **Recommended Tipsters from real ranking** (`app/api/feed/recommended-tipsters`): Replaces the previously hardcoded "FEATURED" set — now ranks all fake tipsters by a composite ROI × win-rate × streak × followers score and returns the top six.
 - **Real-data leaderboard** (`app/(main)/leaderboard/page.tsx`): Fetches `/api/tipsters` and ranks tipsters by deterministic per-period scaling (daily/weekly/monthly/all-time) with avatars, podium and full table.
 - **Enriched /predictor**: AI Match Predictor page now has a 4-tile stat strip (accuracy, markets, AI calls, response time), a Recent Predictions sample grid and an FAQ accordion for SEO long-tail.
 - **SEO metadata**: `generateMetadata` layouts cover `/predictor`, `/feed`, `/bookmarks`, `/leaderboard`, `/tipsters`, `/matches`, `/competitions`, and per-competition pages. Titles/descriptions pull from site_settings where available.

@@ -49,7 +49,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
   const [showSports, setShowSports] = useState(true)
   const stats = useMatchStats()
   const [branding, setBranding] = useState<{ siteName: string; logoUrl: string; logoDarkUrl: string }>({
-    siteName: "BetTips Pro",
+    siteName: "Betcheza",
     logoUrl: "",
     logoDarkUrl: "",
   })
@@ -61,7 +61,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
       .then((d) => {
         if (cancelled || !d) return
         setBranding({
-          siteName: d.siteName || "BetTips Pro",
+          siteName: d.siteName || "Betcheza",
           logoUrl: d.logoUrl || "",
           logoDarkUrl: d.logoDarkUrl || "",
         })
@@ -79,9 +79,10 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
         />
       )}
 
-      {/* Sidebar — narrower & denser */}
+      {/* Sidebar — narrower & denser. Whole sidebar scrolls so the full
+          sports list is reachable without an inner scroll cap. */}
       <aside className={cn(
-        "fixed inset-y-0 left-0 z-50 flex w-56 transform flex-col border-r border-border bg-card transition-transform lg:translate-x-0",
+        "fixed inset-y-0 left-0 z-50 flex w-56 transform flex-col overflow-y-auto border-r border-border bg-card transition-transform lg:translate-x-0",
         sidebarOpen ? "translate-x-0" : "-translate-x-full"
       )}>
         {/* Logo */}
@@ -111,7 +112,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
                     .slice(0, 2)
                     .map((w) => w.charAt(0).toUpperCase())
                     .join("")
-                    .slice(0, 2) || "BT"}
+                    .slice(0, 2) || "BZ"}
                 </div>
                 <span className="text-sm font-bold">{branding.siteName}</span>
               </>
@@ -170,8 +171,8 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
           </button>
 
           {showSports && (
-            <div className="mt-0.5 max-h-56 space-y-0.5 overflow-y-auto">
-              {SPORTS_LIST?.slice(0, 15).map((sport) => (
+            <div className="mt-0.5 space-y-0.5">
+              {SPORTS_LIST?.map((sport) => (
                 <Link
                   key={sport.id}
                   href={`/matches?sport=${sport.slug}`}

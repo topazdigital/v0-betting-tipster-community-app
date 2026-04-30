@@ -7,6 +7,8 @@
 // persistence (table is created lazily if DATABASE_URL exists).
 // ─────────────────────────────────────────────────────────────────────
 
+import fs from 'fs';
+import path from 'path';
 import { getFakeTipsters, type FakeTipster } from './fake-tipsters';
 
 export interface CompetitionParticipant {
@@ -100,6 +102,51 @@ function buildParticipants(seed: number, count: number, multiplier: number): Com
       isVerified: t.isVerified,
     };
   });
+}
+
+// ─── Persistence ──────────────────────────────────────────────────────
+// Admin-created competitions and join records persist across restarts in
+// .local/state/competitions.json (mirroring auto-tips-store).
+
+const STATE_FILE = path.join(process.cwd(), '.local', 'state', 'competitions.json');
+
+interface PersistedState {
+  // Competitions added by admin (overlay on top of seeded ones)
+  added: Competition[];
+  // Per-competition list of joined human-user IDs
+  joinedByCompetition: Record<number, number[]>;
+}
+
+const g = globalThis as { __competitionsState?: PersistedState };
+g.__competitionsState = g.__competitionsState || { added: [], joinedByCompetition: {} };
+const state = g.__competitionsState;
+
+function ensureDir(p: string) {
+  try { fs.mkdirSync(path.dirname(p), { recursive: true }); } catch {}
+}
+
+let _stateLoaded = false;
+function loadState() {
+  if (_stateLoaded) return;
+  _stateLoaded = true;
+  try {
+    if (!fs.existsSync(STATE_FILE)) return;
+    const raw = JSON.parse(fs.readFileSync(STATE_FILE, 'utf8')) as PersistedState;
+    state.added = Array.isArray(raw.added) ? raw.added : [];
+    state.joinedByCompetition = raw.joinedByCompetition || {};
+  } catch (e) {
+    console.warn('[competitions] load failed', e);
+  }
+}
+loadState();
+
+function persistState() {
+  try {
+    ensureDir(STATE_FILE);
+    fs.writeFileSync(STATE_FILE, JSON.stringify(state));
+  } catch (e) {
+    console.warn('[competitions] persist failed', e);
+  }
 }
 
 let _seeded: Competition[] | null = null;
@@ -258,7 +305,7 @@ function seedCompetitions(): Competition[] {
 
 export function getCompetitions(): Competition[] {
   if (!_seeded) _seeded = seedCompetitions();
-  return _seeded;
+  return [..._seeded, ...state.added];
 }
 
 export function getCompetitionBySlug(slug: string): Competition | undefined {
@@ -267,6 +314,146 @@ export function getCompetitionBySlug(slug: string): Competition | undefined {
 
 export function getCompetitionById(id: number): Competition | undefined {
   return getCompetitions().find(c => c.id === id);
+}
+
+// ─── Admin & user mutations ───────────────────────────────────────────
+
+function nextId(): number {
+  const all = getCompetitions();
+  return Math.max(0, ...all.map(c => c.id)) + 1;
+}
+
+export interface NewCompetitionInput {
+  name: string;
+  description: string;
+  type: Competition['type'];
+  status?: Competition['status'];
+  startDate: string;
+  endDate: string;
+  prizePool: number;
+  currency?: string;
+  entryFee: number;
+  maxParticipants: number;
+  prizes?: Array<{ place: string; amount: number }>;
+  rules?: string[];
+  sportFocus: string;
+}
+
+export function addCompetition(input: NewCompetitionInput): Competition {
+  const id = nextId();
+  const baseSlug = slugify(input.name) || `competition-${id}`;
+  // Avoid slug collisions
+  let slug = baseSlug;
+  let n = 2;
+  while (getCompetitions().some(c => c.slug === slug)) {
+    slug = `${baseSlug}-${n++}`;
+  }
+  const comp: Competition = {
+    id,
+    slug,
+    name: input.name,
+    description: input.description || '',
+    type: input.type,
+    status: input.status || 'upcoming',
+    startDate: input.startDate,
+    endDate: input.endDate,
+    prizePool: Number(input.prizePool) || 0,
+    currency: input.currency || 'KES',
+    entryFee: Number(input.entryFee) || 0,
+    maxParticipants: Number(input.maxParticipants) || 100,
+    prizes: input.prizes && input.prizes.length > 0 ? input.prizes : [
+      { place: '1st', amount: Math.round((Number(input.prizePool) || 0) * 0.5) },
+      { place: '2nd', amount: Math.round((Number(input.prizePool) || 0) * 0.3) },
+      { place: '3rd', amount: Math.round((Number(input.prizePool) || 0) * 0.15) },
+      { place: '4-10th', amount: Math.round((Number(input.prizePool) || 0) * 0.05 / 7) },
+    ],
+    rules: input.rules && input.rules.length > 0 ? input.rules : [
+      'Tips must be placed before kickoff.',
+      'Tie-breaker is total ROI.',
+    ],
+    sportFocus: input.sportFocus || 'multi-sport',
+    // Seed with a small set of fake-tipster participants so the leaderboard
+    // is never empty when admins create a brand-new competition.
+    participants: buildParticipants(id * 31 + 7, Math.min(40, Math.max(10, Math.floor((Number(input.maxParticipants) || 100) / 5))), 0.15),
+  };
+  state.added.push(comp);
+  persistState();
+  return comp;
+}
+
+export function updateCompetition(id: number, patch: Partial<NewCompetitionInput>): Competition | null {
+  const idx = state.added.findIndex(c => c.id === id);
+  if (idx < 0) return null; // seeded ones aren't editable
+  const cur = state.added[idx];
+  const updated: Competition = {
+    ...cur,
+    ...patch,
+    id: cur.id,
+    slug: cur.slug,
+    participants: cur.participants,
+    prizePool: patch.prizePool !== undefined ? Number(patch.prizePool) : cur.prizePool,
+    entryFee: patch.entryFee !== undefined ? Number(patch.entryFee) : cur.entryFee,
+    maxParticipants: patch.maxParticipants !== undefined ? Number(patch.maxParticipants) : cur.maxParticipants,
+    currency: patch.currency || cur.currency,
+    status: (patch.status as Competition['status']) || cur.status,
+    type: (patch.type as Competition['type']) || cur.type,
+    prizes: patch.prizes && patch.prizes.length > 0 ? patch.prizes : cur.prizes,
+    rules: patch.rules && patch.rules.length > 0 ? patch.rules : cur.rules,
+  };
+  state.added[idx] = updated;
+  persistState();
+  return updated;
+}
+
+export function deleteCompetition(id: number): boolean {
+  const before = state.added.length;
+  state.added = state.added.filter(c => c.id !== id);
+  if (state.added.length === before) return false;
+  delete state.joinedByCompetition[id];
+  persistState();
+  return true;
+}
+
+export type JoinResult =
+  | { ok: true; alreadyJoined: boolean; participantCount: number }
+  | { ok: false; error: string };
+
+export function joinCompetition(competitionId: number, userId: number, userName: string): JoinResult {
+  const comp = getCompetitionById(competitionId);
+  if (!comp) return { ok: false, error: 'Competition not found' };
+  if (comp.status === 'completed') return { ok: false, error: 'Competition has already ended' };
+
+  const joined = state.joinedByCompetition[competitionId] || [];
+  if (joined.includes(userId)) {
+    return { ok: true, alreadyJoined: true, participantCount: comp.participants.length };
+  }
+  if (comp.participants.length >= comp.maxParticipants) {
+    return { ok: false, error: 'Competition is full' };
+  }
+
+  // Add the human user as a real participant on top of the fake leaderboard.
+  comp.participants.push({
+    rank: comp.participants.length + 1,
+    tipsterId: userId,
+    username: userName,
+    displayName: userName,
+    avatar: null,
+    countryCode: null,
+    winRate: 0,
+    roi: 0,
+    tips: 0,
+    won: 0,
+    points: 0,
+    streak: 0,
+    isVerified: false,
+  });
+  state.joinedByCompetition[competitionId] = [...joined, userId];
+  persistState();
+  return { ok: true, alreadyJoined: false, participantCount: comp.participants.length };
+}
+
+export function hasUserJoined(competitionId: number, userId: number): boolean {
+  return (state.joinedByCompetition[competitionId] || []).includes(userId);
 }
 
 export function publicCompetitionSummary(c: Competition) {

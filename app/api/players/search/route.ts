@@ -94,7 +94,7 @@ export async function GET(req: NextRequest) {
   try {
     const r = await fetch(url, {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (compatible; BetTipsPro/1.0; +https://bettipspro.com)',
+        'User-Agent': 'Mozilla/5.0 (compatible; Betcheza/1.0; +https://betcheza.com)',
         Accept: 'application/json',
       },
       next: { revalidate: 30 },

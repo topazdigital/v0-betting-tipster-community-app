@@ -49,7 +49,7 @@ const MODEL = process.env.OPENAI_MODEL || 'gpt-5-mini';
 // ----- App-knowledge system prompt -----
 // Detailed, opinionated, structured. The LLM answers grounded in this app's
 // concrete features, navigation and tone-of-voice — not generic chat fluff.
-const SYSTEM_BASE = `You are Betcheza AI — the betting copilot inside the Betcheza (BetTips Pro) sports tipster web app.
+const SYSTEM_BASE = `You are Betcheza AI — the betting copilot inside the Betcheza sports tipster web app.
 
 # About the app
 - Betcheza is a multi-sport betting tipster platform. It covers 200+ leagues across soccer, basketball, NFL, MLB, NHL, MMA/UFC, tennis, cricket, rugby, golf and racing.

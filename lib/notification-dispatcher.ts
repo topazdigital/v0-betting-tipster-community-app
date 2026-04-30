@@ -96,8 +96,8 @@ function emailHtml(input: DispatchInput): string {
   return `<div style="font-family:system-ui,sans-serif;max-width:560px;padding:16px">
     <h2 style="margin:0 0 8px 0;color:#0ea5e9">${escapeHtml(input.title)}</h2>
     <p style="color:#334155;line-height:1.5">${escapeHtml(input.content)}</p>
-    ${input.link ? `<p><a href="${escapeHtml(input.link)}" style="display:inline-block;background:#0ea5e9;color:#fff;padding:10px 16px;border-radius:8px;text-decoration:none">Open BetTips Pro</a></p>` : ''}
-    <p style="color:#94a3b8;font-size:12px;margin-top:24px">Manage notifications in your BetTips Pro settings.</p>
+    ${input.link ? `<p><a href="${escapeHtml(input.link)}" style="display:inline-block;background:#0ea5e9;color:#fff;padding:10px 16px;border-radius:8px;text-decoration:none">Open Betcheza</a></p>` : ''}
+    <p style="color:#94a3b8;font-size:12px;margin-top:24px">Manage notifications in your Betcheza settings.</p>
   </div>`;
 }
 

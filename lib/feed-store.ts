@@ -356,50 +356,90 @@ export async function deleteComment(commentId: string): Promise<boolean> {
 // catalogue so the feed never feels empty. Each post is deterministic
 // (seeded by tipster id) so reloads don't shuffle content.
 
-const POST_TEMPLATES: Array<{ content: string; pick?: string; odds?: number; matchTitle?: string | null }> = [
-  { content: '🔥 Loading up on Arsenal -1 vs Brighton today. Their press has been ruthless, expect 2+ goals.', pick: 'Arsenal -1.0', odds: 1.95, matchTitle: 'Arsenal vs Brighton' },
-  { content: 'Real Madrid look untouchable at the Bernabéu this season. ML and BTTS combo is the move tonight.', pick: 'Madrid + BTTS', odds: 2.85, matchTitle: 'Real Madrid vs Sevilla' },
-  { content: 'Over 2.5 in Bayern matches has hit 9/10 of the last 10. Easy money on the Klassiker tonight 📈', pick: 'Over 2.5', odds: 1.75, matchTitle: 'Bayern vs Dortmund' },
-  { content: 'Man City attacking xG is off the charts. Anyone fading them is brave. Stick with the champions.', pick: 'Man City -1.5', odds: 2.10, matchTitle: 'Man City vs Brentford' },
-  { content: '4-fold weekend acca: Man City, Real Madrid, Inter, PSG — all home wins. ~7.50 odds. Who is in?', pick: '4-fold ACCA', odds: 7.50, matchTitle: null },
-  { content: 'Tennis pick of the day — Sinner is rolling on hard court. Straight sets value at 1.55.', pick: 'Sinner 2-0', odds: 1.55, matchTitle: 'Sinner vs Rune' },
-  { content: 'Both teams to score yes is printing money in Serie A this gameweek. Riding it again.', pick: 'BTTS Yes', odds: 1.72, matchTitle: 'Roma vs Lazio' },
-  { content: 'Premier League over 2.5 has been brutal lately. Pivoting to Asian handicaps + corner markets.', pick: 'Over 9.5 corners', odds: 1.85, matchTitle: 'Liverpool vs Chelsea' },
-  { content: 'NBA take: Celtics ATS at home vs anyone outside the top 5 is automatic. Tail Boston tonight.', pick: 'Celtics -6.5', odds: 1.90, matchTitle: 'Celtics vs Hawks' },
-  { content: 'Tracking my staking plan — up 12u this week with patience. Quality over quantity always wins.', pick: undefined, odds: undefined, matchTitle: null },
-  { content: 'Friendly reminder: discipline > picks. Bankroll management is what separates pros from punters.', pick: undefined, odds: undefined, matchTitle: null },
-  { content: 'Gor Mahia at home is a different beast. KPL is criminally underrated by the bookies. Daily analysis here 🇰🇪', pick: 'Gor Mahia DNB', odds: 1.65, matchTitle: null },
-  { content: 'PSG away record is shaky. Backing the underdog +1 handicap, value all over this line.', pick: 'Underdog +1', odds: 1.95, matchTitle: 'Marseille vs PSG' },
-  { content: 'My MLS model is hitting 64% on overs. Sharing 3 plays today — DM me for the full slate.', pick: 'Over 3.5', odds: 2.10, matchTitle: null },
-  { content: 'Champions League knockouts coming — already locking in my outright value picks. Big underdogs to advance.', pick: 'Outright', odds: 4.50, matchTitle: null },
+// Post templates are wired to REAL upcoming matches at seed time. The
+// `{home}`, `{away}`, `{league}` placeholders are filled per-match, and
+// each post stores the actual matchId so the feed deep-links straight
+// to /matches/[slug] in the UI.
+const POST_TEMPLATES: Array<{ content: (m: { home: string; away: string; league: string }) => string; pickFor: (m: { home: string; away: string }) => string | null; odds: number | null }> = [
+  { content: m => `🔥 Loading up on ${m.home} to dominate ${m.away}. Press has been ruthless — expect 2+ goals.`, pickFor: m => `${m.home} -1.0`, odds: 1.95 },
+  { content: m => `${m.home} look untouchable at home. ML + BTTS combo is the move for ${m.home} vs ${m.away}.`, pickFor: m => `${m.home} ML + BTTS`, odds: 2.85 },
+  { content: m => `Over 2.5 in ${m.league} matches like ${m.home}-${m.away} has been a printer. Riding it.`, pickFor: () => 'Over 2.5', odds: 1.75 },
+  { content: m => `${m.home} attacking xG is off the charts. Fading them vs ${m.away} is brave.`, pickFor: m => `${m.home} -1.5`, odds: 2.10 },
+  { content: m => `${m.home} vs ${m.away} — backing both teams to score. Defenses leak in this ${m.league} fixture.`, pickFor: () => 'BTTS Yes', odds: 1.72 },
+  { content: m => `Asian handicap value on ${m.away} +1 in ${m.league}. Closing-line value > vibes.`, pickFor: m => `${m.away} +1 AH`, odds: 1.95 },
+  { content: m => `${m.home} home record is elite this season. Tail them vs ${m.away} on the moneyline.`, pickFor: m => `${m.home} ML`, odds: 1.90 },
+  { content: m => `Form check on ${m.home}-${m.away}: under 2.5 has hit 6 of last 8. Locking it in.`, pickFor: () => 'Under 2.5', odds: 1.85 },
+  { content: m => `Corners model loves ${m.home} vs ${m.away}. Over 9.5 is the play in ${m.league} tempo games.`, pickFor: () => 'Over 9.5 corners', odds: 1.85 },
+  { content: m => `${m.away} away pressure leaks goals. Backing ${m.home} clean sheet here — value at the price.`, pickFor: m => `${m.home} clean sheet`, odds: 2.40 },
+  { content: m => `Big call: ${m.away} pull off the upset at ${m.home}. The line is too generous.`, pickFor: m => `${m.away} ML`, odds: 3.20 },
+  { content: m => `${m.league} tip: ${m.home} -1 first half. They start fast and ${m.away} concede early.`, pickFor: m => `${m.home} -1 1H`, odds: 2.50 },
+  { content: m => `Tracking my staking plan — patience pays. Today’s lean is ${m.home} vs ${m.away}.`, pickFor: () => null, odds: null },
+  { content: m => `Reminder: discipline > picks. Bankroll-first on ${m.home}-${m.away}. 1u stake.`, pickFor: () => null, odds: null },
+  { content: m => `Combo idea: ${m.home} or draw double-chance + over 1.5. Safer angle in ${m.league}.`, pickFor: m => `${m.home} or draw + Over 1.5`, odds: 1.65 },
 ];
 
+// Internal: synchronous fast path that fires the async fill in the background
+// the first time a request hits the empty store. Subsequent requests see
+// posts already populated.
+let seeding = false;
 export function seedDemoPostsIfEmpty(): void {
+  if (s.posts.size > 0 || seeding) return;
+  seeding = true;
+  // Fire & forget — the next refresh will see the posts.
+  (async () => {
+    try {
+      await seedDemoPostsFromRealMatches();
+    } catch (e) {
+      console.warn('[feed-store] seed failed', e);
+    } finally {
+      seeding = false;
+    }
+  })();
+}
+
+// Async seeding wired to REAL upcoming matches. Each fake-tipster authors
+// one post tied to a different real match so the post deep-links to the
+// actual match page via its matchId.
+export async function seedDemoPostsFromRealMatches(): Promise<void> {
   if (s.posts.size > 0) return;
   const fakes = getFakeTipsters();
   if (fakes.length === 0) return;
+  const { getUpcomingMatches } = await import('./api/unified-sports-api');
+  let upcoming: Array<{ id: string; homeTeam: { name: string }; awayTeam: { name: string }; league?: { name?: string }; sport?: { name?: string } }> = [];
+  try {
+    upcoming = (await getUpcomingMatches()) as never;
+  } catch (e) {
+    console.warn('[feed-store] could not fetch upcoming matches', e);
+    return;
+  }
+  if (!upcoming || upcoming.length === 0) return;
+  // Pick the first 24 fake tipsters as authors and assign each a distinct match.
+  const authors = fakes.slice(0, 24);
   const now = Date.now();
-  // Pick the first 18 fake tipsters as authors (deterministic)
-  const authors = fakes.slice(0, 18);
   authors.forEach((t, i) => {
+    const match = upcoming[i % upcoming.length];
+    if (!match) return;
+    const ctx = {
+      home: match.homeTeam.name,
+      away: match.awayTeam.name,
+      league: match.league?.name || match.sport?.name || 'the league',
+    };
     const tpl = POST_TEMPLATES[i % POST_TEMPLATES.length];
     const id = makeId('post');
-    // deterministic likes from tipster popularity
     const likes = Math.max(3, Math.min(120, Math.round(t.followersCount / 25 + (i * 3))));
     s.posts.set(id, {
       id,
       userId: t.id,
       authorName: t.displayName,
       authorAvatar: t.avatar,
-      content: tpl.content,
-      pick: tpl.pick ?? null,
-      odds: tpl.odds ?? null,
-      matchId: null,
-      matchTitle: tpl.matchTitle ?? null,
+      content: tpl.content(ctx),
+      pick: tpl.pickFor(ctx),
+      odds: tpl.odds,
+      matchId: match.id,
+      matchTitle: `${ctx.home} vs ${ctx.away}`,
       imageUrl: null,
       likes,
       commentCount: 0,
-      // Spread posts across the last ~30 hours (deterministic by index)
       createdAt: new Date(now - (i * 105 + 17) * 60 * 1000).toISOString(),
     });
     s.comments.set(id, []);
