@@ -5,6 +5,7 @@ import {
   listTipsForTipster,
   seedTipsForMatch,
   settleStaleAutoTips,
+  computeRealTipsterStats,
   type GeneratedTip,
 } from '@/lib/auto-tips-store';
 import { getAllMatches, type UnifiedMatch } from '@/lib/api/unified-sports-api';
@@ -166,6 +167,11 @@ function autoTipToRecent(t: GeneratedTip, realMatch?: UnifiedMatch) {
     homeScore = 2; awayScore = 1;
   } else if (t.status === 'lost') {
     homeScore = 1; awayScore = 2;
+  } else if (t.status === 'void') {
+    // Void usually means the market resolved to a push (e.g. AH 0 with 1-1)
+    // — show the score-line if we have it, otherwise leave null.
+    homeScore = realMatch?.homeScore != null ? Number(realMatch.homeScore) : null;
+    awayScore = realMatch?.awayScore != null ? Number(realMatch.awayScore) : null;
   }
   return {
     id: t.id,
@@ -284,6 +290,22 @@ export async function GET(request: NextRequest, context: RouteContext) {
       autoTipToRecent(t, matchIndex.get(String(t.matchId))),
     );
     response.recentTips = tips;
+
+    // Layer in REAL settled stats — once a tipster has actual settled tips on
+    // real matches, the profile header should reflect those numbers (not the
+    // deterministic catalogue defaults). We keep the catalogue numbers as a
+    // floor so brand-new tipsters still look established.
+    const real = computeRealTipsterStats(tipsterId);
+    if (real.won + real.lost >= 5) {
+      response.tipster = {
+        ...response.tipster,
+        winRate: real.winRate,
+        wonTips: real.won,
+        lostTips: real.lost,
+        pendingTips: real.pending,
+        totalTips: real.totalSettled + real.pending,
+      };
+    }
   }
 
   if (includeStats) {

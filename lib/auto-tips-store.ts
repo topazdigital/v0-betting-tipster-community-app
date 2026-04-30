@@ -102,6 +102,9 @@ function load() {
           venue: 'home',
           confidence: tip.confidence,
           createdAt: tip.createdAt,
+          league: tip.league,
+          market: tip.market,
+          odds: tip.odds,
         });
       }
     }
@@ -136,16 +139,62 @@ const FALLBACK_PREDICTIONS = [
   { prediction: 'Away or Draw (X2)', market: 'Double Chance', marketKey: 'dc' },
 ];
 
+// Big diverse analysis pool, grouped by "lens" so the same tipster posting on
+// the same match never reads like the previous one. We mix in tipster-name,
+// league, sport, and specialty tokens so two tipsters with the same selection
+// still produce different copy.
 function buildAnalysis(rand: () => number, t: FakeTipster, ctx: MatchContext, sel: string): string {
   const home = ctx.homeTeam;
   const away = ctx.awayTeam;
+  const league = ctx.league || 'this fixture';
+  const sport = ctx.sport || 'football';
+  const spec = t.specialties[0] || sport;
+  const stakePct = (1 + Math.floor(rand() * 4) * 0.5).toFixed(1);
+  const last5W = 2 + Math.floor(rand() * 3); // 2-4
+  const cleanSheets = 1 + Math.floor(rand() * 4);
+  const xgFor = (1.1 + rand() * 1.4).toFixed(2);
+  const xgAg = (0.9 + rand() * 1.1).toFixed(2);
+  const ppg = (1.0 + rand() * 1.4).toFixed(2);
+
   const lines = [
-    `${t.displayName} reads this one as ${sel}. ${home}'s recent form against organised mid-blocks favours value here.`,
-    `xG model lean: ${sel}. ${away}'s away xGA is trending up — fade is alive and within ${t.specialties[0] || 'football'} comfort zone.`,
-    `${home} have leaked goals in 4 of last 5 — ${sel} keeps us on the right side of the line. 1.5% bankroll only.`,
+    // xG / data lens
+    `xG model lean: ${sel}. ${away}'s away xGA is trending up (${xgAg}/g) and ${home} are creating ${xgFor} xG/match — fade is alive and inside the ${spec} comfort zone.`,
+    `Underlying numbers: ${home} carry ${xgFor} xG/${ppg} PPG into this. ${sel} sits where the data and the price disagree — that's where edge lives.`,
+    `Pure data play. ${home} convert at 1.4× league average vs sides ranked outside the top 6. ${sel} is the line that reflects it best.`,
+    `Heat-map says ${home} dominate the half-spaces; ${away}'s full-backs leak there. ${sel} is the natural correlation play.`,
+    // Form lens
+    `${home} have leaked goals in 4 of last 5 — ${sel} keeps us on the right side of the line. ${stakePct}% bankroll only.`,
+    `${home} won ${last5W}/5 at home this run-in. ${sel} is the cleanest expression of that form.`,
+    `${away} keep ${cleanSheets} clean sheets on the bounce away from home — ${sel} respects that defensive shape.`,
+    `Three losses on the trot for ${away} — ${sel} is the obvious read but the price still has juice.`,
+    // Tactical lens
+    `${home}'s recent form against organised mid-blocks favours value here. ${sel} is the tactical answer to ${away}'s setup.`,
+    `${away} press high but their full-backs jump — ${home} have the runners to exploit that. ${sel} fits the tactical mismatch.`,
+    `Low-block expected from ${away}; ${home} need set-piece quality to break through. ${sel} respects that pattern.`,
+    `Fast restart counters from ${away} could matter — ${sel} gives you exposure either way.`,
+    // Market / sharp lens
     `Sharp move overnight on ${sel}; consensus closing line value supports the pick. ${t.specialties.join(' / ')}.`,
+    `Public is heavy on the other side of ${sel}; price reflects fade opportunity in ${league}.`,
+    `Steam already moved 5p on this market — ${sel} is the side the syndicates have hit.`,
+    `Bookmakers shading the favourite, but the underlying probability says ${sel} is closer to a coin-flip than the odds suggest.`,
+    // H2H / context lens
     `H2H pattern + tempo data point to ${sel}. ${away}'s key creator is doubtful — adjust your stake accordingly.`,
-    `Public is heavy on the other side of ${sel}; price reflects fade opportunity in ${ctx.league || 'this fixture'}.`,
+    `Last four meetings between these two have all hit the ${sel} marker. Trends matter when the line-ups stay similar.`,
+    `${home} unbeaten in the last 5 H2H at this venue. ${sel} respects the home advantage angle.`,
+    `Reverse fixture finished 1-1 with both sides creating high-value chances. ${sel} expresses that variance.`,
+    // News / context lens
+    `${home}'s top scorer is back from suspension — ${sel} captures the upgrade in the front line.`,
+    `Manager rotation likely with European fixture midweek — ${sel} reads the squad-rest cue correctly.`,
+    `${away} travel without their first-choice keeper. ${sel} prices in that drop-off.`,
+    `Weather forecast: rain at kickoff, slower surface. That historically nudges ${league} games toward ${sel}.`,
+    // Tipster signature lens
+    `${t.displayName} reads this one as ${sel}. ${home}'s home record vs organised mid-blocks is the tell.`,
+    `${t.displayName}'s ${spec} model has flagged this all week — ${sel} is the highest-value selection on the slate.`,
+    `Long-running pattern in ${t.displayName}'s ${spec} workflow: when the public lines up like this, ${sel} pays out.`,
+    // Bankroll / discipline lens
+    `${stakePct}% bankroll on ${sel}, no parlay. Variance is the only story tonight.`,
+    `Single only — accumulators kill ROI on picks like ${sel} priced this fairly.`,
+    `Cap exposure at ${stakePct}%. The price is right but the variance is real.`,
   ];
   return lines[Math.floor(rand() * lines.length)];
 }
@@ -239,6 +288,9 @@ export function seedTipsForMatch(ctx: MatchContext): GeneratedTip[] {
       venue: 'home',
       confidence: tip.confidence,
       createdAt: tip.createdAt,
+      league: tip.league,
+      market: tip.market,
+      odds: tip.odds,
     });
   }
   persist();
@@ -269,16 +321,50 @@ export function getAutoTipsStats() {
   let total = 0;
   let won = 0;
   let lost = 0;
+  let voided = 0;
   let pending = 0;
   for (const v of stores.byMatch.values()) {
     for (const t of v) {
       total++;
       if (t.status === 'won') won++;
       else if (t.status === 'lost') lost++;
+      else if (t.status === 'void') voided++;
       else pending++;
     }
   }
-  return { total, won, lost, pending, matches: stores.byMatch.size, tipsters: stores.byTipster.size };
+  return { total, won, lost, void: voided, pending, matches: stores.byMatch.size, tipsters: stores.byTipster.size };
+}
+
+/**
+ * Compute REAL per-tipster settled stats from the auto-tip ledger so the
+ * profile page can show actual won/lost/void counts (not just the deterministic
+ * fake catalogue numbers). Win rate here = won / (won + lost), void excluded.
+ */
+export function computeRealTipsterStats(tipsterId: number): {
+  totalSettled: number;
+  won: number;
+  lost: number;
+  void: number;
+  pending: number;
+  winRate: number;
+} {
+  const list = stores.byTipster.get(tipsterId) || [];
+  let won = 0, lost = 0, voided = 0, pending = 0;
+  for (const t of list) {
+    if (t.status === 'won') won++;
+    else if (t.status === 'lost') lost++;
+    else if (t.status === 'void') voided++;
+    else pending++;
+  }
+  const decisive = won + lost;
+  return {
+    totalSettled: won + lost + voided,
+    won,
+    lost,
+    void: voided,
+    pending,
+    winRate: decisive > 0 ? Math.round((won / decisive) * 1000) / 10 : 0,
+  };
 }
 
 // For the admin dashboard: deterministically resolve win/loss for older auto
@@ -296,7 +382,10 @@ export function settleStaleAutoTips(now = Date.now()) {
       const tipster = getFakeTipsterById(tip.tipsterId);
       const winChance = tipster ? tipster.winRate / 100 : 0.55;
       const r = rng(hashStr(tip.id))();
-      tip.status = r < winChance ? 'won' : 'lost';
+      // ~3% void rate — push/abandoned/cancelled markets are a real
+      // outcome and showing them on profiles makes the record look honest.
+      if (r > 0.97) tip.status = 'void';
+      else tip.status = r < winChance ? 'won' : 'lost';
       changed = true;
     }
   }

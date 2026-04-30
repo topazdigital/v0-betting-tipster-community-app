@@ -165,10 +165,10 @@ export default function MatchPredictorPage() {
               </div>
               <div className="min-w-0">
                 <h1 className="text-lg font-black md:text-xl leading-tight">
-                  AI Match Predictor
+                  Betcheza AI Predictor
                 </h1>
                 <p className="mt-0.5 text-xs text-muted-foreground leading-snug">
-                  AI analysis for any matchup — pick, confidence level, and recommended markets.
+                  Betcheza AI reads any matchup and gives you a pick, confidence level, and recommended markets.
                 </p>
               </div>
             </div>
@@ -482,7 +482,7 @@ export default function MatchPredictorPage() {
 
 const FAQS = [
   {
-    q: 'How accurate is the AI Match Predictor?',
+    q: 'How accurate is Betcheza AI?',
     a: 'Across the last three months our blended model has hit roughly 68% on flagship markets. Confidence is exposed honestly so you can size your stakes accordingly — a 55% pick is not the same as a 75% pick.',
   },
   {

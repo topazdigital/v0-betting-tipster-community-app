@@ -54,9 +54,9 @@ export function parseSocialLinks(raw: string): SocialLink[] {
 const DEFAULTS: SiteSettings = {
   site_name: 'Betcheza',
   site_description: 'Your trusted betting tips community. Get expert predictions, track your performance, and compete with other tipsters.',
-  logo_url: '',
-  logo_dark_url: '',
-  favicon_url: '',
+  logo_url: '/betcheza-logo-light.svg',
+  logo_dark_url: '/betcheza-logo-dark.svg',
+  favicon_url: '/betcheza-favicon.svg',
   primary_color: '#10B981',
   default_theme: 'light',
   google_analytics_id: '',

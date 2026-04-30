@@ -18,7 +18,8 @@ import {
   Bell,
   MessageCircle,
   Brain,
-  Wallet
+  Wallet,
+  UserPlus
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ALL_SPORTS, ALL_LEAGUES, BOOKMAKERS, getSportIcon } from '@/lib/sports-data';
@@ -338,6 +339,18 @@ export function SidebarNew({ selectedSportId, onSelectSport }: SidebarNewProps) 
                 <span>Tipsters</span>
               </Link>
               <Link
+                href="/become-tipster"
+                className={cn(
+                  'flex items-center gap-2 rounded-lg px-2 py-2 text-sm transition-colors',
+                  pathname === '/become-tipster'
+                    ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+                    : 'text-sidebar-foreground hover:bg-sidebar-accent/50'
+                )}
+              >
+                <UserPlus className="h-4 w-4 text-primary" />
+                <span>Become a Tipster</span>
+              </Link>
+              <Link
                 href="/predictor"
                 className={cn(
                   'flex items-center gap-2 rounded-lg px-2 py-2 text-sm transition-colors',
@@ -347,7 +360,7 @@ export function SidebarNew({ selectedSportId, onSelectSport }: SidebarNewProps) 
                 )}
               >
                 <Brain className="h-4 w-4 text-primary" />
-                <span>Match Predictor</span>
+                <span>Betcheza AI</span>
                 <span className="ml-auto rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-bold text-primary">AI</span>
               </Link>
               <Link

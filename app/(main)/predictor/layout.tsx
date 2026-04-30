@@ -3,8 +3,8 @@ import { getSiteSettings } from '@/lib/site-settings';
 
 export async function generateMetadata(): Promise<Metadata> {
   const s = await getSiteSettings();
-  const title = `AI Predictor · ${s.site_name}`;
-  const description = `Free AI-powered match predictions on ${s.site_name}. Get probability-based picks across football, basketball, tennis, and more — updated continuously from real bookmaker odds.`;
+  const title = `Betcheza AI · ${s.site_name}`;
+  const description = `Betcheza AI gives you free probability-based match predictions across football, basketball, tennis and more — updated continuously from real bookmaker odds.`;
   return {
     title,
     description,

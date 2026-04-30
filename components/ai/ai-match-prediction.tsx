@@ -55,10 +55,10 @@ export function AIMatchPrediction({
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5">
-            <h3 className="text-sm font-bold text-foreground">AI Match Prediction</h3>
+            <h3 className="text-sm font-bold text-foreground">Betcheza AI Prediction</h3>
             <span className="text-[9px] font-bold uppercase tracking-wide bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white px-1.5 py-0.5 rounded">AI</span>
           </div>
-          <p className="text-[11px] text-muted-foreground">Auto-generated from odds, form &amp; head-to-head</p>
+          <p className="text-[11px] text-muted-foreground">Betcheza AI · trained on odds, form &amp; head-to-head</p>
         </div>
         <Sparkles className="h-4 w-4 text-violet-400" />
       </div>

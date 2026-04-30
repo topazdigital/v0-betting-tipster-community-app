@@ -45,8 +45,8 @@ export function AIPrediction({ prediction, match }: AIPredictionProps) {
           <Brain className="h-5 w-5 text-primary" />
         </div>
         <div>
-          <h3 className="font-semibold text-foreground">AI Match Analysis</h3>
-          <p className="text-xs text-muted-foreground">Powered by Groq AI</p>
+          <h3 className="font-semibold text-foreground">Betcheza AI Analysis</h3>
+          <p className="text-xs text-muted-foreground">Powered by Betcheza AI</p>
         </div>
       </div>
 

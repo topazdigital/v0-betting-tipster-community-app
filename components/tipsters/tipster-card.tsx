@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { TrendingUp, TrendingDown, Users, Target } from 'lucide-react';
+import { TrendingUp, TrendingDown, Users, Target, BadgeCheck } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { FollowTipsterButton } from '@/components/tipsters/follow-tipster-button';
@@ -9,7 +9,10 @@ import type { User, TipsterProfile } from '@/lib/types';
 
 interface TipsterCardProps {
   user: Pick<User, 'id' | 'username' | 'display_name' | 'avatar_url'>;
-  profile: Pick<TipsterProfile, 'win_rate' | 'roi' | 'total_tips' | 'won_tips' | 'streak' | 'rank' | 'followers_count' | 'is_pro'>;
+  profile: Pick<TipsterProfile, 'win_rate' | 'roi' | 'total_tips' | 'won_tips' | 'streak' | 'rank' | 'followers_count' | 'is_pro'> & {
+    /** Optional — when true a small verified checkmark sits next to the name. */
+    is_verified?: boolean;
+  };
   compact?: boolean;
 }
 
@@ -36,6 +39,9 @@ export function TipsterCard({ user, profile, compact = false }: TipsterCardProps
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-1">
               <span className="truncate font-medium text-foreground">{user.display_name}</span>
+              {profile.is_verified && (
+                <BadgeCheck className="h-3.5 w-3.5 shrink-0 text-primary" aria-label="Verified tipster" />
+              )}
               <span className="text-xs text-muted-foreground">#{profile.rank}</span>
             </div>
             <div className="flex items-center gap-3 text-xs">
@@ -82,6 +88,12 @@ export function TipsterCard({ user, profile, compact = false }: TipsterCardProps
             <Link href={`/tipsters/${user.username}`} className="hover:underline">
               <span className="font-semibold text-foreground">{user.display_name}</span>
             </Link>
+            {profile.is_verified && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary" title="Verified tipster">
+                <BadgeCheck className="h-3 w-3" />
+                Verified
+              </span>
+            )}
             <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
               #{profile.rank}
             </span>

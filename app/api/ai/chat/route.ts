@@ -342,7 +342,10 @@ export async function POST(request: NextRequest) {
         ...history.map((m) => ({ role: m.role, content: m.content })),
       ],
       max_completion_tokens: 2500,
-      reasoning_effort: 'minimal',
+      // 'low' gives noticeably smarter, more specific answers (cites form, odds,
+      // tactical detail) at a tiny latency cost vs 'minimal'. Worth the trade
+      // for a chat assistant — feels meaningfully more analytical.
+      reasoning_effort: 'low',
     };
     const completion = await openai.chat.completions.create(params);
 

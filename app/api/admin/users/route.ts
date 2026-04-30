@@ -3,6 +3,7 @@ import { getCurrentUser } from '@/lib/auth';
 import { hasPermission, type Role, ROLE_LABELS } from '@/lib/permissions';
 import { mockUsers } from '@/lib/mock-data';
 import { getFakeTipsters } from '@/lib/fake-tipsters';
+import { getUserRoleOverride, setUserRoleOverride } from '@/lib/user-role-overrides';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -23,9 +24,6 @@ interface AdminUserRow {
   lastActive: string;
 }
 
-// In-memory role overrides — allows admins to promote/demote without a DB.
-const roleOverrides = new Map<number, Role>();
-
 function buildAllUsers(): AdminUserRow[] {
   const real: AdminUserRow[] = mockUsers.map(u => ({
     id: u.id,
@@ -33,7 +31,7 @@ function buildAllUsers(): AdminUserRow[] {
     displayName: u.display_name || u.username,
     email: u.email || '',
     avatar: u.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${u.username}`,
-    role: (roleOverrides.get(u.id) || u.role || 'user') as Role,
+    role: (getUserRoleOverride(u.id) || u.role || 'user') as Role,
     status: 'active' as const,
     isFake: false,
     joined: new Date(u.created_at).toLocaleDateString(),
@@ -49,7 +47,7 @@ function buildAllUsers(): AdminUserRow[] {
     displayName: t.displayName,
     email: `${t.username}@seed.local`,
     avatar: t.avatar,
-    role: (roleOverrides.get(t.id) || 'tipster') as Role,
+    role: (getUserRoleOverride(t.id) || 'tipster') as Role,
     status: 'active' as const,
     isFake: true,
     joined: new Date(t.joinedAt).toLocaleDateString(),
@@ -118,6 +116,6 @@ export async function PATCH(request: NextRequest) {
   if (!id || !validRoles.includes(role)) {
     return NextResponse.json({ success: false, error: 'invalid payload' }, { status: 400 });
   }
-  roleOverrides.set(id, role);
+  setUserRoleOverride(id, role);
   return NextResponse.json({ success: true, id, role });
 }

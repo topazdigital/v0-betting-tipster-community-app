@@ -7,7 +7,7 @@ import { format } from "date-fns"
 import { 
   ArrowLeft, Check, Star, Users, TrendingUp, Target, Flame, 
   Calendar, MapPin, Trophy, ChevronRight, ExternalLink,
-  BarChart3, Activity, Clock
+  BarChart3, Activity, Clock, BadgeCheck, MinusCircle
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -184,7 +184,10 @@ export default function TipsterProfilePage({ params }: PageProps) {
                 <div className="flex flex-wrap items-center gap-1.5 mb-0.5">
                   <h1 className="text-lg font-bold">{tipster.displayName}</h1>
                   {tipster.verified && (
-                    <Check className="h-4 w-4 rounded-full bg-primary p-0.5 text-primary-foreground" />
+                    <span className="inline-flex items-center gap-0.5 rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-bold uppercase text-primary">
+                      <BadgeCheck className="h-3 w-3" />
+                      Verified
+                    </span>
                   )}
                   {tipster.isPro && (
                     <Badge className="h-4 bg-gradient-to-r from-primary to-primary/80 text-[10px] px-1.5">
@@ -340,7 +343,7 @@ export default function TipsterProfilePage({ params }: PageProps) {
                   odds: number;
                   stake: number;
                   analysis: string;
-                  status: 'won' | 'lost' | 'pending';
+                  status: 'won' | 'lost' | 'pending' | 'void';
                   confidence: number;
                   likes: number;
                   createdAt: string;
@@ -361,6 +364,7 @@ export default function TipsterProfilePage({ params }: PageProps) {
                       tip.status === 'won' && "border-success/30 bg-success/5",
                       tip.status === 'lost' && "border-destructive/30 bg-destructive/5",
                       tip.status === 'pending' && "border-warning/30 bg-warning/5",
+                      tip.status === 'void' && "border-muted-foreground/30 bg-muted/30",
                       matchHref && "hover:border-primary/40 hover:shadow-sm cursor-pointer",
                     )}
                   >
@@ -376,9 +380,12 @@ export default function TipsterProfilePage({ params }: PageProps) {
                       <Badge 
                         variant={tip.status === 'won' ? 'default' : tip.status === 'lost' ? 'destructive' : 'secondary'}
                         className={cn(
-                          tip.status === 'won' && "bg-success text-success-foreground"
+                          "inline-flex items-center gap-1",
+                          tip.status === 'won' && "bg-success text-success-foreground",
+                          tip.status === 'void' && "bg-muted text-muted-foreground border border-border"
                         )}
                       >
+                        {tip.status === 'void' && <MinusCircle className="h-3 w-3" />}
                         {tip.status.toUpperCase()}
                       </Badge>
                     </div>
@@ -395,7 +402,10 @@ export default function TipsterProfilePage({ params }: PageProps) {
                       <span>Confidence: {tip.confidence}%</span>
                       <span>Stake: {tip.stake}/5</span>
                       {tip.status !== 'pending' && tip.match.homeScore !== null && (
-                        <span>Result: {tip.match.homeScore} - {tip.match.awayScore}</span>
+                        <span className="font-mono">
+                          Final: <strong>{tip.match.homeScore} - {tip.match.awayScore}</strong>
+                          {tip.status === 'void' && ' · push'}
+                        </span>
                       )}
                       {matchHref && (
                         <span className="ml-auto inline-flex items-center gap-0.5 text-primary group-hover:underline">
