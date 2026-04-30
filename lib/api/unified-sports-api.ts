@@ -649,10 +649,16 @@ async function fetchESPN(
   const base = `${ESPN_BASE_URL}/${sport}/${league}/${endpoint}`;
   const url = dates ? `${base}?dates=${dates}` : base;
 
+  // ESPN tennis (ATP/WTA) and golf scoreboards are huge (often >2MB) and exceed
+  // Next.js's data-cache item limit, which spams "Failed to set fetch cache"
+  // warnings. Skip the data cache for those endpoints — our in-memory cache
+  // (setCache/getCache) already handles dedupe + TTL upstream.
+  const skipDataCache = sport === 'tennis' || sport === 'golf';
+
   try {
     const response = await fetch(url, {
       headers: { 'Accept': 'application/json' },
-      next: { revalidate: 15 },
+      ...(skipDataCache ? { cache: 'no-store' as const } : { next: { revalidate: 15 } }),
     });
 
     if (!response.ok) {

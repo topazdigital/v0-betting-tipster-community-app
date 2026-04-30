@@ -6,7 +6,8 @@ import {
   listPushSubscriptions,
   listAllUserIds,
 } from '@/lib/notification-store';
-import { sendBulkMail } from '@/lib/mailer';
+import { sendBulkMailBatched, renderTemplate } from '@/lib/mailer';
+import { getTemplate } from '@/lib/email-templates-store';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,6 +16,10 @@ interface BroadcastBody {
   body: string;
   link?: string;
   audience?: 'all' | 'push' | 'email';
+  /** Optional batching overrides for very large lists. */
+  batchSize?: number;
+  perEmailDelayMs?: number;
+  perBatchDelayMs?: number;
 }
 
 export async function POST(req: Request) {
@@ -54,18 +59,45 @@ export async function POST(req: Request) {
     }
   }
 
-  let emailResult: { sent: number; failed: number; skipped?: boolean } | null = null;
+  let emailResult: { sent: number; failed: number; skipped?: boolean; total?: number } | null = null;
   if (audience === 'all' || audience === 'email') {
     const emailSubs = (await listEmailSubscribers()).filter((s) => s.active);
     const recipients = emailSubs.map((s) => s.email);
-    const html = `<div style="font-family:system-ui,sans-serif;max-width:600px;margin:0 auto;padding:24px;background:#fff;color:#111">
+
+    // Render the broadcast through the editable template; fall back to the
+    // legacy hand-coded HTML when the template is empty.
+    const tpl = getTemplate('broadcast');
+    const baseVars = {
+      subject: title,
+      heading: title,
+      body: escapeHtml(body).replace(/\n/g, '<br/>'),
+      siteUrl: (process.env.NEXT_PUBLIC_APP_URL || 'https://betcheza.com').replace(/\/$/, ''),
+      name: 'there',
+      email: '',
+    };
+    const renderedSubject = renderTemplate(tpl.subject || title, baseVars) || title;
+    const renderedHtml =
+      renderTemplate(tpl.html, baseVars) ||
+      `<div style="font-family:system-ui,sans-serif;max-width:600px;margin:0 auto;padding:24px;background:#fff;color:#111">
         <h1 style="margin:0 0 12px;font-size:22px">${escapeHtml(title)}</h1>
-        <div style="font-size:15px;line-height:1.5;color:#333">${escapeHtml(body).replace(/\n/g, '<br/>')}</div>
+        <div style="font-size:15px;line-height:1.5;color:#333">${baseVars.body}</div>
         ${data.link ? `<p style="margin-top:24px"><a href="${escapeAttr(data.link)}" style="background:#10B981;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;display:inline-block">Open</a></p>` : ''}
         <hr style="margin:32px 0;border:none;border-top:1px solid #eee"/>
         <p style="font-size:11px;color:#999">You received this because you subscribed to Betcheza updates.</p>
       </div>`;
-    emailResult = await sendBulkMail(recipients, title, html, body);
+    const renderedText = renderTemplate(tpl.text, baseVars) || body;
+
+    emailResult = await sendBulkMailBatched(
+      recipients,
+      renderedSubject,
+      renderedHtml,
+      renderedText,
+      {
+        batchSize: data.batchSize ?? 25,
+        perEmailDelayMs: data.perEmailDelayMs ?? 80,
+        perBatchDelayMs: data.perBatchDelayMs ?? 1500,
+      },
+    );
     count += emailResult.sent;
   }
 

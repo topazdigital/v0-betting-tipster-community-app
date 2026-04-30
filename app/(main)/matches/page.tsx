@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, Suspense } from 'react';
+import { useState, useMemo, Suspense, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { Calendar, Search, Filter, Clock, Flame, ChevronDown, ChevronRight, CalendarDays, CalendarClock } from 'lucide-react';
@@ -132,12 +132,44 @@ function MatchesContent() {
     return result;
   }, [matches, leagueFilter, search, dateTab, calendarDate]);
 
-  // Group matches by league — preserves the API's sport priority → league priority → time order
-  // (filteredMatches is already sorted by sportPriority -> leaguePriority -> status -> kickoff)
+  // ── Infinite scroll: only render a window of matches; grow as user reaches the bottom.
+  const PAGE_SIZE = 40;
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
+
+  // Reset window whenever filters change
+  useEffect(() => {
+    setVisibleCount(PAGE_SIZE);
+  }, [search, statusFilter, leagueFilter, selectedSportId, dateTab, calendarDate]);
+
+  const visibleMatches = useMemo(
+    () => filteredMatches.slice(0, visibleCount),
+    [filteredMatches, visibleCount],
+  );
+  const hasMore = visibleCount < filteredMatches.length;
+
+  // IntersectionObserver to auto-load the next page as the sentinel scrolls into view
+  useEffect(() => {
+    if (!hasMore) return;
+    const node = sentinelRef.current;
+    if (!node) return;
+    const obs = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) {
+          setVisibleCount((c) => Math.min(c + PAGE_SIZE, filteredMatches.length));
+        }
+      },
+      { rootMargin: '400px 0px' },
+    );
+    obs.observe(node);
+    return () => obs.disconnect();
+  }, [hasMore, filteredMatches.length]);
+
+  // Group the *visible* matches by league — preserves the API's sport priority → league priority → time order
   const groupedMatches = useMemo(() => {
     const groups = new Map<string, { sport: Match['sport']; league: Match['league']; matches: Match[] }>();
 
-    filteredMatches.forEach(match => {
+    visibleMatches.forEach(match => {
       const key = `${match.sport.id}-${match.league.id}-${match.league.name}`;
       const existing = groups.get(key);
       if (existing) {
@@ -147,14 +179,13 @@ function MatchesContent() {
       }
     });
 
-    // Map preserves insertion order — that's exactly what we want
     return Array.from(groups.entries()).map(([key, group]) => ({
       key,
       sport: group.sport,
       league: group.league,
       matches: group.matches,
     }));
-  }, [filteredMatches]);
+  }, [visibleMatches]);
 
   return (
     <div className="flex">
@@ -332,6 +363,18 @@ function MatchesContent() {
                 </div>
               );
               })}
+
+              {/* Infinite scroll sentinel + footer */}
+              {hasMore ? (
+                <div ref={sentinelRef} className="flex items-center justify-center gap-2 py-6 text-xs text-muted-foreground">
+                  <Spinner className="h-4 w-4" />
+                  <span>Loading more matches… ({visibleCount} of {filteredMatches.length})</span>
+                </div>
+              ) : filteredMatches.length > PAGE_SIZE ? (
+                <div className="py-6 text-center text-[11px] text-muted-foreground">
+                  All {filteredMatches.length} matches loaded.
+                </div>
+              ) : null}
             </div>
           ) : (
             /* Empty State */

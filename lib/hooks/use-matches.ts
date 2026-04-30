@@ -199,10 +199,24 @@ function getLiveMatches(matches: Match[]): Match[] {
     });
 }
 
+// Local-tz YYYY-MM-DD helper — must match the matches page's `toLocalISODate`
+// so the sidebar/header badge counts agree with the on-page list.
+function toLocalISODate(d: Date): string {
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+}
+
 function getTodayMatches(matches: Match[]): Match[] {
-  const today = new Date().toDateString();
+  // Use local-ISO date so the count exactly matches the matches page's
+  // "Today" filter, AND exclude finished matches (those live on the
+  // Results page) so the badge doesn't double-count yesterday's finals
+  // that the feed still tags as "today" in UTC.
+  const todayKey = toLocalISODate(new Date());
   return matches
-    .filter(m => new Date(m.kickoffTime).toDateString() === today)
+    .filter(m => m.status !== 'finished' && m.status !== 'cancelled' && m.status !== 'postponed')
+    .filter(m => toLocalISODate(new Date(m.kickoffTime)) === todayKey)
     .sort((a, b) => {
       const statusOrder: Record<string, number> = { live: 0, halftime: 1, scheduled: 2, finished: 3, postponed: 4 };
       const statusOrderA = statusOrder[a.status] ?? 5;

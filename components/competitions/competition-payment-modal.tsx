@@ -1,11 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Loader2, Smartphone, CreditCard, Wallet, ShieldCheck } from 'lucide-react';
+import { Loader2, Smartphone, CreditCard, Wallet, ShieldCheck, ArrowDownToLine } from 'lucide-react';
 
 interface Props {
   open: boolean;
@@ -34,6 +35,19 @@ export function CompetitionPaymentModal({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [stkSent, setStkSent] = useState(false);
+  const [walletBalance, setWalletBalance] = useState<number | null>(null);
+
+  // Fetch wallet balance whenever the modal opens or method switches to wallet,
+  // so the user can see whether they have enough before clicking Pay.
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    fetch('/api/payments/competition-entry')
+      .then((r) => r.ok ? r.json() : { balance: 0 })
+      .then((d) => { if (!cancelled) setWalletBalance(typeof d.balance === 'number' ? d.balance : 0); })
+      .catch(() => { if (!cancelled) setWalletBalance(0); });
+    return () => { cancelled = true; };
+  }, [open]);
 
   const reset = () => {
     setError(null);
@@ -54,6 +68,14 @@ export function CompetitionPaymentModal({
       if (cardCvc.length < 3) { setError('CVC must be 3 digits.'); return; }
     }
 
+    // Block wallet payments before we even hit the server when the user
+    // clearly doesn't have enough — saves a roundtrip and the confusion of
+    // a 402 from the API.
+    if (method === 'wallet' && walletBalance !== null && walletBalance < amount) {
+      setError(`Insufficient wallet balance. You have ${currency} ${walletBalance.toLocaleString()}. Top up first.`);
+      return;
+    }
+
     setSubmitting(true);
     try {
       const res = await fetch('/api/payments/competition-entry', {
@@ -71,6 +93,8 @@ export function CompetitionPaymentModal({
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.success) {
         setError(data.error || 'Payment failed. Please try again.');
+        // If the server returned the latest balance, sync it.
+        if (typeof data.balance === 'number') setWalletBalance(data.balance);
         setSubmitting(false);
         return;
       }
@@ -196,11 +220,28 @@ export function CompetitionPaymentModal({
           )}
 
           {method === 'wallet' && (
-            <div className="rounded-md border bg-muted/40 p-3 space-y-1.5">
-              <p className="text-xs font-semibold">Pay from Betcheza wallet</p>
-              <p className="text-[10px] text-muted-foreground">
-                Your wallet balance will be charged {currency} {amount}. Top up first if you don't have enough.
-              </p>
+            <div className="rounded-md border bg-muted/40 p-3 space-y-2">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-semibold">Pay from Betcheza wallet</p>
+                  <p className="text-[10px] text-muted-foreground">
+                    {walletBalance === null
+                      ? 'Loading balance…'
+                      : <>Available <span className="font-semibold text-foreground">{currency} {walletBalance.toLocaleString()}</span> · Charge <span className="font-semibold text-foreground">{currency} {amount.toLocaleString()}</span></>
+                    }
+                  </p>
+                </div>
+                {walletBalance !== null && walletBalance < amount && (
+                  <Link href="/dashboard/wallet" className="inline-flex items-center gap-1 rounded-md bg-primary px-2 py-1 text-[10px] font-semibold text-primary-foreground">
+                    <ArrowDownToLine className="h-3 w-3" /> Top up
+                  </Link>
+                )}
+              </div>
+              {walletBalance !== null && walletBalance < amount && (
+                <p className="text-[10px] text-rose-500">
+                  Insufficient balance — short by {currency} {(amount - walletBalance).toLocaleString()}.
+                </p>
+              )}
             </div>
           )}
 
@@ -211,12 +252,14 @@ export function CompetitionPaymentModal({
           {!stkSent && (
             <Button
               onClick={handlePay}
-              disabled={submitting}
+              disabled={submitting || (method === 'wallet' && walletBalance !== null && walletBalance < amount)}
               className="w-full h-9 text-xs"
               size="sm"
             >
               {submitting ? (
                 <><Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />Processing…</>
+              ) : method === 'wallet' && walletBalance !== null && walletBalance < amount ? (
+                <>Insufficient wallet balance</>
               ) : (
                 <>Pay {currency} {amount.toLocaleString()}</>
               )}

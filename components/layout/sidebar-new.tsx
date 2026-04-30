@@ -17,7 +17,8 @@ import {
   LayoutDashboard,
   Bell,
   MessageCircle,
-  Brain
+  Brain,
+  Wallet
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ALL_SPORTS, ALL_LEAGUES, BOOKMAKERS, getSportIcon } from '@/lib/sports-data';
@@ -360,6 +361,18 @@ export function SidebarNew({ selectedSportId, onSelectSport }: SidebarNewProps) 
               >
                 <LayoutDashboard className="h-4 w-4" />
                 <span>My Dashboard</span>
+              </Link>
+              <Link
+                href="/dashboard/wallet"
+                className={cn(
+                  'flex items-center gap-2 rounded-lg px-2 py-2 text-sm transition-colors',
+                  pathname === '/dashboard/wallet'
+                    ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+                    : 'text-sidebar-foreground hover:bg-sidebar-accent/50'
+                )}
+              >
+                <Wallet className="h-4 w-4" />
+                <span>Wallet</span>
               </Link>
               <Link
                 href="/feed"

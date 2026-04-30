@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { subscribeEmail } from '@/lib/notification-store';
-import { sendMail } from '@/lib/mailer';
+import { sendMail, renderTemplate } from '@/lib/mailer';
+import { getTemplate } from '@/lib/email-templates-store';
 
 export const dynamic = 'force-dynamic';
 
@@ -87,12 +88,27 @@ export async function POST(req: NextRequest) {
   const appUrl =
     req.nextUrl.origin ||
     (process.env.NEXT_PUBLIC_APP_URL || 'https://betcheza.com').replace(/\/$/, '');
-  const { text, html } = buildWelcomeEmail({ email, topics, unsubscribeUrl, appUrl });
+  // Prefer the admin-editable welcome template; fall back to the legacy hand-coded one
+  // if the template is missing or empty for any reason.
   let emailStatus: 'sent' | 'skipped' | 'failed' = 'skipped';
+  let subject = 'Welcome to Betcheza — your tips inbox is live 🎯';
+  let html: string;
+  let text: string;
+  try {
+    const tpl = getTemplate('subscriber_welcome');
+    const vars = { name: email.split('@')[0], email, siteUrl: appUrl };
+    subject = renderTemplate(tpl.subject || subject, vars);
+    html = renderTemplate(tpl.html, vars) || buildWelcomeEmail({ email, topics, unsubscribeUrl, appUrl }).html;
+    text = renderTemplate(tpl.text, vars) || buildWelcomeEmail({ email, topics, unsubscribeUrl, appUrl }).text;
+  } catch {
+    const fallback = buildWelcomeEmail({ email, topics, unsubscribeUrl, appUrl });
+    html = fallback.html;
+    text = fallback.text;
+  }
   try {
     const res = await sendMail({
       to: email,
-      subject: 'Welcome to Betcheza — your tips inbox is live 🎯',
+      subject,
       text,
       html,
     });

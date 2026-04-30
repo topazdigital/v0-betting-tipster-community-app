@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getCurrentUser } from '@/lib/auth';
 import { mockUsers } from '@/lib/mock-data';
+import { getBalance } from '@/lib/wallet-store';
 
 export async function GET() {
   try {
@@ -17,6 +18,11 @@ export async function GET() {
       return NextResponse.json({ user: null }, { status: 401 });
     }
 
+    // Wallet balance is the source of truth — fall back to the seeded
+    // mock balance only if no wallet ledger exists for this user yet.
+    const walletBalance = getBalance(user.id, 'KES');
+    const balance = walletBalance > 0 ? walletBalance : user.balance;
+
     return NextResponse.json({
       user: {
         id: user.id,
@@ -25,7 +31,7 @@ export async function GET() {
         displayName: user.display_name,
         avatarUrl: user.avatar_url,
         role: user.role,
-        balance: user.balance,
+        balance,
       },
     });
   } catch {

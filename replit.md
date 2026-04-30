@@ -6,6 +6,15 @@ Betcheza is a sports betting tipster community platform providing real-time spor
 
 ## User Preferences
 
+> # 🚨 NEVER USE POSTGRESQL — ALWAYS USE MYSQL 🚨
+> **This rule has been broken three times. DO NOT do it again.**
+> - The production target is a **MySQL 8+** server (`mysql://` URL).
+> - Do **NOT** switch the project to PostgreSQL, Drizzle Postgres, Neon, Supabase Postgres, the Replit `postgresql-16` module driver, `pg`, or any other database.
+> - Do **NOT** add the `postgresql-16` module to `.replit`, do not add `pg`/`drizzle-orm/postgres-js`/`@neondatabase/serverless`, do not generate Postgres migrations.
+> - The only valid driver is `mysql2/promise` and the only valid placeholder style is `?`. SQL using `$1`/`$2` is wrong.
+> - The in-memory fallback in `lib/db.ts` (when `DATABASE_URL` is not a `mysql://` URL) is **the correct dev behaviour** — do not "fix" it by switching engines.
+> - If you ever feel tempted to add Postgres, **STOP** and ask the user first.
+
 - I want iterative development.
 - I prefer detailed explanations.
 - Ask before making major changes.
@@ -76,6 +85,13 @@ Key architectural decisions include:
 - **Expanded match coverage**: ESPN per-league + ESPN global + football-data.org + OpenLigaDB + TheSportsDB + FotMob (7-day window, 80 matches/league cap). Total ~2.6k matches/day. Note: Sofascore / livescore.com / scorebat all block server-to-server fetches with 403 from Replit IPs, so they cannot be added without a paid proxy or commercial feed; daily counts are bounded by what free unblocked sources actually publish.
 - **Paid competition entry**: `JoinCompetitionButton` reads `useAuth()` (was using stale SWR `/api/auth/me`, which caused login-loop). For competitions with `entryFee > 0` it opens `CompetitionPaymentModal` (M-Pesa STK / Card / Wallet tabs); the modal posts to `POST /api/payments/competition-entry` (returns `{ success, reference }`) and on success calls the join API with `{ paymentRef }`. `POST /api/competitions/[slug]/join` now returns 402 if a paid competition is joined without a `paymentRef`.
 - **Bug fixes (Apr 30 2026)**: Hardened all `h2h.slice(...)` calls against `null` from cold caches: `components/matches/match-facts.tsx` and `app/(main)/matches/[id]/page.tsx` now wrap with `Array.isArray(h2h) ? h2h : []` before slicing.
+- **Wallet ledger** (`lib/wallet-store.ts`, `app/api/wallet/*`, `app/(main)/dashboard/wallet/page.tsx`): Persistent per-user wallet at `.local/state/wallets.json` with balances + transaction history. Endpoints: `GET /api/wallet` (balances+txns), `POST /api/wallet/deposit`, `POST /api/wallet/withdraw`. The competition entry endpoint (`/api/payments/competition-entry`) actually `debit()`s the wallet on `method='wallet'` and returns 402 with the latest balance on insufficient funds. The `/dashboard/wallet` page provides Deposit (M-Pesa / Card / Bank / Crypto), Withdraw (M-Pesa / Bank / PayPal / Crypto) and History tabs. The competition payment modal now fetches the live balance, disables the Pay button + shows a Top Up CTA when funds are insufficient — fixing the "wallet method joined paid competition with zero balance" bug.
+- **Email templates store** (`lib/email-templates-store.ts`, `app/api/admin/email-templates`, `app/admin/email-templates/page.tsx`): JSON-persistent admin-editable templates for `subscriber_welcome`, `broadcast`, `password_reset`, `competition_join`, `prize_payout`, `tipster_application`. `{{var}}` substitution via `renderTemplate()`. The subscribe + broadcast routes now render through these templates with graceful fallback to legacy hardcoded HTML. Admin UI has subject/HTML/text editors + an iframe preview with sample variables.
+- **Batched bulk email** (`lib/mailer.ts → sendBulkMailBatched`): Bulk send chunks recipients (default 25 per batch), spaces individual sends (80ms) and pauses between batches (1s) to stay under SMTP rate limits. The admin broadcast endpoint accepts `batchSize`, `perEmailDelayMs`, `perBatchDelayMs` overrides for very large lists.
+- **Multi-provider M-Pesa** (`app/api/admin/payment-gateways/route.ts`): Added `mpesa-payhero`, `mpesa-pesapal`, `mpesa-intasend` alongside the existing Daraja entry, each with their own credential schema and fee profile. Admins can enable/configure them from `/admin/payment-gateways`.
+- **Infinite scroll on matches** (`app/(main)/matches/page.tsx`): Renders the first 40 matches and grows the window via `IntersectionObserver` + a sentinel with a 400px rootMargin. Resets on filter change. Avoids the long-page jank when listing 200+ matches across leagues.
+- **Tennis fetch cache fix** (`lib/api/unified-sports-api.ts`): ESPN tennis (ATP/WTA) and golf scoreboard responses regularly exceed Next.js's 2MB data-cache limit, causing "Failed to set fetch cache" warnings. The fetcher now uses `cache: 'no-store'` for those sports — our in-memory cache layer (`setCache`/`getCache`) still handles dedupe + TTL.
+- **Sidebar matches count fix** (`lib/hooks/use-matches.ts`): `getTodayMatches` now uses `toLocalISODate` and excludes finished/cancelled/postponed matches, matching the matches-page filter so the sidebar count and the page count agree.
 
 ## External Dependencies
 

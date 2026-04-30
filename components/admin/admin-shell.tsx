@@ -28,6 +28,7 @@ const adminNavItems = [
   { href: "/admin/notifications", label: "Notifications", icon: Bell },
   { href: "/admin/featured", label: "Featured Tips", icon: Star },
   { href: "/admin/email-config", label: "Email Setup", icon: Mail },
+  { href: "/admin/email-templates", label: "Email Templates", icon: Mail },
   { href: "/admin/social-login", label: "Social Login", icon: KeyRound },
   { href: "/admin/database", label: "Database", icon: Database },
   { href: "/admin/static-pages", label: "Static Pages", icon: FileText },

@@ -83,16 +83,69 @@ export async function sendBulkMail(
   html: string,
   text?: string
 ): Promise<{ sent: number; failed: number; skipped?: boolean }> {
+  return sendBulkMailBatched(recipients, subject, html, text, {
+    batchSize: 25,
+    perEmailDelayMs: 80,
+    perBatchDelayMs: 1000,
+  });
+}
+
+export interface BatchOptions {
+  /** How many emails to send before pausing (default 25). */
+  batchSize?: number;
+  /** Delay between individual emails inside a batch, ms (default 80). */
+  perEmailDelayMs?: number;
+  /** Delay between batches, ms (default 1000). */
+  perBatchDelayMs?: number;
+  /** Optional callback for progress (sent + failed counts). */
+  onProgress?: (progress: { sent: number; failed: number; total: number }) => void;
+}
+
+/**
+ * Batched bulk send. Sends in chunks with two delays:
+ *  - perEmailDelayMs spaces individual emails inside a batch
+ *  - perBatchDelayMs pauses between batches
+ * Useful for staying under SMTP rate limits (e.g. SES "1/sec", Gmail 100/day, etc).
+ */
+export async function sendBulkMailBatched(
+  recipients: string[],
+  subject: string,
+  html: string,
+  text?: string,
+  opts: BatchOptions = {},
+): Promise<{ sent: number; failed: number; skipped?: boolean; total: number }> {
   const ctx = await getTransporter();
-  if (!ctx) return { sent: 0, failed: 0, skipped: true };
+  const total = recipients.length;
+  if (!ctx) return { sent: 0, failed: 0, skipped: true, total };
+
+  const batchSize = Math.max(1, opts.batchSize ?? 25);
+  const perEmailDelayMs = Math.max(0, opts.perEmailDelayMs ?? 80);
+  const perBatchDelayMs = Math.max(0, opts.perBatchDelayMs ?? 1000);
+
   let sent = 0;
   let failed = 0;
-  // Send sequentially with a tiny delay so we don't blow through SMTP rate limits.
-  for (const to of recipients) {
-    const res = await sendMail({ to, subject, html, text });
-    if (res.ok) sent++;
-    else failed++;
-    await new Promise((r) => setTimeout(r, 80));
+
+  for (let i = 0; i < recipients.length; i += batchSize) {
+    const batch = recipients.slice(i, i + batchSize);
+    for (const to of batch) {
+      const res = await sendMail({ to, subject, html, text });
+      if (res.ok) sent++;
+      else failed++;
+      if (perEmailDelayMs > 0) await new Promise((r) => setTimeout(r, perEmailDelayMs));
+    }
+    opts.onProgress?.({ sent, failed, total });
+    if (i + batchSize < recipients.length && perBatchDelayMs > 0) {
+      await new Promise((r) => setTimeout(r, perBatchDelayMs));
+    }
   }
-  return { sent, failed };
+
+  return { sent, failed, total };
+}
+
+/** Replace {{var}} placeholders in a string. Unknown vars are left blank. */
+export function renderTemplate(tpl: string, vars: Record<string, string | number | undefined | null>): string {
+  return tpl.replace(/\{\{\s*([\w.]+)\s*\}\}/g, (_, key: string) => {
+    const v = vars[key];
+    return v === undefined || v === null ? '' : String(v);
+  });
 }
