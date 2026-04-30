@@ -43,7 +43,11 @@ export function MatchCard({ match, odds, compact = false }: MatchCardProps) {
           </div>
           <div className="flex items-center gap-2">
             {isLive ? (
-              <LiveIndicator minute={match.minute ?? 45} />
+              <LiveIndicator
+                minute={match.minute}
+                status={match.status}
+                sportSlug={match.league?.slug || 'soccer'}
+              />
             ) : isFinished ? (
               <span className="font-medium text-foreground">FT</span>
             ) : (

@@ -5,6 +5,7 @@
 import fs from 'fs';
 import path from 'path';
 import { getFakeTipsterById, getFakeTipsters, pickTipstersForMatch, type FakeTipster } from './fake-tipsters';
+import { seedTipEngagement } from './tip-engagement-store';
 
 export interface GeneratedTip {
   id: string;
@@ -81,12 +82,27 @@ function load() {
   try {
     if (!fs.existsSync(FILE)) return;
     const raw = JSON.parse(fs.readFileSync(FILE, 'utf8')) as Record<string, GeneratedTip[]>;
+    const allTipsters = getFakeTipsters();
     for (const [k, v] of Object.entries(raw)) {
       stores.byMatch.set(k, v);
       for (const tip of v) {
         const list = stores.byTipster.get(tip.tipsterId) || [];
         list.push(tip);
         stores.byTipster.set(tip.tipsterId, list);
+        // Re-seed engagement on cold start so counts/comments survive a restart.
+        const others = allTipsters
+          .filter(x => x.id !== tip.tipsterId)
+          .map(x => ({ id: x.id, username: x.username, displayName: x.displayName, avatar: x.avatar }));
+        seedTipEngagement(tip.id, {
+          likes: tip.likes,
+          comments: tip.comments,
+          tipsters: others,
+          homeTeam: tip.homeTeam,
+          awayTeam: tip.awayTeam,
+          venue: 'home',
+          confidence: tip.confidence,
+          createdAt: tip.createdAt,
+        });
       }
     }
   } catch (e) {
@@ -203,10 +219,27 @@ export function seedTipsForMatch(ctx: MatchContext): GeneratedTip[] {
   }
 
   stores.byMatch.set(ctx.matchId, tips);
+  // Seed deterministic likes baseline + cross-engagement comments by
+  // OTHER fake tipsters (everybody except the tip's author).
+  const allTipsters = getFakeTipsters();
   for (const tip of tips) {
     const list = stores.byTipster.get(tip.tipsterId) || [];
     list.push(tip);
     stores.byTipster.set(tip.tipsterId, list);
+
+    const otherTipsters = allTipsters
+      .filter(x => x.id !== tip.tipsterId)
+      .map(x => ({ id: x.id, username: x.username, displayName: x.displayName, avatar: x.avatar }));
+    seedTipEngagement(tip.id, {
+      likes: tip.likes,
+      comments: tip.comments,
+      tipsters: otherTipsters,
+      homeTeam: tip.homeTeam,
+      awayTeam: tip.awayTeam,
+      venue: 'home',
+      confidence: tip.confidence,
+      createdAt: tip.createdAt,
+    });
   }
   persist();
   return tips;

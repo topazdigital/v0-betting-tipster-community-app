@@ -456,6 +456,124 @@ export function hasUserJoined(competitionId: number, userId: number): boolean {
   return (state.joinedByCompetition[competitionId] || []).includes(userId);
 }
 
+// ─── Settlement / prize payout ────────────────────────────────────────
+// Marks a competition as `completed`, records who has been paid (so we
+// never double-pay) and returns the list of (userId, amount) tuples to
+// credit. The actual wallet credit is performed by the admin route so
+// that this store stays free of cross-cutting wallet imports.
+
+interface SettlementRecord {
+  paidAt: string;
+  payouts: Array<{
+    rank: number;
+    place: string;
+    userId: number;
+    username: string;
+    amount: number;
+    isFakeTipster: boolean;
+  }>;
+  totalPaid: number;
+}
+
+const settlements: Record<number, SettlementRecord> = {};
+
+export function getSettlement(competitionId: number): SettlementRecord | null {
+  return settlements[competitionId] || null;
+}
+
+/**
+ * Returns the prize pay-outs for the current leaderboard order. Does NOT
+ * mutate any wallet — the caller (admin route) is responsible for that.
+ * Each `prizes[]` row is matched to as many participants as the place
+ * label implies (e.g. "4-10th" → 7 participants starting at rank 4).
+ */
+export function computePayouts(competitionId: number): SettlementRecord['payouts'] {
+  const comp = getCompetitionById(competitionId);
+  if (!comp) return [];
+  const ranked = [...comp.participants].sort((a, b) => b.points - a.points || b.roi - a.roi);
+  const payouts: SettlementRecord['payouts'] = [];
+  let cursor = 0;
+  for (const prize of comp.prizes) {
+    if (!prize.amount || prize.amount <= 0) continue;
+    const m = prize.place.match(/^(\d+)(?:[-–](\d+))?/);
+    if (!m) {
+      // Single-place "1st" fallback by ordinal
+      const slot = ranked[cursor++];
+      if (slot) payouts.push({
+        rank: slot.rank,
+        place: prize.place,
+        userId: slot.tipsterId,
+        username: slot.username,
+        amount: prize.amount,
+        isFakeTipster: slot.tipsterId >= 1000,
+      });
+      continue;
+    }
+    const start = parseInt(m[1], 10);
+    const end = m[2] ? parseInt(m[2], 10) : start;
+    for (let r = start; r <= end; r++) {
+      const slot = ranked[r - 1];
+      if (!slot) break;
+      payouts.push({
+        rank: r,
+        place: prize.place,
+        userId: slot.tipsterId,
+        username: slot.username,
+        amount: prize.amount,
+        isFakeTipster: slot.tipsterId >= 1000,
+      });
+    }
+    cursor = end;
+  }
+  return payouts;
+}
+
+/**
+ * Records a settlement (status → completed, store payouts). Returns the
+ * payouts that should now be credited to real (non-fake) user wallets.
+ * Idempotent: a second call returns an empty list.
+ */
+export function settleCompetition(competitionId: number): {
+  ok: boolean;
+  alreadySettled: boolean;
+  toCredit: SettlementRecord['payouts'];
+  competition: Competition | null;
+} {
+  const comp = getCompetitionById(competitionId);
+  if (!comp) return { ok: false, alreadySettled: false, toCredit: [], competition: null };
+
+  if (settlements[competitionId]) {
+    return {
+      ok: true,
+      alreadySettled: true,
+      toCredit: [],
+      competition: comp,
+    };
+  }
+
+  const payouts = computePayouts(competitionId);
+  // Only real human users get credited (fake tipsters have ids ≥ 1000).
+  const toCredit = payouts.filter(p => !p.isFakeTipster);
+  const totalPaid = toCredit.reduce((a, p) => a + p.amount, 0);
+
+  settlements[competitionId] = {
+    paidAt: new Date().toISOString(),
+    payouts,
+    totalPaid,
+  };
+
+  // Mark the competition as completed.
+  comp.status = 'completed';
+  // Persist the status change for admin-added competitions
+  const idx = state.added.findIndex(c => c.id === competitionId);
+  if (idx >= 0) {
+    state.added[idx] = comp;
+    persistState();
+  }
+
+  return { ok: true, alreadySettled: false, toCredit, competition: comp };
+}
+
 export function publicCompetitionSummary(c: Competition) {
   return {
     id: c.id,

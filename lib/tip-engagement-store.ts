@@ -17,10 +17,12 @@ export interface TipComment {
 interface Stores {
   // tipId → set of userIds who liked it
   likes: Map<string, Set<number>>;
-  // tipId → list of comments
+  // tipId → list of comments (real, written by visitors)
   comments: Map<string, TipComment[]>;
   // baseline like count seeded from auto-tips so the UI keeps the original number
   baseline: Map<string, number>;
+  // tipId → list of synthetic comments by other fake tipsters (cross-engagement)
+  seededComments: Map<string, TipComment[]>;
 }
 
 const g = globalThis as { __tipEngagementStore?: Stores };
@@ -28,6 +30,7 @@ g.__tipEngagementStore = g.__tipEngagementStore || {
   likes: new Map(),
   comments: new Map(),
   baseline: new Map(),
+  seededComments: new Map(),
 };
 const s = g.__tipEngagementStore;
 
@@ -91,6 +94,8 @@ export async function unlikeTip(tipId: string, userId: number): Promise<{ count:
 // ─── COMMENTS ─────────────────────────────────────────────────────────
 
 export async function listComments(tipId: string, limit = 50): Promise<TipComment[]> {
+  const seeded = s.seededComments.get(tipId) || [];
+  let real: TipComment[] = [];
   if (hasDb()) {
     try {
       const r = await query<{ id: string; tip_id: string; user_id: number; author_name: string; author_avatar: string | null; content: string; created_at: string | Date }>(
@@ -98,7 +103,7 @@ export async function listComments(tipId: string, limit = 50): Promise<TipCommen
          FROM tip_comments WHERE tip_id = ? ORDER BY created_at ASC LIMIT ?`,
         [tipId, limit],
       );
-      return r.rows.map(x => ({
+      real = r.rows.map(x => ({
         id: x.id,
         tipId: x.tip_id,
         userId: x.user_id,
@@ -108,8 +113,11 @@ export async function listComments(tipId: string, limit = 50): Promise<TipCommen
         createdAt: typeof x.created_at === 'string' ? x.created_at : x.created_at.toISOString(),
       }));
     } catch { /* fall through */ }
+  } else {
+    real = s.comments.get(tipId) || [];
   }
-  return (s.comments.get(tipId) || []).slice(0, limit);
+  // Show seeded fake-tipster chatter first, then real visitor comments.
+  return [...seeded, ...real].slice(0, limit);
 }
 
 export async function addComment(input: {
@@ -139,11 +147,99 @@ export async function addComment(input: {
 }
 
 export async function getCommentCount(tipId: string): Promise<number> {
+  const seededN = (s.seededComments.get(tipId) || []).length;
   if (hasDb()) {
     try {
       const r = await query<{ c: number }>(`SELECT COUNT(*) as c FROM tip_comments WHERE tip_id = ?`, [tipId]);
-      return Number(r.rows[0]?.c || 0);
+      return Number(r.rows[0]?.c || 0) + seededN;
     } catch { /* fall through */ }
   }
-  return (s.comments.get(tipId) || []).length;
+  return (s.comments.get(tipId) || []).length + seededN;
+}
+
+// ─── SEEDED FAKE-TIPSTER ENGAGEMENT ──────────────────────────────────
+// Cross-engagement: other fake tipsters comment on (and like) each
+// generated tip. Output is deterministic per (tipId, seed) so every
+// page render shows the same chatter.
+
+const COMMENT_TEMPLATES: string[] = [
+  'Solid call. {team} have been clinical at {venue} lately.',
+  'I&apos;m on this too — {confidence}% feels conservative TBH.',
+  'Risky one. Watch the team news 24h before kickoff.',
+  '{team}&apos;s xG over the last 5 says you&apos;re onto something.',
+  'Took the same line at 1.92. Hold it.',
+  'Disagree on the market — I&apos;d go alt over 2.5 here.',
+  'Booked. Let&apos;s ride. 🤝',
+  '{team} away form is the wildcard. Be careful with stake size.',
+  'Tail confirmed. Good write-up.',
+  'I&apos;ve faded this fixture twice this season — let&apos;s see.',
+  'Live odds dropping on this — the market agrees.',
+  'Strong reasoning. Adding to my acca.',
+];
+
+function deterministicRng(seed: number) {
+  let s = (seed >>> 0) || 1;
+  return () => {
+    s = (s * 1664525 + 1013904223) >>> 0;
+    return s / 0x100000000;
+  };
+}
+
+interface SeedTipster {
+  id: number;
+  username: string;
+  displayName: string;
+  avatar?: string | null;
+}
+
+/**
+ * Seeds synthetic comments + baseline likes for a tip. Idempotent —
+ * a given tipId is only ever seeded once per process.
+ */
+export function seedTipEngagement(
+  tipId: string,
+  opts: {
+    likes: number;
+    comments: number;
+    tipsters: SeedTipster[];
+    homeTeam?: string;
+    awayTeam?: string;
+    venue?: string;
+    confidence?: number;
+    createdAt?: string;
+  },
+) {
+  if (s.seededComments.has(tipId)) return;
+  setBaselineLikes(tipId, opts.likes);
+
+  const list: TipComment[] = [];
+  if (opts.tipsters.length > 0 && opts.comments > 0) {
+    let seedNum = 0;
+    for (let i = 0; i < tipId.length; i++) seedNum = (seedNum * 31 + tipId.charCodeAt(i)) >>> 0;
+    const r = deterministicRng(seedNum);
+    const baseTime = opts.createdAt ? new Date(opts.createdAt).getTime() : Date.now() - 6 * 3600_000;
+    const teamPool = [opts.homeTeam, opts.awayTeam].filter(Boolean) as string[];
+
+    for (let i = 0; i < opts.comments; i++) {
+      const author = opts.tipsters[Math.floor(r() * opts.tipsters.length)];
+      const tpl = COMMENT_TEMPLATES[Math.floor(r() * COMMENT_TEMPLATES.length)];
+      const team = teamPool.length > 0 ? teamPool[Math.floor(r() * teamPool.length)] : 'they';
+      const content = tpl
+        .replace(/\{team\}/g, team)
+        .replace(/\{venue\}/g, opts.venue || 'home')
+        .replace(/\{confidence\}/g, String(opts.confidence || 70));
+      const minsAfter = Math.floor(r() * 5 * 3600); // up to 5h later, in seconds
+      list.push({
+        id: `seed-${tipId}-${i}`,
+        tipId,
+        userId: author.id,
+        authorName: author.displayName,
+        authorAvatar: author.avatar || null,
+        content,
+        createdAt: new Date(baseTime + minsAfter * 1000).toISOString(),
+      });
+    }
+    list.sort((a, b) => (a.createdAt < b.createdAt ? -1 : 1));
+  }
+  s.seededComments.set(tipId, list);
 }

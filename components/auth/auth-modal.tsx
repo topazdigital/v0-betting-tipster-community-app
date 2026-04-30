@@ -1,7 +1,7 @@
 'use client';
 
-import { useRef, useState } from 'react';
-import { Eye, EyeOff, Loader2, CheckCircle2 } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { Eye, EyeOff, Loader2, CheckCircle2, XCircle } from 'lucide-react';
 import { CaptchaChallenge, type CaptchaChallengeHandle } from '@/components/auth/captcha-challenge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -407,33 +407,79 @@ function RegisterPanel() {
     username: '',
     displayName: '',
     password: '',
-    confirmPassword: '',
     phone: '',
     countryCode: 'KE',
   });
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  // Live availability state for email + username (debounced)
+  const [emailCheck, setEmailCheck] = useState<{ status: 'idle' | 'checking' | 'available' | 'taken' | 'invalid'; message?: string }>({ status: 'idle' });
+  const [usernameCheck, setUsernameCheck] = useState<{ status: 'idle' | 'checking' | 'available' | 'taken' | 'invalid'; message?: string }>({ status: 'idle' });
   // Captcha is mandatory on signup — show it immediately so the user has time
   // to solve it while filling the rest of the form.
   const captchaRef = useRef<CaptchaChallengeHandle>(null);
 
   const selectedCountry = countries.find((c) => c.code === formData.countryCode);
 
+  // Debounced live check for email
+  useEffect(() => {
+    const v = formData.email.trim();
+    if (!v) { setEmailCheck({ status: 'idle' }); return; }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) {
+      setEmailCheck({ status: 'invalid', message: 'Enter a valid email' });
+      return;
+    }
+    setEmailCheck({ status: 'checking' });
+    const ctrl = new AbortController();
+    const t = setTimeout(async () => {
+      try {
+        const r = await fetch(`/api/auth/check-availability?email=${encodeURIComponent(v)}`, { signal: ctrl.signal });
+        const d = await r.json();
+        setEmailCheck({ status: d.email?.available ? 'available' : 'taken', message: d.email?.message });
+      } catch {/* ignore */}
+    }, 450);
+    return () => { clearTimeout(t); ctrl.abort(); };
+  }, [formData.email]);
+
+  // Debounced live check for username
+  useEffect(() => {
+    const v = formData.username.trim();
+    if (!v) { setUsernameCheck({ status: 'idle' }); return; }
+    if (v.length < 3) {
+      setUsernameCheck({ status: 'invalid', message: 'At least 3 characters' });
+      return;
+    }
+    setUsernameCheck({ status: 'checking' });
+    const ctrl = new AbortController();
+    const t = setTimeout(async () => {
+      try {
+        const r = await fetch(`/api/auth/check-availability?username=${encodeURIComponent(v)}`, { signal: ctrl.signal });
+        const d = await r.json();
+        setUsernameCheck({ status: d.username?.available ? 'available' : 'taken', message: d.username?.message });
+      } catch {/* ignore */}
+    }, 450);
+    return () => { clearTimeout(t); ctrl.abort(); };
+  }, [formData.username]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
-    if (formData.password !== formData.confirmPassword) {
-      setError('Passwords do not match');
-      return;
-    }
     if (formData.password.length < 8) {
       setError('Password must be at least 8 characters');
       return;
     }
     if (formData.username.length < 3) {
       setError('Username must be at least 3 characters');
+      return;
+    }
+    if (emailCheck.status === 'taken') {
+      setError('That email is already registered. Try signing in instead.');
+      return;
+    }
+    if (usernameCheck.status === 'taken') {
+      setError('That username is taken. Pick a different one.');
       return;
     }
 
@@ -477,16 +523,28 @@ function RegisterPanel() {
 
         <div className="space-y-1">
           <Label htmlFor="modal-reg-email" className="text-xs">Email</Label>
-          <Input
-            id="modal-reg-email"
-            type="email"
-            placeholder="you@example.com"
-            value={formData.email}
-            onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-            required
-            disabled={isLoading}
-            className="h-8 text-xs"
-          />
+          <div className="relative">
+            <Input
+              id="modal-reg-email"
+              type="email"
+              placeholder="you@example.com"
+              value={formData.email}
+              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+              required
+              disabled={isLoading}
+              className="h-8 pr-8 text-xs"
+            />
+            <AvailabilityIndicator status={emailCheck.status} />
+          </div>
+          {emailCheck.status === 'taken' && (
+            <p className="text-[10px] text-destructive leading-tight">{emailCheck.message || 'Email already registered'}</p>
+          )}
+          {emailCheck.status === 'available' && (
+            <p className="text-[10px] text-success leading-tight">Email available</p>
+          )}
+          {emailCheck.status === 'invalid' && (
+            <p className="text-[10px] text-destructive leading-tight">{emailCheck.message}</p>
+          )}
         </div>
 
         <div className="grid gap-2 sm:grid-cols-2">
@@ -494,18 +552,24 @@ function RegisterPanel() {
             <Label htmlFor="modal-reg-username" className="text-xs">
               Username <span className="text-destructive">*</span>
             </Label>
-            <Input
-              id="modal-reg-username"
-              placeholder="e.g. tipsking254"
-              value={formData.username}
-              onChange={(e) => setFormData({ ...formData, username: e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, '') })}
-              required
-              disabled={isLoading}
-              maxLength={20}
-              className="h-8 text-xs"
-            />
+            <div className="relative">
+              <Input
+                id="modal-reg-username"
+                placeholder="e.g. tipsking254"
+                value={formData.username}
+                onChange={(e) => setFormData({ ...formData, username: e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, '') })}
+                required
+                disabled={isLoading}
+                maxLength={20}
+                className="h-8 pr-8 text-xs"
+              />
+              <AvailabilityIndicator status={usernameCheck.status} />
+            </div>
             <p className="text-[10px] text-muted-foreground leading-tight">
-              Lowercase, letters, numbers, underscore.
+              {usernameCheck.status === 'available' ? <span className="text-success">Username available</span>
+                : usernameCheck.status === 'taken' ? <span className="text-destructive">{usernameCheck.message || 'Username taken'}</span>
+                : usernameCheck.status === 'invalid' ? <span className="text-destructive">{usernameCheck.message}</span>
+                : 'Lowercase, letters, numbers, underscore.'}
             </p>
           </div>
           <div className="space-y-1">
@@ -604,6 +668,17 @@ function RegisterPanel() {
         </Button>
       </form>
     </>
+  );
+}
+
+function AvailabilityIndicator({ status }: { status: 'idle' | 'checking' | 'available' | 'taken' | 'invalid' }) {
+  if (status === 'idle') return null;
+  return (
+    <div className="absolute right-2.5 top-1/2 -translate-y-1/2">
+      {status === 'checking' && <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />}
+      {status === 'available' && <CheckCircle2 className="h-3.5 w-3.5 text-success" />}
+      {(status === 'taken' || status === 'invalid') && <XCircle className="h-3.5 w-3.5 text-destructive" />}
+    </div>
   );
 }
 

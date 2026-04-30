@@ -696,7 +696,10 @@ const GLOBAL_SPORT_TYPES: Array<{ sport: string; sportType: ESPNLeagueConfig['sp
   { sport: 'baseball', sportType: 'baseball', sportId: 6 },
   { sport: 'hockey', sportType: 'hockey', sportId: 7 },
   { sport: 'rugby', sportType: 'rugby', sportId: 8 },
+  { sport: 'cricket', sportType: 'cricket', sportId: 26 },
   { sport: 'mma', sportType: 'mma', sportId: 27 },
+  { sport: 'golf', sportType: 'golf', sportId: 9 },
+  { sport: 'racing', sportType: 'racing', sportId: 12 },
 ];
 
 // Cache resolved league info: ESPN league id (numeric) → { name, slug, country }
@@ -792,16 +795,25 @@ async function fetchESPNGlobalSport(sport: string, sportType: ESPNLeagueConfig['
   const cached = getCached<UnifiedMatch[]>(cacheKey, CACHE_DURATION.live);
   if (cached) return cached;
 
-  // Pull a 3-day window (yesterday, today, tomorrow) so the Live + Today
-  // lists are rich without overloading the request.
+  // Pull a 7-day window (yesterday → +6 days) so multi-day tournaments
+  // (tennis Slams, cricket Tests, golf majors) and weekend-heavy sports
+  // always surface their full Today / Upcoming coverage even when ESPN's
+  // default response would only return the next single matchday.
   const now = new Date();
   const start = new Date(now); start.setUTCDate(start.getUTCDate() - 1);
-  const end = new Date(now); end.setUTCDate(end.getUTCDate() + 1);
+  const end = new Date(now); end.setUTCDate(end.getUTCDate() + 6);
   const range = `${formatYYYYMMDD(start)}-${formatYYYYMMDD(end)}`;
   const url = `${ESPN_BASE_URL}/${sport}/all/scoreboard?dates=${range}`;
+  // Same caveat as fetchESPN: tennis & golf payloads exceed Next.js's
+  // data-cache item limit; skip data cache for them and rely on our
+  // in-memory setCache/getCache below.
+  const skipDataCache = sport === 'tennis' || sport === 'golf';
   let data: ESPNScoreboardResponseFull | null = null;
   try {
-    const r = await fetch(url, { headers: { Accept: 'application/json' }, next: { revalidate: 30 } });
+    const r = await fetch(url, {
+      headers: { Accept: 'application/json' },
+      ...(skipDataCache ? { cache: 'no-store' as const } : { next: { revalidate: 30 } }),
+    });
     if (r.ok) data = await r.json() as ESPNScoreboardResponseFull;
   } catch { /* fall through */ }
   if (!data?.events?.length) {

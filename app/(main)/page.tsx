@@ -31,6 +31,7 @@ import { BestBetsPanel } from '@/components/home/best-bets-panel';
 import { FavoritedTipsPanel, FavoritedTipMarqueeCard, useFavoritedTips, type FeaturedItem } from '@/components/home/favorited-tips-panel';
 import { useAuthModal } from '@/contexts/auth-modal-context';
 import { matchIdToSlug } from '@/lib/utils/match-url';
+import { liveStatusLabel } from '@/lib/utils/live-status';
 import { tipsterHref } from '@/lib/utils/slug';
 import { NewsletterSection } from '@/components/sections/newsletter';
 
@@ -629,7 +630,11 @@ function LiveSlide({ matches, totalCount }: { matches: CarouselMatch[]; totalCou
       </div>
       <div className="space-y-3">
         {matches.map(match => {
-          const isHT = match.status === 'halftime';
+          const tickerLabel = liveStatusLabel(
+            match.sport.slug,
+            match.status,
+            match.minute,
+          );
           return (
             <Link
               key={match.id}
@@ -638,13 +643,16 @@ function LiveSlide({ matches, totalCount }: { matches: CarouselMatch[]; totalCou
             >
               <div className="mb-1 flex items-center justify-between text-xs text-muted-foreground">
                 <span className="truncate">{match.sport.icon} {match.league.name}</span>
-                {isHT ? (
-                  <span className="ml-2 shrink-0 rounded-full bg-warning/20 px-2 py-0.5 font-bold text-warning">
-                    HT
-                  </span>
-                ) : (
-                  <span className="ml-2 shrink-0 font-mono text-live">{match.minute ?? 0}&apos;</span>
-                )}
+                <span
+                  className={cn(
+                    'ml-2 shrink-0 font-mono font-bold',
+                    match.status === 'halftime'
+                      ? 'rounded-full bg-warning/20 px-2 py-0.5 text-warning'
+                      : 'text-live',
+                  )}
+                >
+                  {tickerLabel}
+                </span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="truncate text-sm font-medium">{match.homeTeam.name}</span>

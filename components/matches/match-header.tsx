@@ -31,7 +31,11 @@ export function MatchHeader({ match }: MatchHeaderProps) {
           <span>{match.league.name}</span>
         </div>
         {isLive ? (
-          <LiveIndicator minute={45} />
+          <LiveIndicator
+            minute={match.minute}
+            status={match.status}
+            sportSlug={match.league?.slug || 'soccer'}
+          />
         ) : isFinished ? (
           <span className="rounded-full bg-muted px-3 py-1 text-sm font-medium text-foreground">
             Full Time

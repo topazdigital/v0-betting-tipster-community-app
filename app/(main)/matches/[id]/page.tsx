@@ -2273,8 +2273,27 @@ function MatchInfoRail({
   const isTwoWay = NO_DRAW.has(match.sport.slug)
   const consensus = bookmakerOdds.length > 0 ? bookmakerOdds[0] : null
   const allRows = standings.flatMap(g => g.rows)
-  const homeStanding = allRows.find(r => r.teamName === match.homeTeam.name)
-  const awayStanding = allRows.find(r => r.teamName === match.awayTeam.name)
+  // Fuzzy team-name match: ESPN's standings sometimes return a slightly
+  // different display name than the scoreboard ("Man United" vs "Manchester
+  // United Football Club"), which broke the strict-equality lookup and made
+  // the sidebar Form widget render with a placeholder crest instead of the
+  // real club logo. Normalise to lowercase alphanumerics and accept either a
+  // full match or a substring match in either direction.
+  const norm = (s?: string) =>
+    (s || '').toLowerCase().replace(/[^a-z0-9]/g, '')
+  const findStanding = (teamName: string) => {
+    const n = norm(teamName)
+    if (!n) return undefined
+    return (
+      allRows.find(r => norm(r.teamName) === n) ||
+      allRows.find(r => {
+        const rn = norm(r.teamName)
+        return rn && (rn.includes(n) || n.includes(rn))
+      })
+    )
+  }
+  const homeStanding = findStanding(match.homeTeam.name)
+  const awayStanding = findStanding(match.awayTeam.name)
   const last3H2H = Array.isArray(h2h) ? h2h.slice(0, 3) : []
 
   return (

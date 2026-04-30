@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import OpenAI from 'openai'
+import { recordPrediction } from '@/lib/predictor-store'
+import { getUpcomingMatches } from '@/lib/api/unified-sports-api'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -113,9 +115,57 @@ export async function POST(request: NextRequest) {
     )
   }
 
+  // Restrict the predictor to upcoming fixtures so the "recent" list
+  // never grows full of bets on games that already kicked off. Match by
+  // fuzzy team-name contains so user typos don't lock people out.
+  let matchedFixture: { id: string; league: string; kickoffTime: string } | null = null
+  try {
+    const upcoming = await getUpcomingMatches()
+    const lh = home.toLowerCase()
+    const la = away.toLowerCase()
+    const found = upcoming.find(m => {
+      const hn = (m.homeTeam?.name || '').toLowerCase()
+      const an = (m.awayTeam?.name || '').toLowerCase()
+      return (hn.includes(lh) || lh.includes(hn)) && (an.includes(la) || la.includes(an))
+    })
+    if (found) {
+      matchedFixture = {
+        id: String(found.id),
+        league: found.league?.name || body.league || '',
+        kickoffTime: found.kickoffTime,
+      }
+    } else if (process.env.PREDICTOR_STRICT_UPCOMING === '1') {
+      return NextResponse.json(
+        { error: 'No upcoming fixture found for those teams. The predictor only covers upcoming matches.' },
+        { status: 404 },
+      )
+    }
+  } catch {
+    // If the upcoming feed is unavailable we still let the prediction
+    // through — the store will simply record it without a matchId.
+  }
+
+  const finishAndRecord = (out: PredictorResult) => {
+    try {
+      recordPrediction({
+        league: matchedFixture?.league || body.league || 'Friendly',
+        homeTeam: home,
+        awayTeam: away,
+        market: out.market,
+        pick: out.pick,
+        confidence: out.confidence,
+        source: out.source,
+        matchId: matchedFixture?.id,
+      })
+    } catch (e) {
+      console.warn('[predictor] record failed', e)
+    }
+    return NextResponse.json(out)
+  }
+
   const openai = getOpenAI()
   if (!openai) {
-    return NextResponse.json(localPredict(home, away, body.league))
+    return finishAndRecord(localPredict(home, away, matchedFixture?.league || body.league))
   }
 
   const system = `You are Betcheza AI's Match Predictor. The user gives you two teams (and optionally a league or context note). You produce a STRUCTURED JSON prediction.
@@ -159,13 +209,13 @@ Output STRICT JSON with this exact shape:
     }
     const completion = await openai.chat.completions.create(params)
     const raw = completion.choices?.[0]?.message?.content?.trim()
-    if (!raw) return NextResponse.json(localPredict(home, away, body.league))
+    if (!raw) return finishAndRecord(localPredict(home, away, matchedFixture?.league || body.league))
 
     let parsed: Partial<PredictorResult> = {}
     try {
       parsed = JSON.parse(raw) as Partial<PredictorResult>
     } catch {
-      return NextResponse.json(localPredict(home, away, body.league))
+      return finishAndRecord(localPredict(home, away, matchedFixture?.league || body.league))
     }
     const out: PredictorResult = {
       pick: parsed.pick || `${home} Win`,
@@ -179,9 +229,9 @@ Output STRICT JSON with this exact shape:
       reasoning: Array.isArray(parsed.reasoning) ? parsed.reasoning.slice(0, 6) : [],
       source: 'openai',
     }
-    return NextResponse.json(out)
+    return finishAndRecord(out)
   } catch (e) {
     console.error('[predictor] error', e)
-    return NextResponse.json(localPredict(home, away, body.league))
+    return finishAndRecord(localPredict(home, away, matchedFixture?.league || body.league))
   }
 }

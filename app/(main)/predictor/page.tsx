@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -30,6 +30,27 @@ interface PredictionResult {
   source: "openai" | "fallback"
 }
 
+interface UpcomingFixture {
+  id: string
+  homeTeam: string
+  awayTeam: string
+  league: string
+  kickoffTime: string
+  sport: string
+}
+
+interface RecentPredictionRecord {
+  id: string
+  createdAt: string
+  league: string
+  homeTeam: string
+  awayTeam: string
+  market: string
+  pick: string
+  confidence: number
+  result: 'pending' | 'won' | 'lost' | 'push'
+}
+
 export default function MatchPredictorPage() {
   const [homeTeam, setHomeTeam] = useState("")
   const [awayTeam, setAwayTeam] = useState("")
@@ -38,6 +59,50 @@ export default function MatchPredictorPage() {
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState<PredictionResult | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [upcoming, setUpcoming] = useState<UpcomingFixture[]>([])
+  const [recent, setRecent] = useState<RecentPredictionRecord[]>([])
+
+  // Fetch upcoming fixtures once for the autocomplete + recent feed.
+  useEffect(() => {
+    let cancelled = false
+    fetch("/api/predictor/upcoming?limit=60", { cache: "no-store" })
+      .then(r => r.ok ? r.json() : { matches: [] })
+      .then((d: { matches: UpcomingFixture[] }) => {
+        if (!cancelled) setUpcoming(d.matches || [])
+      })
+      .catch(() => {})
+    fetch("/api/predictor/recent?limit=9", { cache: "no-store" })
+      .then(r => r.ok ? r.json() : { predictions: [] })
+      .then((d: { predictions: RecentPredictionRecord[] }) => {
+        if (!cancelled) setRecent(d.predictions || [])
+      })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [])
+
+  // When the user picks (or types) a home team that exactly matches an
+  // upcoming fixture, auto-fill the away team + league for them.
+  useEffect(() => {
+    if (!homeTeam) return
+    const lower = homeTeam.toLowerCase()
+    const match = upcoming.find(m => m.homeTeam.toLowerCase() === lower)
+    if (match) {
+      if (!awayTeam) setAwayTeam(match.awayTeam)
+      if (!league) setLeague(match.league)
+    }
+  }, [homeTeam, upcoming, awayTeam, league])
+
+  const homeOptions = useMemo(() => Array.from(new Set(upcoming.map(m => m.homeTeam))).sort(), [upcoming])
+  const awayOptions = useMemo(() => Array.from(new Set(upcoming.map(m => m.awayTeam))).sort(), [upcoming])
+
+  const refreshRecent = async () => {
+    try {
+      const r = await fetch("/api/predictor/recent?limit=9", { cache: "no-store" })
+      if (!r.ok) return
+      const d = await r.json() as { predictions: RecentPredictionRecord[] }
+      setRecent(d.predictions || [])
+    } catch {}
+  }
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -65,6 +130,7 @@ export default function MatchPredictorPage() {
       }
       const data = (await res.json()) as PredictionResult
       setResult(data)
+      refreshRecent()
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong")
     } finally {
@@ -128,26 +194,37 @@ export default function MatchPredictorPage() {
               <CardContent className="px-3 pb-3">
                 <form onSubmit={submit} className="space-y-3">
                   <div className="space-y-1">
-                    <Label htmlFor="home" className="text-[11px]">Home team</Label>
+                    <Label htmlFor="home" className="text-[11px]">
+                      Home team
+                      <span className="ml-1 text-[9px] font-normal text-muted-foreground">(upcoming fixtures only)</span>
+                    </Label>
                     <Input
                       id="home"
-                      placeholder="e.g. Manchester City"
+                      list="predictor-home-options"
+                      placeholder="Type or pick from upcoming…"
                       value={homeTeam}
                       onChange={(e) => setHomeTeam(e.target.value)}
                       required
                       className="h-8 text-xs"
                     />
+                    <datalist id="predictor-home-options">
+                      {homeOptions.map(name => <option key={name} value={name} />)}
+                    </datalist>
                   </div>
                   <div className="space-y-1">
                     <Label htmlFor="away" className="text-[11px]">Away team</Label>
                     <Input
                       id="away"
-                      placeholder="e.g. Liverpool"
+                      list="predictor-away-options"
+                      placeholder="Auto-fills from your home pick"
                       value={awayTeam}
                       onChange={(e) => setAwayTeam(e.target.value)}
                       required
                       className="h-8 text-xs"
                     />
+                    <datalist id="predictor-away-options">
+                      {awayOptions.map(name => <option key={name} value={name} />)}
+                    </datalist>
                   </div>
                   <div className="space-y-1">
                     <Label htmlFor="league" className="text-[11px]">League (optional)</Label>
@@ -342,34 +419,41 @@ export default function MatchPredictorPage() {
             </div>
           </div>
 
-          {/* Recent Predictions (deterministic samples) */}
+          {/* Recent Predictions (real, persisted) */}
           <section className="mt-6">
             <h2 className="mb-2 flex items-center gap-1.5 text-sm font-bold">
               <History className="h-4 w-4 text-primary" />
               Recent AI predictions
             </h2>
-            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-              {RECENT_PREDICTIONS.map((p, i) => (
-                <div key={i} className="rounded-lg border border-border bg-card p-2.5 transition-colors hover:border-primary/40">
-                  <div className="flex items-center justify-between gap-2 mb-1">
-                    <Badge variant="outline" className="h-4 text-[9px] px-1.5">{p.league}</Badge>
-                    <Badge className={cn(
-                      'h-4 text-[9px] px-1.5 border',
-                      p.result === 'won' && 'bg-emerald-500/15 text-emerald-500 border-emerald-500/30',
-                      p.result === 'lost' && 'bg-rose-500/15 text-rose-500 border-rose-500/30',
-                      p.result === 'pending' && 'bg-amber-500/15 text-amber-500 border-amber-500/30',
-                    )}>{p.result}</Badge>
-                  </div>
-                  <div className="text-xs font-bold leading-tight truncate">{p.match}</div>
-                  <div className="mt-1 flex items-center justify-between">
-                    <div className="text-[10px] text-muted-foreground">
-                      <span className="font-semibold text-foreground">{p.market}</span>: {p.pick}
+            {recent.length === 0 ? (
+              <div className="rounded-lg border border-dashed border-border bg-card p-4 text-center text-[11px] text-muted-foreground">
+                No predictions yet. Run one above and it&apos;ll appear here.
+              </div>
+            ) : (
+              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                {recent.map((p) => (
+                  <div key={p.id} className="rounded-lg border border-border bg-card p-2.5 transition-colors hover:border-primary/40">
+                    <div className="flex items-center justify-between gap-2 mb-1">
+                      <Badge variant="outline" className="h-4 text-[9px] px-1.5 truncate max-w-[60%]">{p.league}</Badge>
+                      <Badge className={cn(
+                        'h-4 text-[9px] px-1.5 border',
+                        p.result === 'won' && 'bg-emerald-500/15 text-emerald-500 border-emerald-500/30',
+                        p.result === 'lost' && 'bg-rose-500/15 text-rose-500 border-rose-500/30',
+                        p.result === 'push' && 'bg-muted text-muted-foreground border-border',
+                        p.result === 'pending' && 'bg-amber-500/15 text-amber-500 border-amber-500/30',
+                      )}>{p.result}</Badge>
                     </div>
-                    <span className={cn('text-xs font-bold tabular-nums', confidenceTone(p.confidence))}>{p.confidence}%</span>
+                    <div className="text-xs font-bold leading-tight truncate">{p.homeTeam} vs {p.awayTeam}</div>
+                    <div className="mt-1 flex items-center justify-between">
+                      <div className="text-[10px] text-muted-foreground truncate pr-1">
+                        <span className="font-semibold text-foreground">{p.market}</span>: {p.pick}
+                      </div>
+                      <span className={cn('text-xs font-bold tabular-nums', confidenceTone(p.confidence))}>{p.confidence}%</span>
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </section>
 
           {/* FAQ (long-tail SEO) */}
@@ -395,15 +479,6 @@ export default function MatchPredictorPage() {
     </div>
   )
 }
-
-const RECENT_PREDICTIONS = [
-  { league: 'EPL',         match: 'Arsenal vs Chelsea',         market: 'BTTS', pick: 'Yes',           confidence: 71, result: 'won' as const },
-  { league: 'La Liga',     match: 'Real Madrid vs Barcelona',   market: 'Match Result', pick: 'Real Madrid',  confidence: 58, result: 'lost' as const },
-  { league: 'Serie A',     match: 'Inter vs Juventus',          market: 'Over/Under 2.5', pick: 'Under',  confidence: 64, result: 'won' as const },
-  { league: 'Bundesliga',  match: 'Bayern vs Dortmund',         market: 'Match Result', pick: 'Bayern',  confidence: 73, result: 'pending' as const },
-  { league: 'NBA',         match: 'Lakers vs Celtics',          market: 'Spread', pick: 'Celtics -3.5', confidence: 62, result: 'won' as const },
-  { league: 'ATP',         match: 'Sinner vs Alcaraz',          market: 'Match Winner', pick: 'Alcaraz', confidence: 55, result: 'pending' as const },
-] as const
 
 const FAQS = [
   {

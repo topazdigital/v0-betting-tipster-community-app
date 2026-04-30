@@ -4,9 +4,10 @@ import { getFakeTipsterById, getFakeTipsterByUsername, getFakeTipsterBySlug, typ
 import {
   listTipsForTipster,
   seedTipsForMatch,
+  settleStaleAutoTips,
   type GeneratedTip,
 } from '@/lib/auto-tips-store';
-import { getAllMatches } from '@/lib/api/unified-sports-api';
+import { getAllMatches, type UnifiedMatch } from '@/lib/api/unified-sports-api';
 
 export const dynamic = 'force-dynamic';
 
@@ -153,7 +154,19 @@ function generateSportBreakdown(specialties: string[]) {
 }
 
 // Convert auto-tip → recentTips wire shape used by the tipster profile UI.
-function autoTipToRecent(t: GeneratedTip) {
+// When a real match record is supplied we prefer its actual scores so
+// finished games surface their real result (not a fake 2-1).
+function autoTipToRecent(t: GeneratedTip, realMatch?: UnifiedMatch) {
+  let homeScore: number | null = null;
+  let awayScore: number | null = null;
+  if (realMatch?.homeScore != null && realMatch?.awayScore != null) {
+    homeScore = Number(realMatch.homeScore);
+    awayScore = Number(realMatch.awayScore);
+  } else if (t.status === 'won') {
+    homeScore = 2; awayScore = 1;
+  } else if (t.status === 'lost') {
+    homeScore = 1; awayScore = 2;
+  }
   return {
     id: t.id,
     match: {
@@ -163,8 +176,9 @@ function autoTipToRecent(t: GeneratedTip) {
       kickoffTime: t.kickoff || t.createdAt,
       league: t.league || '—',
       sport: t.sport || 'Football',
-      homeScore: t.status === 'won' ? 2 : t.status === 'lost' ? 1 : null,
-      awayScore: t.status === 'won' ? 1 : t.status === 'lost' ? 2 : null,
+      homeScore,
+      awayScore,
+      status: realMatch?.status || (t.status === 'pending' ? 'scheduled' : 'finished'),
     },
     market: t.market,
     selection: t.prediction,
@@ -251,9 +265,24 @@ export async function GET(request: NextRequest, context: RouteContext) {
   } = { tipster };
 
   if (includeTips) {
-    // Make sure this tipster has tips on real upcoming matches.
+    // Make sure this tipster has tips on real upcoming matches and any
+    // tip whose kickoff has passed gets a deterministic settled status.
     await bootstrapTipsterTipsFromMatches(tipsterId).catch(() => null);
-    const tips = listTipsForTipster(tipsterId, 25).map(autoTipToRecent);
+    settleStaleAutoTips();
+
+    // Build a matchId → real match index so finished tips can carry the
+    // actual score-line into the profile UI.
+    let matchIndex = new Map<string, UnifiedMatch>();
+    try {
+      const all = await getAllMatches();
+      matchIndex = new Map(all.map(m => [String(m.id), m]));
+    } catch {
+      // ignore — falls back to deterministic synthetic scores
+    }
+
+    const tips = listTipsForTipster(tipsterId, 25).map(t =>
+      autoTipToRecent(t, matchIndex.get(String(t.matchId))),
+    );
     response.recentTips = tips;
   }
 

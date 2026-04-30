@@ -1,12 +1,11 @@
 'use client';
 
-import { Suspense } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { ArrowLeft, ExternalLink, Calendar, Newspaper } from 'lucide-react';
+import { ArrowLeft, Calendar, Loader2, Newspaper } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 
 function ArticleReader() {
@@ -19,6 +18,37 @@ function ArticleReader() {
   const published = params.get('published') || '';
   const sourceUrl = params.get('source_url') || '';
   const source = params.get('source') || 'ESPN';
+
+  const [fullBody, setFullBody] = useState<string[] | null>(null);
+  const [fullBodyLoading, setFullBodyLoading] = useState(false);
+  const [fullBodyError, setFullBodyError] = useState<string | null>(null);
+
+  // Fetch the full article body inline so users never need to bounce off-site.
+  useEffect(() => {
+    if (!sourceUrl) return;
+    let cancelled = false;
+    setFullBodyLoading(true);
+    setFullBodyError(null);
+    fetch(`/api/news/article?url=${encodeURIComponent(sourceUrl)}`, { cache: 'no-store' })
+      .then(async (r) => {
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok || !j.ok) throw new Error(j.error || `Fetch ${r.status}`);
+        return j as { paragraphs?: string[] };
+      })
+      .then((j) => {
+        if (cancelled) return;
+        if (Array.isArray(j.paragraphs) && j.paragraphs.length > 0) {
+          setFullBody(j.paragraphs);
+        }
+      })
+      .catch((e) => {
+        if (!cancelled) setFullBodyError(e instanceof Error ? e.message : 'Could not load full article');
+      })
+      .finally(() => {
+        if (!cancelled) setFullBodyLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [sourceUrl]);
 
   if (!headline) {
     return (
@@ -101,35 +131,33 @@ function ArticleReader() {
       )}
 
       <div className="prose prose-sm max-w-none text-foreground leading-snug">
-        {bodyParagraphs.length > 0 ? (
+        {fullBodyLoading && (
+          <div className="flex items-center gap-2 py-4 text-xs text-muted-foreground">
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            Loading the full story…
+          </div>
+        )}
+        {!fullBodyLoading && fullBody && fullBody.length > 0 ? (
+          fullBody.map((p, i) => (
+            <p key={`f${i}`} className="mb-3 text-[13px] text-foreground/90">
+              {p}
+            </p>
+          ))
+        ) : !fullBodyLoading && bodyParagraphs.length > 0 ? (
           bodyParagraphs.map((p, i) => (
             <p key={i} className="mb-3 text-[13px] text-foreground/90">
               {p}
             </p>
           ))
-        ) : (
+        ) : !fullBodyLoading ? (
           <p className="text-xs text-muted-foreground italic">No preview available for this story.</p>
+        ) : null}
+        {fullBodyError && !fullBody && bodyParagraphs.length > 0 && (
+          <p className="mt-2 text-[10px] text-muted-foreground italic">
+            (Showing summary — full article body unavailable.)
+          </p>
         )}
       </div>
-
-      {sourceUrl && (
-        <Card className="mt-6 border-primary/20 bg-primary/5 rounded-lg">
-          <CardContent className="flex flex-wrap items-center justify-between gap-2 p-3">
-            <div className="min-w-0">
-              <p className="text-xs font-bold leading-tight">Full story available</p>
-              <p className="text-[10px] text-muted-foreground leading-tight">
-                Read the complete article on the original source.
-              </p>
-            </div>
-            <Button asChild size="sm" variant="outline" className="h-7 px-2.5 text-[11px]">
-              <a href={sourceUrl} target="_blank" rel="noopener noreferrer">
-                Read on {source}
-                <ExternalLink className="ml-1 h-3 w-3" />
-              </a>
-            </Button>
-          </CardContent>
-        </Card>
-      )}
 
       <div className="mt-6 border-t border-border pt-4 text-center">
         <Button variant="ghost" size="sm" asChild className="h-7 text-xs text-muted-foreground">
