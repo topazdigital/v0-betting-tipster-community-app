@@ -6,6 +6,9 @@ import {
   getApplication,
   reviewApplication,
 } from '@/lib/tipster-applications-store';
+import { getTemplate as getEmailTemplate } from '@/lib/email-templates-store';
+import { renderTemplate, sendMail } from '@/lib/mailer';
+import { mockUsers } from '@/lib/mock-data';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -57,6 +60,47 @@ export async function PATCH(request: NextRequest, ctx: Ctx) {
   // On approval — promote the user's role so they can post tips immediately.
   if (decision === 'approve') {
     setUserRoleOverride(updated.userId, 'tipster');
+  }
+
+  // ─── Notify the applicant by email — best effort, never blocks the response. ──
+  try {
+    const recipient =
+      updated.email ||
+      existing.email ||
+      mockUsers.find(u => u.id === updated.userId || u.username === updated.username)?.email;
+
+    if (recipient) {
+      const tplKey = decision === 'approve' ? 'tipster_approved' : 'tipster_rejected';
+      const tpl = getEmailTemplate(tplKey);
+      const proto = request.headers.get('x-forwarded-proto') || 'http';
+      const host = request.headers.get('host') || 'localhost:5000';
+      const siteUrl = `${proto}://${host}`;
+      const noteBlock = note
+        ? (tpl.html.includes('<')
+            ? `<blockquote style="border-left:3px solid #10B981;padding-left:12px;color:#475569;margin:16px 0">${note}</blockquote>`
+            : `Note from the team: ${note}\n\n`)
+        : '';
+      const noteBlockText = note ? `Note from the team: ${note}\n\n` : '';
+      const verifiedLine = decision === 'approve' && grantVerified ? ' with the verified badge' : '';
+
+      const subject = renderTemplate(tpl.subject, { name: updated.displayName || updated.username });
+      const html = renderTemplate(tpl.html, {
+        name: updated.displayName || updated.username,
+        siteUrl,
+        verifiedLine,
+        noteBlock,
+      });
+      const text = renderTemplate(tpl.text, {
+        name: updated.displayName || updated.username,
+        siteUrl,
+        verifiedLine,
+        noteBlock: noteBlockText,
+      });
+
+      await sendMail({ to: recipient, subject, html, text });
+    }
+  } catch (err) {
+    console.warn('[tipster-applications] notification email failed:', err);
   }
 
   return NextResponse.json({ application: updated });

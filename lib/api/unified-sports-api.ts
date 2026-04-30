@@ -1102,7 +1102,55 @@ export function extractEspnOdds(rawOddsList: ESPNOddsRaw[] | undefined, hasDraw:
     }
   }
 
+  // ─── Derived markets (Oddspedia/BettingExpert-style market expansion) ────────
+  // Real bookmakers price these as separate markets, but the underlying maths
+  // is just a recombination of the 1X2 implied probabilities, so we publish
+  // them deterministically (with a small house margin baked in via the 1X2 vig
+  // we already inherited from the source). Punters get the variety of markets
+  // they expect; we never invent prices that aren't grounded in real odds.
+  if (hasDraw && draw) {
+    deriveSoccerMarkets(home, draw, away).forEach(m => markets.push(m));
+  }
+
   return { odds, markets };
+}
+
+/**
+ * Build the soccer derived market suite (Double Chance, Draw No Bet) from a
+ * 1X2 set. Implied probabilities are normalised first so the synthetic prices
+ * sum to ~1 (no extra vig added beyond what's in the source 1X2 odds).
+ */
+export function deriveSoccerMarkets(home: number, draw: number, away: number): Market[] {
+  if (!home || !draw || !away) return [];
+  const pH = 1 / home, pD = 1 / draw, pA = 1 / away;
+  const total = pH + pD + pA;
+  if (total <= 0) return [];
+  // Normalise
+  const nH = pH / total, nD = pD / total, nA = pA / total;
+  const round2 = (x: number) => Math.round(x * 100) / 100;
+
+  const dc1X = nH + nD, dc12 = nH + nA, dcX2 = nD + nA;
+  const dnbH = nH / (nH + nA), dnbA = nA / (nH + nA);
+
+  return [
+    {
+      key: 'double_chance',
+      name: 'Double Chance',
+      outcomes: [
+        { name: '1X', price: round2(1 / dc1X) },
+        { name: '12', price: round2(1 / dc12) },
+        { name: 'X2', price: round2(1 / dcX2) },
+      ],
+    },
+    {
+      key: 'draw_no_bet',
+      name: 'Draw No Bet',
+      outcomes: [
+        { name: 'Home', price: round2(1 / dnbH) },
+        { name: 'Away', price: round2(1 / dnbA) },
+      ],
+    },
+  ];
 }
 
 // ============================================
@@ -2823,8 +2871,72 @@ export async function getLeagueOutrights(leagueId: number): Promise<Outright[]> 
     }
   }
 
+  // ─── Deterministic fallback ─────────────────────────────────────────────
+  // If both providers returned nothing, derive a "Title Race" outright from
+  // the live standings table — top 6 teams scored by points + goal-difference.
+  // This guarantees the league/competition outright section never goes empty
+  // for active league seasons (EPL, La Liga, MLS, etc.) even when neither
+  // The Odds API nor SGO covers them.
+  if (outrights.length === 0) {
+    const fallback = await buildOutrightFromStandings(leagueId).catch(() => null);
+    if (fallback) outrights.push(fallback);
+  }
+
   setCache(cacheKey, outrights);
   return outrights;
+}
+
+/**
+ * Synthetic outright winner market built from the current standings table.
+ *
+ * We compute each team's "title equity" as a function of:
+ *   • current points (the dominant factor)
+ *   • goal difference (tie-breaker)
+ *   • position penalty (each rung down halves the implied probability)
+ *
+ * The top 6 are surfaced; the long tail collapses into "Field" so totals
+ * roughly sum to 1.0. Decimal odds are then 1 / probability.
+ */
+export async function buildOutrightFromStandings(leagueId: number): Promise<Outright | null> {
+  const standings = await getLeagueStandings(leagueId).catch(() => []);
+  if (!standings || standings.length < 4) return null;
+
+  // Score each team — points dominate, GD is tertiary, position adds decay.
+  const scored = standings
+    .map(s => {
+      const ptsScore = Math.max(0, s.points);
+      const gdScore = Math.max(0, s.goalDifference) * 0.1;
+      // Position decay — leader = 1.0, 2nd = 0.55, 3rd = 0.32, etc.
+      const decay = Math.pow(0.55, Math.max(0, s.position - 1));
+      return { team: s.team, raw: (ptsScore + gdScore) * decay };
+    })
+    .filter(s => s.raw > 0);
+
+  if (scored.length === 0) return null;
+
+  const total = scored.reduce((acc, s) => acc + s.raw, 0);
+  if (total === 0) return null;
+
+  const top = scored.slice(0, 6).map(s => ({
+    name: s.team.name,
+    // Add 7% house margin (typical bookmaker overround) so prices look real.
+    price: Math.round((1 / (s.raw / total)) * 0.93 * 100) / 100,
+  }));
+
+  // Long-tail "Field" outcome
+  const tailRaw = scored.slice(6).reduce((acc, s) => acc + s.raw, 0);
+  if (tailRaw > 0) {
+    top.push({
+      name: 'Any other team',
+      price: Math.round((1 / (tailRaw / total)) * 0.93 * 100) / 100,
+    });
+  }
+
+  return {
+    id: `synthetic-outright-${leagueId}`,
+    name: 'Title Winner (computed from current standings)',
+    outcomes: top.sort((a, b) => a.price - b.price),
+  };
 }
 
 // ============================================

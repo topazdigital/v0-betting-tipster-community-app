@@ -7,7 +7,9 @@ export type EmailTemplateKey =
   | 'password_reset'
   | 'competition_join'
   | 'prize_payout'
-  | 'tipster_application';
+  | 'tipster_application'
+  | 'tipster_approved'
+  | 'tipster_rejected';
 
 export interface EmailTemplate {
   key: EmailTemplateKey;
@@ -145,6 +147,54 @@ Wallet: {{siteUrl}}/dashboard/wallet`,
 </div>`,
     text: `Hi {{name}}, thanks for applying to become a tipster on Betcheza. Review takes up to 48h.`,
     variables: ['name', 'email'],
+    updatedAt: new Date().toISOString(),
+  },
+  tipster_approved: {
+    key: 'tipster_approved',
+    name: 'Tipster Application Approved',
+    description: 'Sent when an admin approves a tipster application.',
+    subject: 'You\'re a Betcheza Tipster — welcome aboard!',
+    html: `<div style="font-family:system-ui,sans-serif;max-width:560px;margin:0 auto;padding:24px;background:#0b0f17;color:#e7eaf0;border-radius:12px">
+  <h2 style="color:#10B981;margin:0 0 12px">Welcome to the Tipster team, {{name}}! 🎉</h2>
+  <p>Great news — your application has been approved. Your account is now upgraded to the <strong>Tipster</strong> role{{verifiedLine}}.</p>
+  <p>You can start posting tips immediately:</p>
+  <p style="margin:24px 0">
+    <a href="{{siteUrl}}/dashboard" style="background:#10B981;color:#000;padding:10px 20px;border-radius:6px;text-decoration:none;font-weight:bold">Open your dashboard</a>
+  </p>
+  {{noteBlock}}
+  <p style="font-size:12px;color:#94a3b8;margin-top:24px">Tip: post consistently and your stats will start showing up on the public leaderboard.</p>
+</div>`,
+    text: `Welcome to the Tipster team, {{name}}!
+
+Your application has been approved. Your account is now upgraded to Tipster{{verifiedLine}}.
+Start posting at {{siteUrl}}/dashboard
+
+{{noteBlock}}— Team Betcheza`,
+    variables: ['name', 'email', 'siteUrl', 'verifiedLine', 'noteBlock'],
+    updatedAt: new Date().toISOString(),
+  },
+  tipster_rejected: {
+    key: 'tipster_rejected',
+    name: 'Tipster Application Rejected',
+    description: 'Sent when an admin rejects a tipster application.',
+    subject: 'Update on your Betcheza tipster application',
+    html: `<div style="font-family:system-ui,sans-serif;max-width:560px;margin:0 auto;padding:24px">
+  <h2>Application update</h2>
+  <p>Hi {{name}}, thanks for applying to become a tipster on Betcheza. After review, we won't be approving your application this time.</p>
+  {{noteBlock}}
+  <p>You're welcome to keep using Betcheza, build a track record on the predictor, and re-apply in 30 days.</p>
+  <p style="margin:24px 0">
+    <a href="{{siteUrl}}/become-tipster" style="background:#10B981;color:#000;padding:10px 20px;border-radius:6px;text-decoration:none;font-weight:bold">Re-apply later</a>
+  </p>
+</div>`,
+    text: `Hi {{name}}, thanks for applying to become a tipster on Betcheza.
+
+After review, we won't be approving your application this time.
+
+{{noteBlock}}You're welcome to re-apply in 30 days: {{siteUrl}}/become-tipster
+
+— Team Betcheza`,
+    variables: ['name', 'email', 'siteUrl', 'noteBlock'],
     updatedAt: new Date().toISOString(),
   },
 };

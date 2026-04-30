@@ -830,6 +830,7 @@ export async function GET(_request: NextRequest, context: RouteContext) {
     // Oddspedia-style "Bet now" link for each row.
     try {
       const { getSgoBookmakerLines } = await import('@/lib/api/sportsgameodds');
+      const { buildAffiliateLink } = await import('@/lib/bookmakers-store');
       // `match.kickoffTime` is a Date — convert to ISO so SGO can date-filter.
       const isoKickoff = match.kickoffTime instanceof Date
         ? match.kickoffTime.toISOString()
@@ -843,13 +844,21 @@ export async function GET(_request: NextRequest, context: RouteContext) {
       const seen = new Set(bookmakerOdds.map(o => o.bookmaker.toLowerCase()));
       for (const sl of sgoLines) {
         if (seen.has(sl.display.toLowerCase())) continue;
+        // Wrap each per-side deeplink with the admin-configured affiliate URL when
+        // we have a matching slug — that's how Betcheza monetises the "Bet now" CTA.
+        const affHome = buildAffiliateLink(sl.bookmaker, sl.links?.home) || sl.links?.home;
+        const affDraw = buildAffiliateLink(sl.bookmaker, sl.links?.draw) || sl.links?.draw;
+        const affAway = buildAffiliateLink(sl.bookmaker, sl.links?.away) || sl.links?.away;
         bookmakerOdds.push({
           bookmaker: sl.display,
           home: sl.home,
           draw: sl.draw,
           away: sl.away,
-          // Surface deeplinks so the UI can render "Bet now" buttons.
-          links: sl.links,
+          links: {
+            home: affHome || undefined,
+            draw: affDraw || undefined,
+            away: affAway || undefined,
+          },
         } as typeof bookmakerOdds[number] & { links?: { home?: string; draw?: string; away?: string } });
         seen.add(sl.display.toLowerCase());
       }
