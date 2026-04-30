@@ -169,24 +169,37 @@ export default function HomePage() {
                   </Button>
                 </div>
 
-                {/* Quick Stats */}
+                {/* Quick Stats — each tile links somewhere relevant so the
+                    "they look clickable" promise is honoured. */}
                 <div className="mt-4 grid grid-cols-4 gap-2">
-                  <div className="text-center">
+                  <Link
+                    href="/matches?status=live"
+                    className="rounded-lg p-1 text-center transition-colors hover:bg-muted/50"
+                  >
                     <div className="text-2xl font-bold text-foreground">{stats.live ?? 0}</div>
                     <div className="text-xs text-muted-foreground">Live Now</div>
-                  </div>
-                  <div className="text-center">
+                  </Link>
+                  <Link
+                    href="/matches"
+                    className="rounded-lg p-1 text-center transition-colors hover:bg-muted/50"
+                  >
                     <div className="text-2xl font-bold text-foreground">{stats.today ?? 0}</div>
                     <div className="text-xs text-muted-foreground">Today</div>
-                  </div>
-                  <div className="text-center">
+                  </Link>
+                  <Link
+                    href="/matches"
+                    className="rounded-lg p-1 text-center transition-colors hover:bg-muted/50"
+                  >
                     <div className="text-2xl font-bold text-foreground">35+</div>
                     <div className="text-xs text-muted-foreground">Sports</div>
-                  </div>
-                  <div className="text-center">
+                  </Link>
+                  <Link
+                    href="/leaderboard"
+                    className="rounded-lg p-1 text-center transition-colors hover:bg-muted/50"
+                  >
                     <div className="text-2xl font-bold text-foreground">50K+</div>
                     <div className="text-xs text-muted-foreground">Tipsters</div>
-                  </div>
+                  </Link>
                 </div>
               </div>
 

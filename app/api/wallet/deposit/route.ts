@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getCurrentUser } from '@/lib/auth';
 import { credit } from '@/lib/wallet-store';
+import { recordDeposit } from '@/lib/affiliate-clicks-store';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -57,6 +58,19 @@ export async function POST(req: NextRequest) {
             ? 'Deposit via Bank Transfer'
             : 'Deposit via Crypto',
   });
+
+  // Roll the deposit into the bookmaker funnel if this user is
+  // attributed to one (i.e. they signed up via an affiliate click).
+  // Silently no-ops when no attribution exists.
+  try {
+    recordDeposit({
+      userId: user.userId,
+      amount: body.amount,
+      currency: body.currency || 'KES',
+    });
+  } catch (e) {
+    console.warn('[wallet/deposit] affiliate attribution failed:', e);
+  }
 
   return NextResponse.json({
     success: true,

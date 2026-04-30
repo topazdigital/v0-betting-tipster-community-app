@@ -69,8 +69,9 @@ export async function GET(
     if (u?.userId) userId = u.userId;
   } catch { /* ignore */ }
 
+  let recordedClickId: number | undefined;
   try {
-    recordClick({
+    const click = recordClick({
       bookmakerId: book.id,
       bookmakerSlug: book.slug,
       bookmakerName: book.name,
@@ -86,9 +87,32 @@ export async function GET(
       device: detectDevice(ua),
       referer,
     });
+    recordedClickId = click.id;
   } catch (e) {
     console.error('[affiliate-clicks] record failed:', e);
   }
 
-  return NextResponse.redirect(target, 302);
+  // Drop a 30-day attribution cookie so any signup/deposit that
+  // happens later from this device rolls back into the bookmaker
+  // funnel. Using a Response object lets us set the cookie and the
+  // 302 redirect at the same time.
+  const res = NextResponse.redirect(target, 302);
+  try {
+    const cookieValue = JSON.stringify({
+      bid: book.id,
+      slug: book.slug,
+      name: book.name,
+      cid: recordedClickId,
+      ts: Date.now(),
+    });
+    res.cookies.set({
+      name: 'bz_aff',
+      value: cookieValue,
+      maxAge: 30 * 24 * 60 * 60, // 30 days
+      path: '/',
+      sameSite: 'lax',
+      httpOnly: false, // readable by client analytics if needed
+    });
+  } catch { /* never block redirect on cookie failures */ }
+  return res;
 }

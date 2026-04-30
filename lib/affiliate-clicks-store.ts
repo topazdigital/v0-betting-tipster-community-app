@@ -1,7 +1,8 @@
 // ─────────────────────────────────────────────────────────────────────
-// Affiliate clicks store — captures every outbound click on a bookmaker
-// link (with the surrounding sport/league/match/placement context) so the
-// admin dashboard can show which placements actually convert.
+// Affiliate clicks + conversion store — captures every outbound click on
+// a bookmaker link AND ties downstream signups/deposits back to the
+// click that drove them. Powers the conversion funnel in the admin
+// dashboard (clicks → signups → deposits → revenue, per bookmaker).
 //
 // Persistence: JSON file at .local/state/affiliate-clicks.json. Same
 // pattern as bookmakers-store.ts — survives restarts, no DB required.
@@ -29,13 +30,41 @@ export interface AffiliateClick {
   referer?: string;
 }
 
+export interface AttributionRecord {
+  userId: number;
+  bookmakerId: number;
+  bookmakerSlug: string;
+  bookmakerName: string;
+  clickId?: number;
+  signedUpAt: number;
+}
+
+export interface ConversionEvent {
+  id: number;
+  ts: number;
+  type: 'signup' | 'deposit';
+  userId: number;
+  bookmakerId: number;
+  bookmakerSlug: string;
+  bookmakerName: string;
+  amount?: number;            // deposit amount
+  currency?: string;          // deposit currency
+  clickId?: number;
+}
+
 const STORE_DIR = path.join(process.cwd(), '.local', 'state');
 const STORE_FILE = path.join(STORE_DIR, 'affiliate-clicks.json');
 const MAX_CLICKS = 50_000; // hard cap so the JSON file doesn't grow unbounded
+const MAX_CONVERSIONS = 50_000;
 
 interface ClicksFile {
   nextId: number;
   clicks: AffiliateClick[];
+  // Conversion tracking — added in v2. Optional in older files so we
+  // gracefully migrate when reading legacy stores.
+  nextConvId?: number;
+  conversions?: ConversionEvent[];
+  attribution?: Record<number, AttributionRecord>; // userId -> attribution
 }
 
 function ensureDir() {
@@ -49,13 +78,19 @@ function load(): ClicksFile {
       const raw = fs.readFileSync(STORE_FILE, 'utf-8');
       const parsed = JSON.parse(raw) as ClicksFile;
       if (parsed && Array.isArray(parsed.clicks)) {
-        return { nextId: parsed.nextId || (parsed.clicks.length + 1), clicks: parsed.clicks };
+        return {
+          nextId: parsed.nextId || (parsed.clicks.length + 1),
+          clicks: parsed.clicks,
+          nextConvId: parsed.nextConvId || (parsed.conversions?.length || 0) + 1,
+          conversions: parsed.conversions || [],
+          attribution: parsed.attribution || {},
+        };
       }
     }
   } catch (e) {
     console.warn('[affiliate-clicks] failed to read store:', e);
   }
-  return { nextId: 1, clicks: [] };
+  return { nextId: 1, clicks: [], nextConvId: 1, conversions: [], attribution: {} };
 }
 
 function persist(state: ClicksFile) {
@@ -70,7 +105,12 @@ function persist(state: ClicksFile) {
 const g = globalThis as { __affiliateClicksCache?: ClicksFile };
 function cache(): ClicksFile {
   if (!g.__affiliateClicksCache) g.__affiliateClicksCache = load();
-  return g.__affiliateClicksCache!;
+  // Defensive: if an older cache predates conversion fields, hydrate them.
+  const c = g.__affiliateClicksCache!;
+  if (!c.conversions) c.conversions = [];
+  if (!c.attribution) c.attribution = {};
+  if (!c.nextConvId) c.nextConvId = (c.conversions.length || 0) + 1;
+  return c;
 }
 
 export function recordClick(input: Omit<AffiliateClick, 'id' | 'ts'>): AffiliateClick {
@@ -89,6 +129,100 @@ export function recordClick(input: Omit<AffiliateClick, 'id' | 'ts'>): Affiliate
   return click;
 }
 
+// ─── Conversion tracking ────────────────────────────────────────────
+
+/**
+ * Record that a user signed up after clicking through to a bookmaker.
+ * Called from /api/auth/register when the bz_aff cookie is present.
+ * Also stamps the user's attribution so future deposits roll up here.
+ */
+export function recordSignup(opts: {
+  userId: number;
+  bookmakerId: number;
+  bookmakerSlug: string;
+  bookmakerName: string;
+  clickId?: number;
+}): ConversionEvent {
+  const state = cache();
+  state.attribution![opts.userId] = {
+    userId: opts.userId,
+    bookmakerId: opts.bookmakerId,
+    bookmakerSlug: opts.bookmakerSlug,
+    bookmakerName: opts.bookmakerName,
+    clickId: opts.clickId,
+    signedUpAt: Date.now(),
+  };
+  const event: ConversionEvent = {
+    id: state.nextConvId!++,
+    ts: Date.now(),
+    type: 'signup',
+    userId: opts.userId,
+    bookmakerId: opts.bookmakerId,
+    bookmakerSlug: opts.bookmakerSlug,
+    bookmakerName: opts.bookmakerName,
+    clickId: opts.clickId,
+  };
+  state.conversions!.push(event);
+  if (state.conversions!.length > MAX_CONVERSIONS) {
+    state.conversions!.splice(0, state.conversions!.length - MAX_CONVERSIONS);
+  }
+  persist(state);
+  return event;
+}
+
+/**
+ * Record a deposit. If the user has an attribution record (i.e. they
+ * arrived via an affiliate click), the deposit is tied back to that
+ * bookmaker so the funnel can show revenue-per-click.
+ */
+export function recordDeposit(opts: {
+  userId: number;
+  amount: number;
+  currency?: string;
+}): ConversionEvent | null {
+  const state = cache();
+  const attr = state.attribution![opts.userId];
+  if (!attr) return null;
+  const event: ConversionEvent = {
+    id: state.nextConvId!++,
+    ts: Date.now(),
+    type: 'deposit',
+    userId: opts.userId,
+    bookmakerId: attr.bookmakerId,
+    bookmakerSlug: attr.bookmakerSlug,
+    bookmakerName: attr.bookmakerName,
+    amount: opts.amount,
+    currency: opts.currency || 'KES',
+    clickId: attr.clickId,
+  };
+  state.conversions!.push(event);
+  if (state.conversions!.length > MAX_CONVERSIONS) {
+    state.conversions!.splice(0, state.conversions!.length - MAX_CONVERSIONS);
+  }
+  persist(state);
+  return event;
+}
+
+export function getAttribution(userId: number): AttributionRecord | undefined {
+  return cache().attribution![userId];
+}
+
+// ─── Stats / aggregations ───────────────────────────────────────────
+
+export interface FunnelRow {
+  bookmakerId: number;
+  bookmakerName: string;
+  bookmakerSlug: string;
+  clicks: number;
+  signups: number;
+  conversionRate: number;       // signups / clicks (%)
+  deposits: number;             // # of deposits
+  uniqueDepositors: number;
+  revenue: number;              // total deposit amount
+  revenuePerClick: number;      // revenue / clicks
+  arpu: number;                 // revenue / unique depositors
+}
+
 export interface ClickStats {
   total: number;
   last24h: number;
@@ -101,6 +235,17 @@ export interface ClickStats {
   byDevice: Array<{ device: string; clicks: number }>;
   byDay: Array<{ date: string; clicks: number }>;
   recent: AffiliateClick[];
+  funnel: FunnelRow[];
+  funnelTotals: {
+    clicks: number;
+    signups: number;
+    conversionRate: number;
+    deposits: number;
+    uniqueDepositors: number;
+    revenue: number;
+    revenuePerClick: number;
+  };
+  recentConversions: ConversionEvent[];
 }
 
 export function getStats(opts: { days?: number } = {}): ClickStats {
@@ -111,6 +256,7 @@ export function getStats(opts: { days?: number } = {}): ClickStats {
   const dayMs = 24 * 60 * 60 * 1000;
 
   const inWindow = state.clicks.filter(c => c.ts >= cutoff);
+  const conversionsInWindow = (state.conversions || []).filter(c => c.ts >= cutoff);
 
   function topBy<K extends string>(keyFn: (c: AffiliateClick) => string | undefined, labelFn: (key: string, sample: AffiliateClick) => Record<K, string | number>): Array<Record<K, string | number> & { clicks: number }> {
     const map = new Map<string, { sample: AffiliateClick; count: number }>();
@@ -150,6 +296,54 @@ export function getStats(opts: { days?: number } = {}): ClickStats {
   }
   const byDay = [...dayMap.entries()].map(([date, clicks]) => ({ date, clicks }));
 
+  // ── Funnel: per-bookmaker clicks → signups → deposits → revenue ──
+  // Build a unified bookmaker key set from all sources so a bookmaker
+  // shows up even if it has signups but zero clicks in this window.
+  const allBookIds = new Set<number>();
+  byBookmaker.forEach(b => allBookIds.add(b.bookmakerId));
+  conversionsInWindow.forEach(c => allBookIds.add(c.bookmakerId));
+
+  const funnel: FunnelRow[] = [];
+  let totalSignups = 0;
+  let totalDeposits = 0;
+  let totalRevenue = 0;
+  const allDepositors = new Set<number>();
+
+  for (const bookId of allBookIds) {
+    const bookClicks = byBookmaker.find(b => b.bookmakerId === bookId);
+    const clickCount = bookClicks?.clicks ?? 0;
+    const bookConvs = conversionsInWindow.filter(c => c.bookmakerId === bookId);
+    const signups = bookConvs.filter(c => c.type === 'signup');
+    const deposits = bookConvs.filter(c => c.type === 'deposit');
+    const revenue = deposits.reduce((s, d) => s + (d.amount || 0), 0);
+    const depositors = new Set(deposits.map(d => d.userId));
+    deposits.forEach(d => allDepositors.add(d.userId));
+
+    const sample = bookClicks ?? bookConvs[0];
+    if (!sample) continue;
+    const name = bookClicks?.bookmakerName ?? bookConvs[0].bookmakerName;
+    const slug = bookClicks?.bookmakerSlug ?? bookConvs[0].bookmakerSlug;
+
+    totalSignups += signups.length;
+    totalDeposits += deposits.length;
+    totalRevenue += revenue;
+
+    funnel.push({
+      bookmakerId: bookId,
+      bookmakerName: name,
+      bookmakerSlug: slug,
+      clicks: clickCount,
+      signups: signups.length,
+      conversionRate: clickCount > 0 ? (signups.length / clickCount) * 100 : 0,
+      deposits: deposits.length,
+      uniqueDepositors: depositors.size,
+      revenue,
+      revenuePerClick: clickCount > 0 ? revenue / clickCount : 0,
+      arpu: depositors.size > 0 ? revenue / depositors.size : 0,
+    });
+  }
+  funnel.sort((a, b) => b.revenue - a.revenue || b.clicks - a.clicks);
+
   return {
     total: state.clicks.length,
     last24h: state.clicks.filter(c => c.ts >= now - dayMs).length,
@@ -165,6 +359,17 @@ export function getStats(opts: { days?: number } = {}): ClickStats {
     byDevice: topBy<'device'>(c => c.device || 'unknown', (k) => ({ device: k })) as Array<{ device: string; clicks: number }>,
     byDay,
     recent: [...inWindow].sort((a, b) => b.ts - a.ts).slice(0, 50),
+    funnel,
+    funnelTotals: {
+      clicks: inWindow.length,
+      signups: totalSignups,
+      conversionRate: inWindow.length > 0 ? (totalSignups / inWindow.length) * 100 : 0,
+      deposits: totalDeposits,
+      uniqueDepositors: allDepositors.size,
+      revenue: totalRevenue,
+      revenuePerClick: inWindow.length > 0 ? totalRevenue / inWindow.length : 0,
+    },
+    recentConversions: [...conversionsInWindow].sort((a, b) => b.ts - a.ts).slice(0, 30),
   };
 }
 
@@ -172,5 +377,8 @@ export function clearAll(): void {
   const state = cache();
   state.clicks = [];
   state.nextId = 1;
+  state.conversions = [];
+  state.attribution = {};
+  state.nextConvId = 1;
   persist(state);
 }

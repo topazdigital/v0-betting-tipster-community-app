@@ -6,6 +6,8 @@ import { ipKeyFromHeaders, rateLimit } from '@/lib/rate-limit';
 import { getCaptchaProvider, recallMathAnswer, verifyCaptcha } from '@/lib/captcha';
 import { issueVerification } from '@/lib/email-verification-store';
 import { buildVerificationEmail } from '@/lib/email-templates/verification-email';
+import { recordSignup } from '@/lib/affiliate-clicks-store';
+import { cookies } from 'next/headers';
 
 export const dynamic = 'force-dynamic';
 
@@ -169,6 +171,29 @@ export async function POST(request: Request) {
 
     // Add to mock users (in memory only for preview)
     mockUsers.push(newUser);
+
+    // ── Affiliate attribution: if this user clicked through a bookmaker
+    // link in the last 30 days, the redirect handler dropped a `bz_aff`
+    // cookie carrying {bid, slug, name, cid}. Roll the signup back into
+    // that bookmaker's funnel so we can compute clicks → signups → CR.
+    try {
+      const cookieStore = await cookies();
+      const aff = cookieStore.get('bz_aff')?.value;
+      if (aff) {
+        const parsed = JSON.parse(aff) as { bid?: number; slug?: string; name?: string; cid?: number };
+        if (typeof parsed?.bid === 'number' && parsed.slug && parsed.name) {
+          recordSignup({
+            userId: newUser.id,
+            bookmakerId: parsed.bid,
+            bookmakerSlug: parsed.slug,
+            bookmakerName: parsed.name,
+            clickId: parsed.cid,
+          });
+        }
+      }
+    } catch (e) {
+      console.warn('[auth/register] affiliate attribution failed:', e);
+    }
 
     // Set auth cookie — user is logged in immediately, but flagged as
     // unverified until they confirm via the email code/link.
