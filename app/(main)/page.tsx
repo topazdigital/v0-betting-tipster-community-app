@@ -18,6 +18,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { SidebarNew } from '@/components/layout/sidebar-new';
+import { BetchezaBackBanner } from '@/components/home/betcheza-back-banner';
 import { SportsFilter } from '@/components/sports/sports-filter';
 import { MatchCardNew } from '@/components/matches/match-card-new';
 import { Button } from '@/components/ui/button';
@@ -143,6 +144,8 @@ export default function HomePage() {
             <div className="grid gap-4 lg:grid-cols-2 lg:gap-8">
               {/* Left: Main content */}
               <div className="flex flex-col justify-center">
+                {/* "We're back" announcement — animated, dismissable per session */}
+                <BetchezaBackBanner />
                 <Badge variant="secondary" className="mb-2 w-fit text-[10px]">
                   <Zap className="mr-1 h-3 w-3" />
                   Trusted by 50,000+ tipsters

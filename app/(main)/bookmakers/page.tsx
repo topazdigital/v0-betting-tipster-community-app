@@ -280,13 +280,13 @@ export default function BookmakersPage() {
                     </div>
                     <div className="flex gap-1.5">
                       <Button variant="outline" size="sm" className="h-7 text-xs" asChild>
-                        <a href={bookie.affiliateUrl} target="_blank" rel="noopener noreferrer">
+                        <a href={`/api/r/bookmaker/${encodeURIComponent(bookie.slug)}?placement=bookmakers-page-review`} target="_blank" rel="noopener noreferrer">
                           <Shield className="mr-1.5 h-3.5 w-3.5" />
                           Review
                         </a>
                       </Button>
                       <Button size="sm" className="h-7 text-xs px-4" asChild>
-                        <a href={bookie.affiliateUrl} target="_blank" rel="noopener noreferrer">
+                        <a href={`/api/r/bookmaker/${encodeURIComponent(bookie.slug)}?placement=bookmakers-page`} target="_blank" rel="noopener noreferrer">
                           Sign Up
                           <ExternalLink className="ml-1.5 h-3.5 w-3.5" />
                         </a>

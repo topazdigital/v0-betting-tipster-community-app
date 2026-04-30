@@ -8,7 +8,8 @@ const JWT_SECRET = new TextEncoder().encode(
 );
 
 const COOKIE_NAME = 'betcheza_auth';
-const COOKIE_MAX_AGE = 60 * 60 * 24 * 7; // 7 days
+const COOKIE_MAX_AGE_DEFAULT = 60 * 60 * 24 * 7; // 7 days
+const COOKIE_MAX_AGE_REMEMBER = 60 * 60 * 24 * 30; // 30 days
 
 // Password hashing
 export async function hashPassword(password: string): Promise<string> {
@@ -19,12 +20,13 @@ export async function verifyPassword(password: string, hash: string): Promise<bo
   return bcrypt.compare(password, hash);
 }
 
-// JWT token generation
-export async function generateToken(payload: AuthPayload): Promise<string> {
+// JWT token generation. Remember-me extends the JWT exp to match the cookie.
+export async function generateToken(payload: AuthPayload, options?: { rememberMe?: boolean }): Promise<string> {
+  const exp = options?.rememberMe ? '30d' : '7d';
   return new SignJWT({ ...payload })
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
-    .setExpirationTime('7d')
+    .setExpirationTime(exp)
     .sign(JWT_SECRET);
 }
 
@@ -38,16 +40,19 @@ export async function verifyToken(token: string): Promise<AuthPayload | null> {
   }
 }
 
-// Set auth cookie
-export async function setAuthCookie(payload: AuthPayload): Promise<void> {
-  const token = await generateToken(payload);
+// Set auth cookie. Pass { rememberMe: true } to extend the session to 30
+// days; otherwise it's a 7-day session (the default for register and other
+// flows where we haven't asked the user about persistence).
+export async function setAuthCookie(payload: AuthPayload, options?: { rememberMe?: boolean }): Promise<void> {
+  const rememberMe = !!options?.rememberMe;
+  const token = await generateToken(payload, { rememberMe });
   const cookieStore = await cookies();
-  
+
   cookieStore.set(COOKIE_NAME, token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
-    maxAge: COOKIE_MAX_AGE,
+    maxAge: rememberMe ? COOKIE_MAX_AGE_REMEMBER : COOKIE_MAX_AGE_DEFAULT,
     path: '/',
   });
 }

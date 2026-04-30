@@ -212,6 +212,9 @@ function LoginPanel() {
   } | null>(null);
   const [otpCode, setOtpCode] = useState('');
   const [resendNote, setResendNote] = useState('');
+  // Remember me — when checked, the auth cookie + JWT are extended to 30
+  // days. Otherwise we use the 7-day default.
+  const [rememberMe, setRememberMe] = useState(true);
   // Captcha is hidden by default — we surface it once the server flags
   // captchaRequired (typically after 3 failed attempts) so legitimate users
   // never have to solve one on the first try.
@@ -231,7 +234,7 @@ function LoginPanel() {
       captcha = r;
     }
     setIsLoading(true);
-    const result = await login(email, password, captcha);
+    const result = await login(email, password, captcha, { rememberMe });
     setIsLoading(false);
     if (!result.success) {
       setError(result.error || 'Login failed');
@@ -378,6 +381,17 @@ function LoginPanel() {
           </div>
         </div>
 
+        <label className="flex items-center gap-2 select-none cursor-pointer text-xs text-muted-foreground">
+          <input
+            type="checkbox"
+            checked={rememberMe}
+            onChange={(e) => setRememberMe(e.target.checked)}
+            disabled={isLoading}
+            className="h-3.5 w-3.5 rounded border border-input accent-primary"
+          />
+          <span>Keep me signed in for 30 days</span>
+        </label>
+
         <CaptchaChallenge ref={captchaRef} visible={captchaRequired} />
 
         <Button type="submit" size="sm" className="w-full h-8 text-xs" disabled={isLoading}>
@@ -390,18 +404,138 @@ function LoginPanel() {
             'Sign in'
           )}
         </Button>
-
-        <p className="text-center text-[10px] text-muted-foreground">
-          Demo: <code className="rounded bg-muted px-1">admin@betcheza.co.ke</code> / <code className="rounded bg-muted px-1">admin123</code>
-        </p>
       </form>
     </>
+  );
+}
+
+// In-modal panel used right after registration to confirm the email
+// address. Accepts either the 6-digit code OR a click on the link in
+// the email (handled separately by /verify-email page).
+function VerifyEmailPanel({
+  email,
+  displayName,
+  initialEmailStatus,
+  onDone,
+}: {
+  email: string;
+  displayName: string;
+  initialEmailStatus?: 'sent' | 'skipped' | 'failed';
+  onDone: () => void;
+}) {
+  const { verifyEmail, resendVerification } = useAuth();
+  const [code, setCode] = useState('');
+  const [error, setError] = useState('');
+  const [info, setInfo] = useState<string>(() => {
+    if (initialEmailStatus === 'sent') return `We sent a 6-digit code to ${email}.`;
+    if (initialEmailStatus === 'skipped') return 'Email delivery is not yet configured. Ask an admin to set SMTP, then click resend.';
+    if (initialEmailStatus === 'failed') return 'We had trouble sending the email. Try Resend below.';
+    return `Check ${email} for a 6-digit verification code.`;
+  });
+  const [submitting, setSubmitting] = useState(false);
+  const [resending, setResending] = useState(false);
+  const [done, setDone] = useState(false);
+
+  const onSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (code.length !== 6) return;
+    setError('');
+    setSubmitting(true);
+    const r = await verifyEmail(code);
+    setSubmitting(false);
+    if (r.success) {
+      setDone(true);
+      setInfo('Email verified — welcome aboard!');
+      // Auto-close after a brief moment so the user sees the success state.
+      setTimeout(onDone, 1200);
+    } else {
+      setError(r.error || 'Verification failed');
+    }
+  };
+
+  const onResend = async () => {
+    setError('');
+    setInfo('');
+    setResending(true);
+    const r = await resendVerification();
+    setResending(false);
+    if (!r.success) {
+      setError(r.error || 'Could not resend code');
+      return;
+    }
+    if (r.emailStatus === 'sent') setInfo(`A fresh code is on the way to ${email}.`);
+    else if (r.emailStatus === 'skipped') setInfo('Email delivery is not configured yet. Ask an admin to set SMTP.');
+    else setInfo('Code requested. If it does not arrive, contact support.');
+  };
+
+  return (
+    <div className="space-y-3">
+      <div className="rounded-lg border border-primary/30 bg-primary/5 p-3 text-xs leading-relaxed">
+        <p className="font-medium text-foreground">Welcome, {displayName}!</p>
+        <p className="mt-1 text-muted-foreground">
+          {info || `Check ${email} for a 6-digit verification code, or click the verify link inside.`}
+        </p>
+      </div>
+
+      {error && (
+        <div className="rounded border border-destructive/30 bg-destructive/10 p-2 text-xs text-destructive">
+          {error}
+        </div>
+      )}
+      {done && (
+        <div className="flex items-center gap-2 rounded border border-success/30 bg-success/10 p-2 text-xs text-success">
+          <CheckCircle2 className="h-3.5 w-3.5" /> Email verified. You can close this window.
+        </div>
+      )}
+
+      <form onSubmit={onSubmit} className="space-y-2">
+        <Label htmlFor="verify-code" className="text-xs">Verification code</Label>
+        <Input
+          id="verify-code"
+          inputMode="numeric"
+          autoComplete="one-time-code"
+          placeholder="123456"
+          value={code}
+          onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+          className="h-10 text-center text-xl tracking-[0.4em] font-mono"
+          disabled={submitting || done}
+        />
+        <Button type="submit" size="sm" className="w-full h-9 text-xs" disabled={submitting || code.length !== 6 || done}>
+          {submitting ? (<><Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />Verifying…</>) : 'Verify email'}
+        </Button>
+      </form>
+
+      <div className="flex items-center justify-between text-[11px]">
+        <button
+          type="button"
+          onClick={onResend}
+          disabled={resending || done}
+          className="font-medium text-primary hover:underline disabled:opacity-50"
+        >
+          {resending ? 'Sending…' : 'Resend code'}
+        </button>
+        <button
+          type="button"
+          onClick={onDone}
+          className="text-muted-foreground hover:text-foreground hover:underline"
+        >
+          I&apos;ll verify later
+        </button>
+      </div>
+    </div>
   );
 }
 
 function RegisterPanel() {
   const { register } = useAuth();
   const { close } = useAuthModal();
+  // After a successful sign-up we drop the user into the in-modal verify
+  // panel rather than closing — they still need to confirm their email.
+  const [postRegister, setPostRegister] = useState<{
+    email: string;
+    displayName: string;
+    emailStatus?: 'sent' | 'skipped' | 'failed';
+  } | null>(null);
   const [formData, setFormData] = useState({
     email: '',
     username: '',
@@ -503,13 +637,34 @@ function RegisterPanel() {
     setIsLoading(false);
 
     if (result.success) {
-      close();
+      // We deliberately don't close the modal here — the user is signed in
+      // but unverified. Show the verify panel so they can enter the code.
+      if (result.verifyRequired) {
+        setPostRegister({
+          email: formData.email,
+          displayName: formData.displayName,
+          emailStatus: result.emailStatus,
+        });
+      } else {
+        close();
+      }
     } else {
       setError(result.error || 'Registration failed');
       // Refresh the captcha so a stale answer can't be re-submitted.
       await captchaRef.current?.refresh();
     }
   };
+
+  if (postRegister) {
+    return (
+      <VerifyEmailPanel
+        email={postRegister.email}
+        displayName={postRegister.displayName}
+        initialEmailStatus={postRegister.emailStatus}
+        onDone={close}
+      />
+    );
+  }
 
   return (
     <>

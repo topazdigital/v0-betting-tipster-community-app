@@ -12,9 +12,38 @@ interface OddsComparisonProps {
   odds: Odds[];
   bookmakers: Bookmaker[];
   markets: Market[];
+  /** Optional context — when provided we attribute outbound clicks to this match. */
+  matchContext?: {
+    matchId?: string | number;
+    match?: string;
+    sport?: string;
+    league?: string;
+  };
 }
 
-export function OddsComparison({ odds, bookmakers, markets }: OddsComparisonProps) {
+function trackedHref(slug: string | undefined, opts: {
+  placement: string;
+  matchId?: string | number;
+  match?: string;
+  sport?: string;
+  league?: string;
+  market?: string;
+  selection?: string;
+  fallback?: string | null;
+}): string {
+  if (!slug) return opts.fallback || '#';
+  const qs = new URLSearchParams();
+  qs.set('placement', opts.placement);
+  if (opts.matchId !== undefined && opts.matchId !== null) qs.set('matchId', String(opts.matchId));
+  if (opts.match) qs.set('match', opts.match);
+  if (opts.sport) qs.set('sport', opts.sport);
+  if (opts.league) qs.set('league', opts.league);
+  if (opts.market) qs.set('market', opts.market);
+  if (opts.selection) qs.set('selection', opts.selection);
+  return `/api/r/bookmaker/${encodeURIComponent(slug)}?${qs.toString()}`;
+}
+
+export function OddsComparison({ odds, bookmakers, markets, matchContext }: OddsComparisonProps) {
   const { settings } = useUserSettings();
   const [selectedMarket, setSelectedMarket] = useState(markets[0]?.slug || '1x2');
 
@@ -75,7 +104,15 @@ export function OddsComparison({ odds, bookmakers, markets }: OddsComparisonProp
               >
                 {/* Bookmaker */}
                 <a
-                  href={bookmaker.affiliate_url || '#'}
+                  href={trackedHref(bookmaker.slug, {
+                    placement: 'odds-table',
+                    matchId: matchContext?.matchId,
+                    match: matchContext?.match,
+                    sport: matchContext?.sport,
+                    league: matchContext?.league,
+                    market: currentMarket?.slug,
+                    fallback: bookmaker.affiliate_url,
+                  })}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex items-center gap-2 text-sm font-medium text-foreground hover:text-primary"

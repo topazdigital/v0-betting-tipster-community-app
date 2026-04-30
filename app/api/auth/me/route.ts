@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getCurrentUser } from '@/lib/auth';
 import { mockUsers } from '@/lib/mock-data';
 import { getBalance } from '@/lib/wallet-store';
+import { isVerified } from '@/lib/email-verification-store';
 
 export async function GET() {
   try {
@@ -32,6 +33,7 @@ export async function GET() {
         avatarUrl: user.avatar_url,
         role: user.role,
         balance,
+        isEmailVerified: !!user.is_verified || isVerified(user.id),
       },
     });
   } catch {

@@ -108,7 +108,7 @@ export function Sidebar() {
             {mockBookmakers.slice(0, 4).map((bookmaker) => (
               <a
                 key={bookmaker.id}
-                href={bookmaker.affiliate_url || '#'}
+                href={`/api/r/bookmaker/${encodeURIComponent(bookmaker.slug)}?placement=sidebar`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center gap-2 rounded-md border border-border bg-background px-3 py-2 text-sm transition-colors hover:border-primary hover:bg-primary/5"

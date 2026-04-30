@@ -4,6 +4,8 @@ import { mockUsers } from '@/lib/mock-data';
 import { sendMail } from '@/lib/mailer';
 import { ipKeyFromHeaders, rateLimit } from '@/lib/rate-limit';
 import { getCaptchaProvider, recallMathAnswer, verifyCaptcha } from '@/lib/captcha';
+import { issueVerification } from '@/lib/email-verification-store';
+import { buildVerificationEmail } from '@/lib/email-templates/verification-email';
 
 export const dynamic = 'force-dynamic';
 
@@ -168,17 +170,20 @@ export async function POST(request: Request) {
     // Add to mock users (in memory only for preview)
     mockUsers.push(newUser);
 
-    // Set auth cookie
+    // Set auth cookie — user is logged in immediately, but flagged as
+    // unverified until they confirm via the email code/link.
     await setAuthCookie({
       userId: newUser.id,
       email: newUser.email,
       role: newUser.role,
     });
 
-    // Fire registration confirmation email via the admin-configured SMTP.
-    // Don't block the response on it — wrap in try/catch so any SMTP issue
-    // never fails registration. mailer.sendMail returns { skipped: true } if
-    // SMTP isn't configured yet, and logs that so admins know to set it up.
+    // Issue + send the verification email. Two ways to verify:
+    //   1) 6-digit code typed in the modal/profile.
+    //   2) Click the verify link (?token=...) in the email.
+    // SMTP failures NEVER block registration — we still tell the client
+    // "verifyRequired: true" so they can use the resend button.
+    const verification = issueVerification(newUser.id, newUser.email);
     let emailStatus: 'sent' | 'skipped' | 'failed' = 'skipped';
     try {
       const origin =
@@ -187,15 +192,23 @@ export async function POST(request: Request) {
         process.env.NEXT_PUBLIC_APP_URL ||
         'https://betcheza.com';
       const appUrl = origin.replace(/\/$/, '');
-      const { text, html } = buildRegistrationEmail({
+      const verifyUrl = `${appUrl}/verify-email?token=${encodeURIComponent(verification.token)}`;
+      // We also keep the original welcome content available in case admins
+      // ever want a separate welcome flow — silence "unused" lint by binding it.
+      void buildRegistrationEmail({
         displayName: newUser.display_name,
         username: newUser.username,
         email: newUser.email,
         appUrl,
       });
+      const { text, html } = buildVerificationEmail({
+        displayName: newUser.display_name,
+        code: verification.code,
+        verifyUrl,
+      });
       const res = await sendMail({
         to: newUser.email,
-        subject: `Welcome to Betcheza, ${newUser.display_name} 🎯`,
+        subject: 'Confirm your Betcheza email',
         text,
         html,
       });
@@ -203,12 +216,13 @@ export async function POST(request: Request) {
       else if (res.skipped) emailStatus = 'skipped';
       else emailStatus = 'failed';
     } catch (e) {
-      console.error('[auth/register] welcome email failed:', e);
+      console.error('[auth/register] verification email failed:', e);
       emailStatus = 'failed';
     }
 
     return NextResponse.json({
       success: true,
+      verifyRequired: true,
       user: {
         id: newUser.id,
         email: newUser.email,
@@ -217,6 +231,7 @@ export async function POST(request: Request) {
         avatarUrl: newUser.avatar_url,
         role: newUser.role,
         balance: newUser.balance,
+        isEmailVerified: false,
       },
       emailStatus,
     });

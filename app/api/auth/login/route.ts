@@ -42,11 +42,12 @@ export async function POST(request: Request) {
       );
     }
 
-    const { email, password, captchaToken, captchaId } = body as {
+    const { email, password, captchaToken, captchaId, rememberMe } = body as {
       email?: string;
       password?: string;
       captchaToken?: string;
       captchaId?: string;
+      rememberMe?: boolean;
     };
 
     if (!email || !password) {
@@ -138,11 +139,14 @@ export async function POST(request: Request) {
       });
     }
 
-    await setAuthCookie({
-      userId: user.id,
-      email: user.email,
-      role: user.role,
-    });
+    await setAuthCookie(
+      {
+        userId: user.id,
+        email: user.email,
+        role: user.role,
+      },
+      { rememberMe: !!rememberMe },
+    );
 
     return NextResponse.json({
       success: true,
@@ -154,6 +158,7 @@ export async function POST(request: Request) {
         avatarUrl: user.avatar_url,
         role: user.role,
         balance: user.balance,
+        isEmailVerified: !!user.is_verified,
       },
     });
   } catch (error) {

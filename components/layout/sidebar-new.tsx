@@ -472,7 +472,7 @@ export function SidebarNew({ selectedSportId, onSelectSport }: SidebarNewProps) 
               {BOOKMAKERS.filter(b => b.featured).slice(0, 4).map((bookmaker) => (
                 <a
                   key={bookmaker.id}
-                  href={bookmaker.affiliateUrl}
+                  href={`/api/r/bookmaker/${encodeURIComponent(bookmaker.slug)}?placement=sidebar`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex items-center gap-2 rounded-lg border border-sidebar-border bg-sidebar-accent/30 px-3 py-2 text-sm transition-colors hover:bg-sidebar-accent"
